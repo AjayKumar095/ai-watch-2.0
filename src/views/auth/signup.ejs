@@ -1,0 +1,77 @@
+<div class="mx-auto mt-8 max-w-xl">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Student Onboarding</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      Your account is activated once the teacher you select below approves your request.
+    </p>
+
+    <% if (error) { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+    <% } %>
+
+    <form action="/signup/student" method="POST" class="mt-6 space-y-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label" for="firstName">First name</label>
+          <input class="form-input" id="firstName" name="firstName" value="<%= formData.firstName || '' %>" required />
+        </div>
+        <div>
+          <label class="form-label" for="lastName">Last name</label>
+          <input class="form-input" id="lastName" name="lastName" value="<%= formData.lastName || '' %>" required />
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="email">Email</label>
+        <input class="form-input" type="email" id="email" name="email" value="<%= formData.email || '' %>" required />
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label" for="password">Password</label>
+          <input class="form-input" type="password" id="password" name="password" required />
+        </div>
+        <div>
+          <label class="form-label" for="rollNo">Roll number</label>
+          <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label" for="programId">Program</label>
+          <select class="form-input" id="programId" name="programId" required>
+            <option value="">Select a program</option>
+            <% programs.forEach(function(p) { %>
+              <option value="<%= p.id %>" <%= formData.programId === p.id ? 'selected' : '' %>><%= p.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="specializationId">Specialization (if any)</label>
+          <select class="form-input" id="specializationId" name="specializationId">
+            <option value="">None</option>
+            <% programs.forEach(function(p) { p.Specializations && p.Specializations.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= formData.specializationId === s.id ? 'selected' : '' %>><%= p.name %> — <%= s.name %></option>
+            <% }) }) %>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="requestedTeacherId">Request approval from</label>
+        <select class="form-input" id="requestedTeacherId" name="requestedTeacherId" required>
+          <option value="">Select a teacher</option>
+          <% teachers.forEach(function(t) { %>
+            <option value="<%= t.id %>" <%= formData.requestedTeacherId === t.id ? 'selected' : '' %>>
+              <%= t.User.firstName %> <%= t.User.lastName %> (<%= t.employeeCode %>)
+            </option>
+          <% }) %>
+        </select>
+        <p class="mt-1 text-xs text-navy-400">This teacher will see your request in their "Pending Approvals" panel.</p>
+      </div>
+
+      <button type="submit" class="btn-primary w-full">Submit request</button>
+    </form>
+  </div>
+</div>

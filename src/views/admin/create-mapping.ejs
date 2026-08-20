@@ -1,0 +1,41 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Map Teacher to Subject</h1>
+    <p class="mt-1 text-sm text-navy-500">Leave section blank to map the teacher to ALL sections of this offering.</p>
+
+    <% if (error) { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+    <% } %>
+
+    <form action="/admin/mappings/new" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Teacher</label>
+        <select class="form-input" name="teacherId" required>
+          <option value="">Select a teacher</option>
+          <% teachers.forEach(function(t) { %>
+            <option value="<%= t.id %>" <%= formData.teacherId === t.id ? 'selected' : '' %>><%= t.User.firstName %> <%= t.User.lastName %> (<%= t.employeeCode %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Subject Offering</label>
+        <select class="form-input" name="subjectOfferingId" required>
+          <option value="">Select a subject offering</option>
+          <% offerings.forEach(function(o) { %>
+            <option value="<%= o.id %>" <%= formData.subjectOfferingId === o.id ? 'selected' : '' %>><%= o.SubjectPool.name %> — <%= o.Program.name %> Sem <%= o.semesterNumber %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Section (optional — blank = all sections)</label>
+        <select class="form-input" name="sectionId">
+          <option value="">All sections</option>
+          <% sections.forEach(function(s) { %>
+            <option value="<%= s.id %>" <%= formData.sectionId === s.id ? 'selected' : '' %>><%= s.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary w-full">Create mapping</button>
+    </form>
+  </div>
+</div>

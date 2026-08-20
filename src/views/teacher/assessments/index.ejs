@@ -1,0 +1,29 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">My Assessments</h1>
+  <a href="/teacher/assessments/new" class="btn-primary">+ Create Assessment</a>
+</div>
+
+<% if (!assessments.length) { %>
+  <div class="card text-sm text-navy-400">No assessments yet.</div>
+<% } %>
+
+<div class="space-y-3">
+  <% assessments.forEach(function(a) { const c = counts[a.id]; %>
+    <div class="card flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="font-semibold text-navy-900"><%= a.title %></h2>
+        <p class="text-xs text-navy-400">
+          <%= a.SubjectOffering.SubjectPool.name %> · <%= a.SubjectOffering.Program.name %> Sem <%= a.SubjectOffering.semesterNumber %>
+          · <%= a.AssessmentSections.length %> section(s) · Due <%= new Date(a.endAt).toLocaleDateString() %>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="badge-amber"><%= c.pending %> pending</span>
+        <span class="badge-info"><%= c.total %> total</span>
+        <a href="/teacher/assessments/<%= a.id %>/submissions" class="btn-secondary !px-3 !py-1.5 text-xs">View submissions</a>
+        <a href="/teacher/assessments/<%= a.id %>/override" class="btn-ghost text-xs">Open for students</a>
+        <a href="/teacher/assessments/new?duplicateFrom=<%= a.id %>" class="btn-ghost text-xs">Duplicate</a>
+      </div>
+    </div>
+  <% }) %>
+</div>

@@ -1,0 +1,47 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Create Teacher Account</h1>
+    <p class="mt-1 text-sm text-navy-500">Only the superadmin can create teacher accounts.</p>
+
+    <% if (error) { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+    <% } %>
+
+    <form action="/admin/teachers/new" method="POST" class="mt-6 space-y-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label">First name</label>
+          <input class="form-input" name="firstName" value="<%= formData.firstName || '' %>" required />
+        </div>
+        <div>
+          <label class="form-label">Last name</label>
+          <input class="form-input" name="lastName" value="<%= formData.lastName || '' %>" required />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" name="email" value="<%= formData.email || '' %>" required />
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label">Employee code</label>
+          <input class="form-input" name="employeeCode" value="<%= formData.employeeCode || '' %>" required />
+        </div>
+        <div>
+          <label class="form-label">Designation</label>
+          <input class="form-input" name="designation" value="<%= formData.designation || '' %>" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">School</label>
+        <select class="form-input" name="schoolId" required>
+          <option value="">Select a school</option>
+          <% schools.forEach(function(s) { %>
+            <option value="<%= s.id %>"><%= s.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary w-full">Create account</button>
+    </form>
+  </div>
+</div>

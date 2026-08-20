@@ -1,0 +1,33 @@
+<header class="border-b border-navy-100 bg-navy-900">
+  <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+    <a href="/" class="flex items-center gap-2 text-lg font-bold text-white">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-navy-900">AI</span>
+      AI-Watch
+    </a>
+
+    <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+      <nav class="flex items-center gap-4">
+        <% if (currentUser.role === 'STUDENT') { %>
+          <a href="/student/dashboard" class="text-sm font-medium text-navy-100 hover:text-amber-400">Dashboard</a>
+        <% } else if (currentUser.role === 'TEACHER') { %>
+          <a href="/teacher/dashboard" class="text-sm font-medium text-navy-100 hover:text-amber-400">Dashboard</a>
+          <a href="/teacher/roster" class="text-sm font-medium text-navy-100 hover:text-amber-400">My Roster</a>
+        <% } else if (currentUser.role === 'SUPERADMIN') { %>
+          <a href="/admin/dashboard" class="text-sm font-medium text-navy-100 hover:text-amber-400">Dashboard</a>
+          <a href="/admin/teachers/new" class="text-sm font-medium text-navy-100 hover:text-amber-400">Create Teacher</a>
+        <% } %>
+        <span class="hidden text-sm text-navy-300 sm:inline"><%= currentUser.email %></span>
+        <form action="/logout" method="POST">
+          <button type="submit" class="rounded-lg border border-navy-700 px-3 py-1.5 text-sm font-medium text-navy-100 hover:bg-navy-800">
+            Log out
+          </button>
+        </form>
+      </nav>
+    <% } else { %>
+      <nav class="flex items-center gap-3">
+        <a href="/login" class="text-sm font-medium text-navy-100 hover:text-amber-400">Log in</a>
+        <a href="/signup/student" class="btn-primary">Student Sign Up</a>
+      </nav>
+    <% } %>
+  </div>
+</header>

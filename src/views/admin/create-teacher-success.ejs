@@ -1,0 +1,10 @@
+<div class="mx-auto mt-16 max-w-md text-center">
+  <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-info-100 text-info-700 text-2xl">✓</div>
+  <h1 class="text-xl font-bold text-navy-900">Teacher account created</h1>
+  <p class="mt-2 text-sm text-navy-500">
+    <%= email %> can log in with the temporary password below. (In production this is emailed automatically instead
+    of shown here — see the background job queue note in the architecture report.)
+  </p>
+  <p class="mt-4 rounded-lg bg-navy-50 px-4 py-2 font-mono text-sm text-navy-800"><%= tempPassword %></p>
+  <a href="/admin/dashboard" class="btn-secondary mt-6 inline-flex">Back to dashboard</a>
+</div>

@@ -1,0 +1,63 @@
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-navy-900"><%= assessment.title %></h1>
+  <p class="text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= assessment.maxMarks %></p>
+</div>
+
+<div class="mb-4 flex flex-wrap gap-2">
+  <a href="/teacher/assessments/<%= assessment.id %>/submissions" class="btn-<%= !activeSectionId ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">All sections</a>
+  <% sections.forEach(function(s) { %>
+    <a href="/teacher/assessments/<%= assessment.id %>/submissions?sectionId=<%= s.id %>" class="btn-<%= activeSectionId === s.id ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">Section <%= s.name %></a>
+  <% }) %>
+</div>
+
+<div class="card">
+  <form action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST">
+    <div class="mb-3 flex flex-wrap items-end gap-3 rounded-lg bg-navy-50 p-3">
+      <div>
+        <label class="form-label !mb-0.5 text-xs">Bulk marks</label>
+        <input class="form-input !py-1.5" type="number" step="0.5" name="marksObtained" placeholder="e.g. 8" />
+      </div>
+      <div class="flex-1">
+        <label class="form-label !mb-0.5 text-xs">Bulk remarks</label>
+        <input class="form-input !py-1.5" name="remarks" placeholder="Applied to all checked rows" />
+      </div>
+      <button type="submit" class="btn-primary !py-2 text-sm">Apply to selected</button>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-navy-100 text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+            <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.sub-check').forEach(c=>c.checked=this.checked)" /></th>
+            <th class="py-2 pr-3">Student</th>
+            <th class="py-2 pr-3">Section</th>
+            <th class="py-2 pr-3">Status</th>
+            <th class="py-2 pr-3">Submission</th>
+            <th class="py-2 pr-3">Evaluate</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-navy-50">
+          <% submissions.forEach(function(s) { %>
+            <tr>
+              <td class="py-2 pr-3"><input class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
+              <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
+              <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
+              <td class="py-2 pr-3">
+                <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= s.marksObtained %>/<%= assessment.maxMarks %></span>
+                <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
+              </td>
+              <td class="py-2 pr-3 text-navy-500"><%= s.url ? s.url : (s.description ? s.description.slice(0,40) : '—') %></td>
+              <td class="py-2 pr-3">
+                <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
+                  <input class="form-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained || '' %>" />
+                  <input class="form-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
+                  <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Save</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>

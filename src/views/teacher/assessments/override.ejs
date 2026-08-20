@@ -1,0 +1,36 @@
+<div class="mx-auto mt-4 max-w-2xl">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Open Submission Window</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      For <%= assessment.title %> — select students and set a new open/close window just for them
+      (e.g. missed deadline, documented extension).
+    </p>
+
+    <form action="/teacher/assessments/<%= assessment.id %>/override" method="POST" class="mt-6 space-y-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="form-label">New opens (optional)</label>
+          <input class="form-input" type="datetime-local" name="startAt" />
+        </div>
+        <div>
+          <label class="form-label">New closes (optional)</label>
+          <input class="form-input" type="datetime-local" name="endAt" />
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label">Students</label>
+        <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
+          <% enrollments.forEach(function(e) { %>
+            <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
+              <input type="checkbox" name="studentIds" value="<%= e.StudentProfile.id %>" />
+              <%= e.StudentProfile.User.firstName %> <%= e.StudentProfile.User.lastName %> (<%= e.StudentProfile.rollNo %>)
+            </label>
+          <% }) %>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-full">Apply to selected</button>
+    </form>
+  </div>
+</div>

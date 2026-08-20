@@ -1,0 +1,26 @@
+<div class="mx-auto mt-8 max-w-md">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Log in</h1>
+    <p class="mt-1 text-sm text-navy-500">Access your student, teacher, or admin dashboard.</p>
+
+    <% if (error) { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+    <% } %>
+
+    <form action="/login" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label" for="email">Email</label>
+        <input class="form-input" type="email" id="email" name="email" required autofocus />
+      </div>
+      <div>
+        <label class="form-label" for="password">Password</label>
+        <input class="form-input" type="password" id="password" name="password" required />
+      </div>
+      <button type="submit" class="btn-primary w-full">Log in</button>
+    </form>
+
+    <p class="mt-4 text-center text-sm text-navy-500">
+      New student? <a href="/signup/student" class="font-medium text-info-600 hover:text-info-700">Request an account</a>
+    </p>
+  </div>
+</div>
