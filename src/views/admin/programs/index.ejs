@@ -1,0 +1,23 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Programs</h1>
+  <a href="/admin/programs/new" class="btn-primary">+ Add Program</a>
+</div>
+<div class="space-y-3">
+  <% programs.forEach(function(p) { %>
+    <div class="card">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-semibold text-navy-900"><%= p.name %> <span class="text-xs font-normal text-navy-400">(<%= p.code %>)</span></h2>
+          <p class="text-xs text-navy-400"><%= p.School.name %> · <%= p.totalSemesters %> semesters</p>
+        </div>
+        <a href="/admin/programs/<%= p.id %>/specializations/new" class="btn-secondary !px-3 !py-1.5 text-xs">+ Specialization</a>
+      </div>
+      <% if (p.Specializations && p.Specializations.length) { %>
+        <div class="mt-2 flex flex-wrap gap-1">
+          <% p.Specializations.forEach(function(sp) { %><span class="badge-navy"><%= sp.name %></span><% }) %>
+        </div>
+      <% } %>
+    </div>
+  <% }) %>
+  <% if (!programs.length) { %><div class="card text-sm text-navy-400">No programs yet.</div><% } %>
+</div>

@@ -1,0 +1,46 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Bulk Attach Subject to Programs</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      For university-wide subjects (e.g. "AI for All") — select one subject and every program it's taught in,
+      and create all the offerings in one action.
+    </p>
+
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <% if (result) { %>
+      <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+        <%= result.createdCount %> created, <%= result.skippedCount %> already existed (of <%= result.totalRequested %> programs selected).
+      </div>
+    <% } %>
+
+    <form action="/admin/subject-offerings/bulk-attach" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Subject</label>
+        <select class="form-input" name="subjectId" required>
+          <option value="">Select a subject</option>
+          <% subjects.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %> (<%= s.code %>)</option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">Semester number</label><input class="form-input" type="number" name="semesterNumber" min="1" required /></div>
+      <div>
+        <label class="form-label">Academic Session</label>
+        <select class="form-input" name="academicSessionId" required>
+          <option value="">Select a session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Programs (select all that apply)</label>
+        <div class="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
+          <% programs.forEach(function(p) { %>
+            <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
+              <input type="checkbox" name="programIds" value="<%= p.id %>" />
+              <%= p.name %>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-full">Attach to selected programs</button>
+    </form>
+  </div>
+</div>

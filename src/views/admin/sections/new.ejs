@@ -1,0 +1,36 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Add Section / Sub-Group</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      A Section is a top-level class (e.g. "A"). A Sub-Group sits under a Section (e.g. "A - PG1"),
+      for classes split into smaller practical/lab groups.
+    </p>
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <form action="/admin/sections/new" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Program Offering</label>
+        <select class="form-input" name="programOfferingId" required>
+          <option value="">Select a program offering</option>
+          <% offerings.forEach(function(o) { %><option value="<%= o.id %>"><%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.AcademicSession.label %>)</option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Kind</label>
+        <select class="form-input" name="kind" id="kindSelect" onchange="document.getElementById('parentWrap').style.display = this.value === 'GROUP' ? 'block' : 'none'">
+          <option value="SECTION">Section (top-level)</option>
+          <option value="GROUP">Sub-Group (under a Section)</option>
+        </select>
+      </div>
+      <div id="parentWrap" style="display:none">
+        <label class="form-label">Parent Section</label>
+        <select class="form-input" name="parentSectionId">
+          <option value="">Select the parent Section</option>
+          <% topSections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.ProgramOffering.Program ? s.ProgramOffering.Program.name + ' — ' : '' %>Section <%= s.name %></option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">Name</label><input class="form-input" name="name" placeholder="A  or  PG1" value="<%= formData.name || '' %>" required /></div>
+      <div><label class="form-label">Capacity (optional)</label><input class="form-input" type="number" name="capacity" /></div>
+      <button type="submit" class="btn-primary w-full">Create</button>
+    </form>
+  </div>
+</div>

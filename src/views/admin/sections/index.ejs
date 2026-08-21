@@ -1,0 +1,29 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Sections & Sub-Groups</h1>
+  <a href="/admin/sections/new" class="btn-primary">+ Add Section / Sub-Group</a>
+</div>
+<div class="space-y-4">
+  <% offerings.forEach(function(o) { %>
+    <div class="card">
+      <h2 class="font-semibold text-navy-900"><%= o.Program.name %> — Semester <%= o.semesterNumber %> <span class="text-xs font-normal text-navy-400">(<%= o.AcademicSession.label %>)</span></h2>
+      <% if (o.Sections && o.Sections.length) { %>
+        <div class="mt-3 space-y-2">
+          <% o.Sections.forEach(function(sec) { %>
+            <div class="rounded-lg border border-navy-100 p-2">
+              <span class="font-medium text-navy-800">Section <%= sec.name %></span>
+              <% if (sec.capacity) { %><span class="text-xs text-navy-400"> · capacity <%= sec.capacity %></span><% } %>
+              <% if (sec.subGroups && sec.subGroups.length) { %>
+                <div class="ml-4 mt-1 flex flex-wrap gap-1">
+                  <% sec.subGroups.forEach(function(g) { %><span class="badge-info"><%= g.name %></span><% }) %>
+                </div>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="mt-2 text-sm text-navy-400">No sections yet for this offering.</p>
+      <% } %>
+    </div>
+  <% }) %>
+  <% if (!offerings.length) { %><div class="card text-sm text-navy-400">No program offerings yet — create one first.</div><% } %>
+</div>

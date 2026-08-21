@@ -1,0 +1,38 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Add Subject Offering</h1>
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <form action="/admin/subject-offerings/new" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Subject</label>
+        <select class="form-input" name="subjectId" required>
+          <option value="">Select a subject</option>
+          <% subjects.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %> (<%= s.code %>)</option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Program</label>
+        <select class="form-input" name="programId" required>
+          <option value="">Select a program</option>
+          <% programs.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">Semester number</label><input class="form-input" type="number" name="semesterNumber" min="1" required /></div>
+      <div>
+        <label class="form-label">Specialization (optional)</label>
+        <select class="form-input" name="specializationId">
+          <option value="">None (all specializations)</option>
+          <% specializations.forEach(function(sp) { %><option value="<%= sp.id %>"><%= sp.Program.name %> — <%= sp.name %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Academic Session</label>
+        <select class="form-input" name="academicSessionId" required>
+          <option value="">Select a session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary w-full">Create offering</button>
+    </form>
+  </div>
+</div>

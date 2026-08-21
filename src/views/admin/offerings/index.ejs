@@ -1,0 +1,16 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Program Offerings</h1>
+  <a href="/admin/offerings/new" class="btn-primary">+ Add Offering</a>
+</div>
+<div class="space-y-3">
+  <% offerings.forEach(function(o) { %>
+    <div class="card flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 class="font-semibold text-navy-900"><%= o.Program.name %> — Semester <%= o.semesterNumber %></h2>
+        <p class="text-xs text-navy-400"><%= o.AcademicSession.label %></p>
+      </div>
+      <span class="badge-navy"><%= o.Sections ? o.Sections.length : 0 %> section(s)</span>
+    </div>
+  <% }) %>
+  <% if (!offerings.length) { %><div class="card text-sm text-navy-400">No program offerings yet.</div><% } %>
+</div>

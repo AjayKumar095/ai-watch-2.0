@@ -169,3 +169,15 @@ exports.autoEnroll = async (req, res) => {
     result: { offeringName: offering.SubjectPool.name, created, skipped, total: matchingStudents.length },
   });
 };
+
+exports.listMappings = async (req, res) => {
+  const mappings = await TeacherSubjectMapping.findAll({
+    include: [
+      { model: TeacherProfile, include: [User] },
+      { model: SubjectOffering, include: [SubjectPool, Program] },
+      Section,
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+  res.render("admin/mappings/index", { title: "Teacher-Subject Mappings", mappings });
+};

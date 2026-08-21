@@ -1,0 +1,19 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Add Program</h1>
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <form action="/admin/programs/new" method="POST" class="mt-6 space-y-4">
+      <div><label class="form-label">Name</label><input class="form-input" name="name" value="<%= formData.name || '' %>" required /></div>
+      <div><label class="form-label">Code</label><input class="form-input" name="code" value="<%= formData.code || '' %>" required /></div>
+      <div>
+        <label class="form-label">School</label>
+        <select class="form-input" name="schoolId" required>
+          <option value="">Select a school</option>
+          <% schools.forEach(function(s) { %><option value="<%= s.id %>" <%= formData.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">Total semesters</label><input class="form-input" type="number" name="totalSemesters" min="1" max="12" value="<%= formData.totalSemesters || '' %>" required /></div>
+      <button type="submit" class="btn-primary w-full">Create program</button>
+    </form>
+  </div>
+</div>

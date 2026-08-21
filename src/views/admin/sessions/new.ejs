@@ -1,0 +1,14 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Add Academic Session</h1>
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <form action="/admin/sessions/new" method="POST" class="mt-6 space-y-4">
+      <div><label class="form-label">Label</label><input class="form-input" name="label" placeholder="2026-2027" value="<%= formData.label || '' %>" required /></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="form-label">Start date</label><input class="form-input" type="date" name="startDate" required /></div>
+        <div><label class="form-label">End date</label><input class="form-input" type="date" name="endDate" required /></div>
+      </div>
+      <button type="submit" class="btn-primary w-full">Create session</button>
+    </form>
+  </div>
+</div>

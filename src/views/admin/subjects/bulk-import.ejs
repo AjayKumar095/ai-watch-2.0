@@ -1,0 +1,30 @@
+<div class="mx-auto mt-4 max-w-2xl">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Bulk Import Subjects</h1>
+    <p class="mt-1 text-sm text-navy-500">Paste CSV with columns: name, code, category (UNIVERSITY_WIDE or PROGRAM_SPECIFIC — optional, defaults to University-Wide).</p>
+
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+
+    <% if (result) { %>
+      <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+        <%= result.created.length %> created, <%= result.skipped.length %> skipped.
+      </div>
+      <% if (result.skipped.length) { %>
+        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <strong>Skipped rows:</strong>
+          <ul class="mt-1 list-disc pl-4">
+            <% result.skipped.forEach(function(s) { %><li><%= s.line %> — <%= s.reason %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+    <% } %>
+
+    <form action="/admin/subjects/bulk-import" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">CSV data</label>
+        <textarea class="form-input font-mono text-xs" name="csvText" rows="8" placeholder="name,code,category&#10;AI for All,GEN-AI-101,UNIVERSITY_WIDE&#10;Corporate Finance,FIN-301,PROGRAM_SPECIFIC"></textarea>
+      </div>
+      <button type="submit" class="btn-primary w-full">Import</button>
+    </form>
+  </div>
+</div>

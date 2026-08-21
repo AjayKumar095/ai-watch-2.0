@@ -1,0 +1,12 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Add Specialization</h1>
+    <p class="mt-1 text-sm text-navy-500">For <%= program.name %></p>
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <form action="/admin/programs/<%= program.id %>/specializations/new" method="POST" class="mt-6 space-y-4">
+      <div><label class="form-label">Name</label><input class="form-input" name="name" value="<%= formData.name || '' %>" required /></div>
+      <div><label class="form-label">Description (optional)</label><textarea class="form-input" name="description" rows="2"><%= formData.description || '' %></textarea></div>
+      <button type="submit" class="btn-primary w-full">Add specialization</button>
+    </form>
+  </div>
+</div>
