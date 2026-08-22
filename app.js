@@ -63,6 +63,9 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
+  if (err && err.message && (err.code === "LIMIT_FILE_SIZE" || /csv/i.test(err.message))) {
+    return res.status(400).render("error", { title: "Upload problem", message: err.message });
+  }
   res.status(500).render("error", { title: "Something went wrong", message: "An unexpected error occurred." });
 });
 

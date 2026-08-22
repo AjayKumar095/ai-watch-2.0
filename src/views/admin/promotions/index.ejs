@@ -1,0 +1,19 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Promotion Batches</h1>
+  <a href="/admin/promotions/new" class="btn-primary">+ Run Promotion</a>
+</div>
+<div class="space-y-3">
+  <% batches.forEach(function(b) { %>
+    <div class="card flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 class="font-semibold text-navy-900"><%= b.Program.name %></h2>
+        <p class="text-xs text-navy-400"><%= b.fromSession.label %> → <%= b.toSession.label %> · <%= new Date(b.executedAt).toLocaleString() %></p>
+      </div>
+      <div class="flex gap-2">
+        <span class="badge-info"><%= b.PromotionRecords.filter(r => r.result === 'PROMOTED').length %> promoted</span>
+        <span class="badge-amber"><%= b.PromotionRecords.filter(r => r.result === 'GRADUATED').length %> graduated</span>
+      </div>
+    </div>
+  <% }) %>
+  <% if (!batches.length) { %><div class="card text-sm text-navy-400">No promotion batches yet.</div><% } %>
+</div>

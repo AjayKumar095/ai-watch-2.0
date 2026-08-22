@@ -15,6 +15,9 @@ const {
   User,
 } = require("../models");
 
+const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
+const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
+
 async function loadTeacherProfile(req) {
   return TeacherProfile.findOne({ where: { userId: req.currentUser.id } });
 }
@@ -65,7 +68,7 @@ exports.list = async (req, res) => {
     };
   }
 
-  res.render("teacher/assessments/index", { title: "My Assessments", assessments, counts });
+  res.render("teacher/assessments/index", { title: "My Assessments", assessments, counts, breadcrumbs: [ROOT, { label: "Assessments" }] });
 };
 
 exports.showCreate = async (req, res) => {
@@ -80,7 +83,7 @@ exports.showCreate = async (req, res) => {
     }
   }
 
-  res.render("teacher/assessments/new", { title: "Create Assessment", targetOptions, error: null, formData: prefill });
+  res.render("teacher/assessments/new", { title: "Create Assessment", targetOptions, error: null, formData: prefill, breadcrumbs: [ROOT, ASSESSMENTS, { label: "Create Assessment" }] });
 };
 
 exports.create = async (req, res) => {
@@ -91,8 +94,9 @@ exports.create = async (req, res) => {
   let targets = req.body.targets || []; // format: "<subjectOfferingId>:<sectionId>"
   if (!Array.isArray(targets)) targets = [targets];
 
+  const breadcrumbs = [ROOT, ASSESSMENTS, { label: "Create Assessment" }];
   const rerender = (error) =>
-    res.status(400).render("teacher/assessments/new", { title: "Create Assessment", targetOptions, error, formData: req.body });
+    res.status(400).render("teacher/assessments/new", { title: "Create Assessment", targetOptions, error, formData: req.body, breadcrumbs });
 
   if (!title || !startAt || !endAt || !maxMarks || !targets.length) {
     return rerender("Please fill in all fields and select at least one section to target.");
@@ -146,7 +150,7 @@ exports.showOverride = async (req, res) => {
     include: [{ model: StudentProfile, include: [User] }],
   });
 
-  res.render("teacher/assessments/override", { title: "Open Submission Window", assessment, enrollments });
+  res.render("teacher/assessments/override", { title: "Open Submission Window", assessment, enrollments, breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Open Submission Window" }] });
 };
 
 exports.applyOverride = async (req, res) => {

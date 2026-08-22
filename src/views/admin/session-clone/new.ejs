@@ -1,0 +1,45 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Clone Academic Session Forward</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      Clones this program's offerings, sections, sub-groups, subject offerings, and teacher mappings from one
+      session into a new one. Review and adjust individual teacher assignments afterwards.
+    </p>
+
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+    <% if (result) { %>
+      <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+        Cloned: <%= result.offerings %> offering(s), <%= result.sections %> section(s)/sub-group(s),
+        <%= result.subjectOfferings %> subject offering(s), <%= result.mappings %> teacher mapping(s).
+        <% if (result.skipped.length) { %>
+          <div class="mt-2 text-xs text-amber-700"><strong>Skipped:</strong> <%= result.skipped.join('; ') %></div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <form action="/admin/session-clone" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Program</label>
+        <select class="form-input" name="programId" required>
+          <option value="">Select a program</option>
+          <% programs.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">From session</label>
+        <select class="form-input" name="fromSessionId" required>
+          <option value="">Select source session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">To session</label>
+        <select class="form-input" name="toSessionId" required>
+          <option value="">Select target session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary w-full">Clone forward</button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+<div class="mx-auto mt-4 max-w-2xl">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Preview Promotion</h1>
+    <p class="mt-1 text-sm text-navy-500">Preview first — nothing is changed until you commit, and you can exclude specific students (held back / on backlog) before committing.</p>
+
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+
+    <form action="/admin/promotions/preview" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Program</label>
+        <select class="form-input" name="programId" required>
+          <option value="">Select a program</option>
+          <% programs.forEach(function(p) { %><option value="<%= p.id %>" <%= preview && preview.programId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">From semester number</label><input class="form-input" type="number" name="fromSemesterNumber" min="1" value="<%= preview ? preview.fromSemesterNumber : '' %>" required /></div>
+      <div>
+        <label class="form-label">From session (current)</label>
+        <select class="form-input" name="fromSessionId" required>
+          <option value="">Select session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= preview && preview.fromSessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">To session (next)</label>
+        <select class="form-input" name="toSessionId" required>
+          <option value="">Select session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= preview && preview.toSessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-secondary w-full">Preview</button>
+    </form>
+
+    <% if (preview) { %>
+      <div class="mt-6 border-t border-navy-100 pt-6">
+        <h2 class="text-sm font-semibold text-navy-800">
+          <%= preview.students.length %> active student(s) in <%= preview.program.name %> Semester <%= preview.fromSemesterNumber %>
+          — will <%= preview.willGraduate ? 'GRADUATE' : 'move to Semester ' + preview.toSemesterNumber %>
+        </h2>
+
+        <% if (!preview.students.length) { %>
+          <p class="mt-2 text-sm text-navy-400">No matching students found.</p>
+        <% } else { %>
+          <form action="/admin/promotions/commit" method="POST" class="mt-3">
+            <input type="hidden" name="programId" value="<%= preview.programId %>" />
+            <input type="hidden" name="fromSemesterNumber" value="<%= preview.fromSemesterNumber %>" />
+            <input type="hidden" name="fromSessionId" value="<%= preview.fromSessionId %>" />
+            <input type="hidden" name="toSessionId" value="<%= preview.toSessionId %>" />
+
+            <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
+              <% preview.students.forEach(function(s) { %>
+                <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
+                  <input type="checkbox" name="studentIds" value="<%= s.id %>" checked />
+                  <%= s.User.firstName %> <%= s.User.lastName %> (<%= s.rollNo %>)
+                </label>
+              <% }) %>
+            </div>
+            <p class="mt-2 text-xs text-navy-400">Uncheck any student who should NOT be promoted (held back / backlog).</p>
+            <button type="submit" class="btn-primary mt-4 w-full"><%= preview.willGraduate ? 'Commit: Graduate selected students' : 'Commit: Promote selected students' %></button>
+          </form>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

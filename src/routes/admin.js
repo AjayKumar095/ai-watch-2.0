@@ -8,6 +8,11 @@ const academicSessionController = require("../controllers/academicSessionControl
 const programOfferingController = require("../controllers/programOfferingController");
 const sectionController = require("../controllers/sectionController");
 const subjectOfferingController = require("../controllers/subjectOfferingController");
+const sessionCloneController = require("../controllers/sessionCloneController");
+const promotionController = require("../controllers/promotionController");
+const certificateController = require("../controllers/certificateController");
+const auditLogController = require("../controllers/auditLogController");
+const upload = require("../middleware/upload");
 
 router.use(requireAuth, requireRole("SUPERADMIN"));
 
@@ -40,7 +45,7 @@ router.get("/subjects", subjectPoolController.list);
 router.get("/subjects/new", subjectPoolController.showCreate);
 router.post("/subjects/new", subjectPoolController.create);
 router.get("/subjects/bulk-import", subjectPoolController.showBulkImport);
-router.post("/subjects/bulk-import", subjectPoolController.bulkImport);
+router.post("/subjects/bulk-import", upload.single("csvFile"), subjectPoolController.bulkImport);
 
 // Academic Sessions
 router.get("/sessions", academicSessionController.list);
@@ -63,5 +68,24 @@ router.get("/subject-offerings/new", subjectOfferingController.showCreate);
 router.post("/subject-offerings/new", subjectOfferingController.create);
 router.get("/subject-offerings/bulk-attach", subjectOfferingController.showBulkAttach);
 router.post("/subject-offerings/bulk-attach", subjectOfferingController.bulkAttach);
+
+// Session Clone Forward
+router.get("/session-clone", sessionCloneController.showClone);
+router.post("/session-clone", sessionCloneController.clone);
+
+// Promotions
+router.get("/promotions", promotionController.list);
+router.get("/promotions/new", promotionController.showPreviewForm);
+router.post("/promotions/preview", promotionController.preview);
+router.post("/promotions/commit", promotionController.commit);
+
+// Certificates
+router.get("/certificates", certificateController.list);
+router.get("/certificates/new", certificateController.showGenerate);
+router.post("/certificates/check", certificateController.checkAndPreview);
+router.post("/certificates/generate", certificateController.generate);
+
+// Audit Log
+router.get("/audit-log", auditLogController.list);
 
 module.exports = router;

@@ -1,5 +1,8 @@
 const { Section, ProgramOffering, Program, AcademicSession, AuditLog } = require("../models");
 
+const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
+const SECTIONS = { label: "Sections & Sub-Groups", url: "/admin/sections" };
+
 exports.list = async (req, res) => {
   const offerings = await ProgramOffering.findAll({
     include: [
@@ -9,20 +12,21 @@ exports.list = async (req, res) => {
     ],
     order: [["semesterNumber", "ASC"]],
   });
-  res.render("admin/sections/index", { title: "Sections & Sub-Groups", offerings });
+  res.render("admin/sections/index", { title: "Sections & Sub-Groups", offerings, breadcrumbs: [ROOT, { label: "Sections & Sub-Groups" }] });
 };
 
 exports.showCreate = async (req, res) => {
   const offerings = await ProgramOffering.findAll({ include: [Program, AcademicSession] });
   const topSections = await Section.findAll({ where: { parentSectionId: null }, include: [{ model: ProgramOffering, include: [Program] }] });
-  res.render("admin/sections/new", { title: "Add Section / Sub-Group", offerings, topSections, error: null, formData: {} });
+  res.render("admin/sections/new", { title: "Add Section / Sub-Group", offerings, topSections, error: null, formData: {}, breadcrumbs: [ROOT, SECTIONS, { label: "Add Section / Sub-Group" }] });
 };
 
 exports.create = async (req, res) => {
   const { programOfferingId, name, kind, parentSectionId, capacity } = req.body;
   const offerings = await ProgramOffering.findAll({ include: [Program, AcademicSession] });
   const topSections = await Section.findAll({ where: { parentSectionId: null }, include: [{ model: ProgramOffering, include: [Program] }] });
-  const rerender = (error) => res.status(400).render("admin/sections/new", { title: "Add Section / Sub-Group", offerings, topSections, error, formData: req.body });
+  const breadcrumbs = [ROOT, SECTIONS, { label: "Add Section / Sub-Group" }];
+  const rerender = (error) => res.status(400).render("admin/sections/new", { title: "Add Section / Sub-Group", offerings, topSections, error, formData: req.body, breadcrumbs });
 
   if (!programOfferingId || !name) return rerender("Program offering and name are required.");
   if (kind === "GROUP" && !parentSectionId) return rerender("A sub-group needs a parent Section selected.");

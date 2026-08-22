@@ -51,9 +51,20 @@ Use `sequelize-cli` migrations for the real cutover rather than `sync()` in prod
 ## What's implemented
 
 - JWT auth (access + refresh, rotation, httpOnly/sameSite cookies)
+- Breadcrumb navigation across admin, teacher, and student pages
 - Student onboarding with teacher-approval-request routing (replaces "class in-charge")
 - Superadmin: create teacher accounts, map teacher→subject→section (with conflict flag),
   auto-enroll students into a subject offering
+- Superadmin CRUD: Schools, Programs + Specializations, Academic Sessions,
+  Program Offerings, Sections & Sub-Groups (hierarchical), Subject Pool
+  (including CSV file upload + paste-text bulk import), Subject Offerings
+  (including bulk-attach one subject across many programs at once)
+- Superadmin workflows: Session Clone-Forward (clones offerings/sections/
+  subject-offerings/mappings into a new academic session), Promotion engine
+  (preview → commit, with per-student exclusion for held-back cases,
+  auto-graduates students past their program's final semester), Certificate
+  generation (with an eligibility check gating on all assessments evaluated),
+  Audit Log viewer (filterable by action)
 - Teacher: dashboard, roster (grouped by subject/program/section), pending-approvals
   panel with bulk approve, assessment creation (multi-section + bulk-across-programs),
   duplicate-as-template, submissions view (filter by section), single + bulk evaluate,
@@ -61,11 +72,11 @@ Use `sequelize-cli` migrations for the real cutover rather than `sync()` in prod
 - Student: dashboard, assessment detail + submit (link-based; swap for signed
   object-storage upload in production per the architecture report)
 
-## Not yet built (see architecture report for the full plan)
+## Not yet built
 
-- Subject pool bulk CSV import
-- Promotion engine (preview → commit)
-- Certificate generation
-- Academic-session bulk-clone-forward tooling
-- Admin CRUD screens for School/Program/Specialization/AcademicSession/Section
-  (currently created via `scripts/seed.js` — same pattern, just needs forms)
+- Admin CRUD for editing/deleting existing records (currently create + list;
+  edit/delete follow the same pattern, just not scaffolded yet)
+- Real email delivery for credentials/notifications (currently shown on-screen;
+  swap in a background job queue + transactional email provider per the
+  architecture report §4.2)
+- Signed object-storage uploads for submissions (currently a plain URL field)

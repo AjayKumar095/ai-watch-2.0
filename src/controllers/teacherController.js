@@ -14,6 +14,8 @@ const {
 } = require("../models");
 const { hashPassword } = require("../utils/password");
 
+const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
+
 async function loadTeacherProfile(req) {
   return TeacherProfile.findOne({ where: { userId: req.currentUser.id } });
 }
@@ -48,6 +50,7 @@ exports.dashboard = async (req, res) => {
     mappings,
     assessmentCount,
     pendingEvalCount,
+    breadcrumbs: [{ label: "Dashboard" }],
   });
 };
 
@@ -78,7 +81,7 @@ exports.roster = async (req, res) => {
     };
   }
 
-  res.render("teacher/roster", { title: "My Roster", grouped: Object.values(grouped) });
+  res.render("teacher/roster", { title: "My Roster", grouped: Object.values(grouped), breadcrumbs: [ROOT, { label: "My Roster" }] });
 };
 
 exports.approveRequest = async (req, res) => {

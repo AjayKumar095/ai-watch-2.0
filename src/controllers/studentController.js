@@ -11,6 +11,8 @@ const {
   Section,
 } = require("../models");
 
+const ROOT = { label: "Dashboard", url: "/student/dashboard" };
+
 exports.dashboard = async (req, res) => {
   const studentProfile = await StudentProfile.findOne({
     where: { userId: req.currentUser.id },
@@ -40,6 +42,7 @@ exports.dashboard = async (req, res) => {
     assessments,
     submissionByAssessment,
     certificates,
+    breadcrumbs: [{ label: "Dashboard" }],
   });
 };
 
@@ -64,7 +67,7 @@ exports.showAssessment = async (req, res) => {
   const existingSubmission = await Submission.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
   const override = await AssessmentStudentOverride.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
 
-  res.render("student/assessment-detail", { title: assessment.title, assessment, enrollment, existingSubmission, override, error: null });
+  res.render("student/assessment-detail", { title: assessment.title, assessment, enrollment, existingSubmission, override, error: null, breadcrumbs: [ROOT, { label: assessment.title }] });
 };
 
 exports.submitAssessment = async (req, res) => {

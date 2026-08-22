@@ -1,11 +1,14 @@
 const { SubjectOffering, SubjectPool, Program, Specialization, AcademicSession, AuditLog } = require("../models");
 
+const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
+const OFFERINGS = { label: "Subject Offerings", url: "/admin/subject-offerings" };
+
 exports.list = async (req, res) => {
   const offerings = await SubjectOffering.findAll({
     include: [SubjectPool, Program, Specialization, AcademicSession],
     order: [["semesterNumber", "ASC"]],
   });
-  res.render("admin/subject-offerings/index", { title: "Subject Offerings", offerings });
+  res.render("admin/subject-offerings/index", { title: "Subject Offerings", offerings, breadcrumbs: [ROOT, { label: "Subject Offerings" }] });
 };
 
 exports.showCreate = async (req, res) => {
@@ -15,7 +18,7 @@ exports.showCreate = async (req, res) => {
     AcademicSession.findAll({ where: { isActive: true } }),
     Specialization.findAll({ include: [Program] }),
   ]);
-  res.render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error: null, formData: {} });
+  res.render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error: null, formData: {}, breadcrumbs: [ROOT, OFFERINGS, { label: "Add Offering" }] });
 };
 
 exports.create = async (req, res) => {
@@ -26,8 +29,9 @@ exports.create = async (req, res) => {
     AcademicSession.findAll({ where: { isActive: true } }),
     Specialization.findAll({ include: [Program] }),
   ]);
+  const breadcrumbs = [ROOT, OFFERINGS, { label: "Add Offering" }];
   const rerender = (error) =>
-    res.status(400).render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error, formData: req.body });
+    res.status(400).render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error, formData: req.body, breadcrumbs });
 
   if (!subjectId || !programId || !semesterNumber || !academicSessionId) return rerender("Subject, program, semester, and session are required.");
 
@@ -56,7 +60,7 @@ exports.showBulkAttach = async (req, res) => {
     Program.findAll({ where: { isActive: true } }),
     AcademicSession.findAll({ where: { isActive: true } }),
   ]);
-  res.render("admin/subject-offerings/bulk-attach", { title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null, error: null });
+  res.render("admin/subject-offerings/bulk-attach", { title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null, error: null, breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }] });
 };
 
 exports.bulkAttach = async (req, res) => {
@@ -74,6 +78,7 @@ exports.bulkAttach = async (req, res) => {
     return res.status(400).render("admin/subject-offerings/bulk-attach", {
       title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null,
       error: "Subject, semester, session, and at least one program are required.",
+      breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
     });
   }
 
@@ -100,5 +105,6 @@ exports.bulkAttach = async (req, res) => {
     title: "Bulk Attach Subject to Programs", subjects, programs, sessions,
     result: { createdCount: created.length, skippedCount: skipped.length, totalRequested: programIds.length },
     error: null,
+    breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
   });
 };

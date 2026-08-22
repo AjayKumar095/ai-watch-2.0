@@ -1,0 +1,30 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Audit Log</h1>
+</div>
+
+<div class="mb-4 flex flex-wrap gap-2">
+  <a href="/admin/audit-log" class="btn-<%= !activeAction ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">All</a>
+  <% actions.forEach(function(a) { %>
+    <a href="/admin/audit-log?action=<%= a %>" class="btn-<%= activeAction === a ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs"><%= a %></a>
+  <% }) %>
+</div>
+
+<div class="card">
+  <table class="min-w-full divide-y divide-navy-100 text-sm">
+    <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+      <th class="py-2 pr-3">When</th><th class="py-2 pr-3">By</th><th class="py-2 pr-3">Action</th><th class="py-2 pr-3">Entity</th><th class="py-2 pr-3">Details</th>
+    </tr></thead>
+    <tbody class="divide-y divide-navy-50">
+      <% logs.forEach(function(l) { %>
+        <tr>
+          <td class="py-2 pr-3 whitespace-nowrap text-navy-400"><%= new Date(l.createdAt).toLocaleString() %></td>
+          <td class="py-2 pr-3 text-navy-600"><%= l.User ? l.User.firstName + ' ' + l.User.lastName : '—' %></td>
+          <td class="py-2 pr-3"><span class="badge-navy"><%= l.action %></span></td>
+          <td class="py-2 pr-3 text-navy-500"><%= l.entityType %> <span class="text-navy-300">#<%= (l.entityId || '').toString().slice(0,8) %></span></td>
+          <td class="py-2 pr-3 font-mono text-xs text-navy-400"><%= l.metadata ? JSON.stringify(l.metadata) : '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!logs.length) { %><tr><td colspan="5" class="py-4 text-navy-400">No audit entries yet.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>

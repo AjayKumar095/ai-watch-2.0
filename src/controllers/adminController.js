@@ -11,6 +11,8 @@ const {
 const { hashPassword } = require("../utils/password");
 const crypto = require("crypto");
 
+const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
+
 exports.dashboard = async (req, res) => {
   const [teacherCount, studentCount, schoolCount, programCount, subjectCount, sessionCount] = await Promise.all([
     TeacherProfile.count(),
@@ -24,19 +26,21 @@ exports.dashboard = async (req, res) => {
   res.render("admin/dashboard", {
     title: "Superadmin Dashboard",
     stats: { teacherCount, studentCount, schoolCount, programCount, subjectCount, sessionCount },
+    breadcrumbs: [{ label: "Dashboard" }],
   });
 };
 
 exports.showCreateTeacher = async (req, res) => {
   const schools = await School.findAll({ where: { isActive: true } });
-  res.render("admin/create-teacher", { title: "Create Teacher Account", schools, error: null, formData: {} });
+  res.render("admin/create-teacher", { title: "Create Teacher Account", schools, error: null, formData: {}, breadcrumbs: [ROOT, { label: "Create Teacher" }] });
 };
 
 exports.createTeacher = async (req, res) => {
   const { email, firstName, lastName, employeeCode, schoolId, designation } = req.body;
   const schools = await School.findAll({ where: { isActive: true } });
+  const breadcrumbs = [ROOT, { label: "Create Teacher" }];
   const rerender = (error) =>
-    res.status(400).render("admin/create-teacher", { title: "Create Teacher Account", schools, error, formData: req.body });
+    res.status(400).render("admin/create-teacher", { title: "Create Teacher Account", schools, error, formData: req.body, breadcrumbs });
 
   if (!email || !firstName || !lastName || !employeeCode || !schoolId) {
     return rerender("Please fill in all required fields.");
@@ -69,7 +73,7 @@ exports.createTeacher = async (req, res) => {
     metadata: { email },
   });
 
-  res.render("admin/create-teacher-success", { title: "Teacher Created", email, tempPassword });
+  res.render("admin/create-teacher-success", { title: "Teacher Created", email, tempPassword, breadcrumbs: [ROOT, { label: "Create Teacher" }] });
 };
 
 // ---------------------------------------------------------------------------
@@ -90,7 +94,7 @@ exports.showCreateMapping = async (req, res) => {
     SubjectOffering.findAll({ include: [SubjectPool, Program] }),
     Section.findAll(),
   ]);
-  res.render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error: null, formData: {} });
+  res.render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error: null, formData: {}, breadcrumbs: [ROOT, { label: "Teacher Mappings", url: "/admin/mappings" }, { label: "Add Mapping" }] });
 };
 
 exports.createMapping = async (req, res) => {
@@ -100,8 +104,9 @@ exports.createMapping = async (req, res) => {
     SubjectOffering.findAll({ include: [SubjectPool, Program] }),
     Section.findAll(),
   ]);
+  const breadcrumbs = [ROOT, { label: "Teacher Mappings", url: "/admin/mappings" }, { label: "Add Mapping" }];
   const rerender = (error, status = 400) =>
-    res.status(status).render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error, formData: req.body });
+    res.status(status).render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error, formData: req.body, breadcrumbs });
 
   if (!teacherId || !subjectOfferingId) return rerender("Please select both a teacher and a subject offering.");
 
@@ -134,7 +139,7 @@ exports.createMapping = async (req, res) => {
 
 exports.showEnroll = async (req, res) => {
   const offerings = await SubjectOffering.findAll({ include: [SubjectPool, Program] });
-  res.render("admin/enroll", { title: "Enroll Students", offerings, result: null });
+  res.render("admin/enroll", { title: "Enroll Students", offerings, result: null, breadcrumbs: [ROOT, { label: "Enroll Students" }] });
 };
 
 exports.autoEnroll = async (req, res) => {
@@ -167,6 +172,7 @@ exports.autoEnroll = async (req, res) => {
     title: "Enroll Students",
     offerings,
     result: { offeringName: offering.SubjectPool.name, created, skipped, total: matchingStudents.length },
+    breadcrumbs: [ROOT, { label: "Enroll Students" }],
   });
 };
 
@@ -179,5 +185,5 @@ exports.listMappings = async (req, res) => {
     ],
     order: [["createdAt", "DESC"]],
   });
-  res.render("admin/mappings/index", { title: "Teacher-Subject Mappings", mappings });
+  res.render("admin/mappings/index", { title: "Teacher-Subject Mappings", mappings, breadcrumbs: [ROOT, { label: "Teacher Mappings" }] });
 };

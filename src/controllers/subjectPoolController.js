@@ -1,17 +1,22 @@
+const { parse } = require("csv-parse/sync");
 const { SubjectPool, AuditLog } = require("../models");
+
+const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
+const SUBJECTS = { label: "Subject Pool", url: "/admin/subjects" };
 
 exports.list = async (req, res) => {
   const subjects = await SubjectPool.findAll({ order: [["name", "ASC"]] });
-  res.render("admin/subjects/index", { title: "Subject Pool", subjects });
+  res.render("admin/subjects/index", { title: "Subject Pool", subjects, breadcrumbs: [ROOT, { label: "Subject Pool" }] });
 };
 
 exports.showCreate = (req, res) => {
-  res.render("admin/subjects/new", { title: "Add Subject", error: null, formData: {} });
+  res.render("admin/subjects/new", { title: "Add Subject", error: null, formData: {}, breadcrumbs: [ROOT, SUBJECTS, { label: "Add Subject" }] });
 };
 
 exports.create = async (req, res) => {
   const { name, code, category } = req.body;
-  const rerender = (error) => res.status(400).render("admin/subjects/new", { title: "Add Subject", error, formData: req.body });
+  const breadcrumbs = [ROOT, SUBJECTS, { label: "Add Subject" }];
+  const rerender = (error) => res.status(400).render("admin/subjects/new", { title: "Add Subject", error, formData: req.body, breadcrumbs });
 
   if (!name || !code) return rerender("Name and code are required.");
   const existing = await SubjectPool.findOne({ where: { code } });
@@ -27,32 +32,48 @@ exports.create = async (req, res) => {
   res.redirect("/admin/subjects");
 };
 
-// Bulk CSV import — expects a "name,code,category" header row.
-// category is optional per row; defaults to UNIVERSITY_WIDE.
+// --- Bulk import: pasted CSV text OR an uploaded .csv file, same underlying
+// row processor either way. ---
+
 exports.showBulkImport = (req, res) => {
-  res.render("admin/subjects/bulk-import", { title: "Bulk Import Subjects", result: null, error: null });
+  res.render("admin/subjects/bulk-import", {
+    title: "Bulk Import Subjects", result: null, error: null,
+    breadcrumbs: [ROOT, SUBJECTS, { label: "Bulk Import" }],
+  });
 };
 
-exports.bulkImport = async (req, res) => {
-  const { csvText } = req.body;
-  if (!csvText || !csvText.trim()) {
-    return res.status(400).render("admin/subjects/bulk-import", { title: "Bulk Import Subjects", result: null, error: "Paste some CSV text first." });
+function parseRows(csvContent) {
+  // Tolerant parser: works whether the source used csv-parse-friendly
+  // quoting or was hand-typed comma-separated text with a header row.
+  let records;
+  try {
+    records = parse(csvContent, { columns: true, skip_empty_lines: true, trim: true });
+  } catch (e) {
+    // Fall back to naive split for hand-pasted text without proper quoting.
+    const lines = csvContent.trim().split("\n").map((l) => l.trim()).filter(Boolean);
+    const dataLines = lines[0] && lines[0].toLowerCase().startsWith("name") ? lines.slice(1) : lines;
+    records = dataLines.map((line) => {
+      const [name, code, category] = line.split(",").map((s) => (s || "").trim());
+      return { name, code, category };
+    });
   }
+  return records;
+}
 
-  const lines = csvText.trim().split("\n").map((l) => l.trim()).filter(Boolean);
-  const dataLines = lines[0].toLowerCase().startsWith("name") ? lines.slice(1) : lines;
-
+async function processRows(records, userId) {
   const created = [];
   const skipped = [];
-  for (const line of dataLines) {
-    const [name, code, category] = line.split(",").map((s) => (s || "").trim());
+  for (const row of records) {
+    const name = (row.name || "").trim();
+    const code = (row.code || "").trim();
+    const category = (row.category || "").trim().toUpperCase();
     if (!name || !code) {
-      skipped.push({ line, reason: "missing name or code" });
+      skipped.push({ line: JSON.stringify(row), reason: "missing name or code" });
       continue;
     }
     const existing = await SubjectPool.findOne({ where: { code } });
     if (existing) {
-      skipped.push({ line, reason: "code already exists" });
+      skipped.push({ line: `${name},${code}`, reason: "code already exists" });
       continue;
     }
     const subject = await SubjectPool.create({
@@ -63,18 +84,38 @@ exports.bulkImport = async (req, res) => {
     });
     created.push(subject);
   }
-
   await AuditLog.create({
-    userId: req.currentUser.id,
+    userId,
     action: "BULK_IMPORT_SUBJECTS",
     entityType: "SubjectPool",
     entityId: "bulk",
     metadata: { createdCount: created.length, skippedCount: skipped.length },
   });
+  return { created, skipped };
+}
 
-  res.render("admin/subjects/bulk-import", {
-    title: "Bulk Import Subjects",
-    result: { created, skipped },
-    error: null,
-  });
+exports.bulkImport = async (req, res) => {
+  const breadcrumbs = [ROOT, SUBJECTS, { label: "Bulk Import" }];
+  // req.file comes from multer (file upload); req.body.csvText from the pasted-text form.
+  const csvContent = req.file ? req.file.buffer.toString("utf-8") : req.body.csvText;
+
+  if (!csvContent || !csvContent.trim()) {
+    return res.status(400).render("admin/subjects/bulk-import", {
+      title: "Bulk Import Subjects", result: null,
+      error: "Paste CSV text or choose a .csv file to upload.", breadcrumbs,
+    });
+  }
+
+  let result;
+  try {
+    const records = parseRows(csvContent);
+    result = await processRows(records, req.currentUser.id);
+  } catch (err) {
+    return res.status(400).render("admin/subjects/bulk-import", {
+      title: "Bulk Import Subjects", result: null,
+      error: "Couldn't parse that file — check it's a valid CSV with name,code,category columns.", breadcrumbs,
+    });
+  }
+
+  res.render("admin/subjects/bulk-import", { title: "Bulk Import Subjects", result, error: null, breadcrumbs });
 };

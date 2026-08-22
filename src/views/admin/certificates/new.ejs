@@ -1,0 +1,52 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Generate Certificate</h1>
+    <p class="mt-1 text-sm text-navy-500">Checks that every assessment for the student's enrolled subjects in this semester/session has been evaluated before allowing generation.</p>
+
+    <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+
+    <form action="/admin/certificates/check" method="POST" class="mt-6 space-y-4">
+      <div>
+        <label class="form-label">Student</label>
+        <select class="form-input" name="studentId" required>
+          <option value="">Select a student</option>
+          <% students.forEach(function(s) { %><option value="<%= s.id %>" <%= eligibility && eligibility.studentId === s.id ? 'selected' : '' %>><%= s.User.firstName %> <%= s.User.lastName %> (<%= s.rollNo %>)</option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Program</label>
+        <select class="form-input" name="programId" required>
+          <option value="">Select a program</option>
+          <% programs.forEach(function(p) { %><option value="<%= p.id %>" <%= eligibility && eligibility.programId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+      </div>
+      <div><label class="form-label">Semester number</label><input class="form-input" type="number" name="semesterNumber" min="1" value="<%= eligibility ? eligibility.semesterNumber : '' %>" required /></div>
+      <div>
+        <label class="form-label">Academic Session</label>
+        <select class="form-input" name="academicSessionId" required>
+          <option value="">Select a session</option>
+          <% sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= eligibility && eligibility.academicSessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        </select>
+      </div>
+      <button type="submit" class="btn-secondary w-full">Check eligibility</button>
+    </form>
+
+    <% if (eligibility) { %>
+      <div class="mt-6 border-t border-navy-100 pt-6">
+        <% if (eligibility.eligible) { %>
+          <div class="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">✓ Eligible — all assessments evaluated.</div>
+          <form action="/admin/certificates/generate" method="POST" class="mt-4 space-y-3">
+            <input type="hidden" name="studentId" value="<%= eligibility.studentId %>" />
+            <input type="hidden" name="programId" value="<%= eligibility.programId %>" />
+            <input type="hidden" name="semesterNumber" value="<%= eligibility.semesterNumber %>" />
+            <input type="hidden" name="academicSessionId" value="<%= eligibility.academicSessionId %>" />
+            <div><label class="form-label">AI proficiency level (optional)</label><input class="form-input" name="aiLevel" placeholder="e.g. Proficient" /></div>
+            <button type="submit" class="btn-primary w-full">Generate certificate</button>
+          </form>
+        <% } else { %>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">✗ Not yet eligible — <%= eligibility.reason %></div>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

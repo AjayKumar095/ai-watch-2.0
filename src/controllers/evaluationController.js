@@ -8,6 +8,9 @@ const {
   SubjectPool,
 } = require("../models");
 
+const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
+const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
+
 // Submissions for one assessment, filterable/groupable by section directly
 // (Submission.sectionId is denormalized at submit time for exactly this
 // reason — see the schema notes: "which student came from which class").
@@ -40,6 +43,7 @@ exports.showSubmissions = async (req, res) => {
     submissions,
     sections: Object.values(sectionMap),
     activeSectionId: req.query.sectionId || null,
+    breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }],
   });
 };
 
