@@ -7,6 +7,7 @@ const {
   SubjectOffering,
   SubjectPool,
 } = require("../models");
+const renderBlocks = require("../utils/renderBlocks");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
@@ -40,6 +41,7 @@ exports.showSubmissions = async (req, res) => {
   res.render("teacher/assessments/submissions", {
     title: "Submissions",
     assessment,
+    descriptionHtml: Array.isArray(assessment.description) ? renderBlocks(assessment.description) : "",
     submissions,
     sections: Object.values(sectionMap),
     activeSectionId: req.query.sectionId || null,

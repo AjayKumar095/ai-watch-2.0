@@ -10,14 +10,15 @@
       <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
     <% } %>
 
-    <form action="/teacher/assessments/new" method="POST" class="mt-6 space-y-4">
+    <form id="assessment-form" action="/teacher/assessments/new" method="POST" class="mt-6 space-y-4">
       <div>
         <label class="form-label">Title</label>
         <input class="form-input" name="title" value="<%= formData.title || '' %>" required />
       </div>
       <div>
         <label class="form-label">Description</label>
-        <textarea class="form-input" name="description" rows="3"><%= formData.description || '' %></textarea>
+        <div id="assessment-editor" class="rounded-lg border border-navy-200"></div>
+        <input type="hidden" id="descriptionBlocks" name="descriptionBlocks" />
       </div>
       <div>
         <label class="form-label">Attachment URL (optional)</label>
@@ -58,3 +59,21 @@
     </form>
   </div>
 </div>
+
+<link rel="stylesheet" href="/js/assessmentEditorEntry.css" />
+<script src="/js/assessmentEditorEntry.js"></script>
+<script>
+  (function () {
+    var initialContent = null;
+    try {
+      initialContent = JSON.parse(<%- JSON.stringify(initialDescriptionJson) %>);
+    } catch (e) {
+      initialContent = null;
+    }
+    var editorHandle = window.AssessmentEditorApp.mount("assessment-editor", initialContent);
+
+    document.getElementById("assessment-form").addEventListener("submit", function () {
+      document.getElementById("descriptionBlocks").value = JSON.stringify(editorHandle.getContent());
+    });
+  })();
+</script>

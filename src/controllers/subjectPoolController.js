@@ -1,5 +1,6 @@
 const { parse } = require("csv-parse/sync");
 const { SubjectPool, AuditLog } = require("../models");
+const { safeDestroy } = require("../utils/deleteHelpers");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const SUBJECTS = { label: "Subject Pool", url: "/admin/subjects" };
@@ -30,6 +31,41 @@ exports.create = async (req, res) => {
   });
   await AuditLog.create({ userId: req.currentUser.id, action: "CREATE_SUBJECT", entityType: "SubjectPool", entityId: subject.id, metadata: { name, code } });
   res.redirect("/admin/subjects");
+};
+
+exports.showEdit = async (req, res) => {
+  const subject = await SubjectPool.findByPk(req.params.id);
+  if (!subject) return res.redirect("/admin/subjects");
+  res.render("admin/subjects/edit", { title: "Edit Subject", subject, error: null, breadcrumbs: [ROOT, SUBJECTS, { label: subject.name }] });
+};
+
+exports.edit = async (req, res) => {
+  const subject = await SubjectPool.findByPk(req.params.id);
+  if (!subject) return res.redirect("/admin/subjects");
+  const { name, code, category } = req.body;
+  const breadcrumbs = [ROOT, SUBJECTS, { label: subject.name }];
+  if (!name || !code) {
+    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Name and code are required.", breadcrumbs });
+  }
+  const existing = await SubjectPool.findOne({ where: { code } });
+  if (existing && existing.id !== subject.id) {
+    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Another subject already uses this code.", breadcrumbs });
+  }
+  subject.name = name;
+  subject.code = code;
+  subject.category = category === "PROGRAM_SPECIFIC" ? "PROGRAM_SPECIFIC" : "UNIVERSITY_WIDE";
+  await subject.save();
+  await AuditLog.create({ userId: req.currentUser.id, action: "UPDATE_SUBJECT", entityType: "SubjectPool", entityId: subject.id, metadata: {} });
+  res.redirect("/admin/subjects");
+};
+
+exports.delete = async (req, res) => {
+  const subject = await SubjectPool.findByPk(req.params.id);
+  if (!subject) return res.redirect("/admin/subjects");
+  if (await safeDestroy(subject, res, "/admin/subjects", "subject")) {
+    await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT", entityType: "SubjectPool", entityId: req.params.id, metadata: {} });
+    res.redirect("/admin/subjects");
+  }
 };
 
 // --- Bulk import: pasted CSV text OR an uploaded .csv file, same underlying

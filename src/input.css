@@ -30,4 +30,27 @@
   .form-label {
     @apply mb-1 block text-sm font-medium text-navy-700;
   }
+  .prose-content {
+    @apply text-sm text-navy-700;
+  }
+  .prose-content h1, .prose-content h2, .prose-content h3 {
+    @apply mb-2 mt-4 font-bold text-navy-900;
+  }
+  .prose-content h1 { @apply text-2xl; }
+  .prose-content h2 { @apply text-xl; }
+  .prose-content h3 { @apply text-lg; }
+  .prose-content p { @apply mb-3 leading-relaxed; }
+  .prose-content ul { @apply mb-3 list-disc space-y-1 pl-5; }
+  .prose-content ol { @apply mb-3 list-decimal space-y-1 pl-5; }
+  .prose-content blockquote { @apply mb-3 border-l-4 border-amber-300 bg-amber-50 py-2 pl-4 italic text-navy-600; }
+  .prose-content pre { @apply mb-3 overflow-x-auto rounded-lg bg-navy-900 p-3 text-xs text-navy-50; }
+  .prose-content code { @apply rounded bg-navy-100 px-1 py-0.5 text-xs; }
+  .prose-content pre code { @apply bg-transparent p-0 text-navy-50; }
+  .prose-content figure { @apply mb-3; }
+  .prose-content img { @apply rounded-lg; }
+  .prose-content figcaption { @apply mt-1 text-xs text-navy-400; }
+  .prose-content table { @apply mb-3 w-full border-collapse text-sm; }
+  .prose-content td { @apply border border-navy-100 px-2 py-1; }
+  .prose-content a { @apply text-info-600 underline; }
+  .prose-content hr { @apply my-4 border-navy-100; }
 }

@@ -8,6 +8,7 @@
     "dev": "nodemon app.js",
     "build:css": "tailwindcss -i ./src/input.css -o ./public/css/output.css --minify",
     "watch:css": "tailwindcss -i ./src/input.css -o ./public/css/output.css --watch",
+    "build:editor": "esbuild src/client/assessmentEditorEntry.jsx --bundle --outdir=public/js --minify --loader:.woff=file --loader:.woff2=file --loader:.ttf=file --loader:.eot=file --conditions=style",
     "seed": "node scripts/seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -15,6 +16,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@blocknote/core": "^0.54.0",
+    "@blocknote/mantine": "^0.54.0",
     "bcryptjs": "^3.0.3",
     "connect-flash": "^0.1.1",
     "cookie-parser": "^1.4.7",
@@ -30,12 +33,15 @@
     "multer": "^2.2.0",
     "pg": "^8.23.0",
     "pg-hstore": "^2.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "sequelize": "^6.37.8",
     "sqlite3": "^6.0.1",
     "uuid": "^14.0.2"
   },
   "devDependencies": {
     "autoprefixer": "^10.5.4",
+    "esbuild": "^0.28.2",
     "nodemon": "^3.1.14",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19"

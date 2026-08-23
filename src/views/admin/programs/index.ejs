@@ -8,9 +8,9 @@
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="font-semibold text-navy-900"><%= p.name %> <span class="text-xs font-normal text-navy-400">(<%= p.code %>)</span></h2>
-          <p class="text-xs text-navy-400"><%= p.School.name %> · <%= p.totalSemesters %> semesters</p>
+          <p class="text-xs text-navy-400"><%= p.School.name %> · <%= p.totalSemesters %> semesters<% if (p.durationYears) { %> · <%= p.durationYears %> years<% } %> · <span class="<%= p.isActive ? 'text-info-600' : 'text-amber-600' %>"><%= p.isActive ? 'Active' : 'Inactive' %></span></p>
         </div>
-        <a href="/admin/programs/<%= p.id %>/specializations/new" class="btn-secondary !px-3 !py-1.5 text-xs">+ Specialization</a>
+        <a href="/admin/programs/<%= p.id %>" class="btn-primary !px-3 !py-1.5 text-xs">Manage →</a>
       </div>
       <% if (p.Specializations && p.Specializations.length) { %>
         <div class="mt-2 flex flex-wrap gap-1">

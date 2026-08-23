@@ -22,11 +22,15 @@ async function loadTeacherProfile(req) {
   return TeacherProfile.findOne({ where: { userId: req.currentUser.id } });
 }
 
+const { targetableSectionsForMapping } = require("../services/sectionScope");
+
 // Builds the list of "subjectOffering + concrete sections" combos a teacher
-// can target, expanding an all-sections mapping (sectionId = null) into
-// every section under that offering's ProgramOffering. This is what powers
-// the "select exactly the sections you teach" picker (fixes "2 of 3
-// sections" and the old duplicate-assessment-per-section problem).
+// can target. A mapping scoped to a specific top-level Section covers that
+// whole class (including its sub-groups) as ONE target; a mapping scoped to
+// a specific sub-group is scoped to just that sub-group; an "all sections"
+// mapping (sectionId = null) expands to one option per TOP-LEVEL section
+// under the offering (each of which still covers its own sub-groups) — see
+// src/services/sectionScope.js for the shared hierarchy rule.
 async function buildTargetOptions(teacherProfile) {
   const mappings = await TeacherSubjectMapping.findAll({
     where: { teacherId: teacherProfile.id },
@@ -38,13 +42,12 @@ async function buildTargetOptions(teacherProfile) {
     if (m.sectionId) {
       options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: m.Section });
     } else {
-      // all-sections mapping — expand to every section under the matching ProgramOffering
       const offerings = await ProgramOffering.findAll({
         where: { programId: m.SubjectOffering.programId, semesterNumber: m.SubjectOffering.semesterNumber },
-        include: [Section],
       });
       for (const po of offerings) {
-        for (const sec of po.Sections) {
+        const topSections = await targetableSectionsForMapping(null, po.id);
+        for (const sec of topSections) {
           options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: sec });
         }
       }
@@ -76,21 +79,28 @@ exports.showCreate = async (req, res) => {
   const targetOptions = await buildTargetOptions(teacherProfile);
 
   let prefill = {};
+  let initialDescription = null;
   if (req.query.duplicateFrom) {
     const source = await Assessment.findOne({ where: { id: req.query.duplicateFrom, createdById: req.currentUser.id } });
     if (source) {
-      prefill = { title: source.title + " (Copy)", description: source.description, maxMarks: source.maxMarks, attachmentUrl: source.attachmentUrl };
+      prefill = { title: source.title + " (Copy)", maxMarks: source.maxMarks, attachmentUrl: source.attachmentUrl };
+      initialDescription = source.description || null;
     }
   }
 
-  res.render("teacher/assessments/new", { title: "Create Assessment", targetOptions, error: null, formData: prefill, breadcrumbs: [ROOT, ASSESSMENTS, { label: "Create Assessment" }] });
+  res.render("teacher/assessments/new", {
+    title: "Create Assessment", targetOptions, error: null, formData: prefill,
+    // Passed to the client as the BlockNote editor's initialContent — null means "start blank."
+    initialDescriptionJson: JSON.stringify(initialDescription),
+    breadcrumbs: [ROOT, ASSESSMENTS, { label: "Create Assessment" }],
+  });
 };
 
 exports.create = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
   const targetOptions = await buildTargetOptions(teacherProfile);
 
-  const { title, description, attachmentUrl, startAt, endAt, maxMarks } = req.body;
+  const { title, attachmentUrl, startAt, endAt, maxMarks, descriptionBlocks } = req.body;
   let targets = req.body.targets || []; // format: "<subjectOfferingId>:<sectionId>"
   if (!Array.isArray(targets)) targets = [targets];
 
@@ -100,6 +110,17 @@ exports.create = async (req, res) => {
 
   if (!title || !startAt || !endAt || !maxMarks || !targets.length) {
     return rerender("Please fill in all fields and select at least one section to target.");
+  }
+
+  // descriptionBlocks arrives as a JSON string from the BlockNote editor's
+  // hidden input (editor.document, serialized client-side before submit).
+  let description = null;
+  if (descriptionBlocks) {
+    try {
+      description = JSON.parse(descriptionBlocks);
+    } catch (e) {
+      return rerender("Couldn't read the assessment content — please try again.");
+    }
   }
 
   // Group selected targets by subjectOfferingId — one Assessment row per
@@ -132,6 +153,12 @@ exports.create = async (req, res) => {
   }
 
   res.redirect("/teacher/assessments");
+};
+
+// Called by the BlockNote editor's uploadFile callback (assessmentEditorEntry.jsx).
+exports.uploadImage = (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, error: "No image file received." });
+  res.json({ success: true, file: { url: `/uploads/assessment-content/${req.file.filename}` } });
 };
 
 // Bulk "open submission for selected students" — reuses

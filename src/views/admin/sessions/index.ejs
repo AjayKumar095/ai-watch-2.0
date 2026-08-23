@@ -5,7 +5,7 @@
 <div class="card">
   <table class="min-w-full divide-y divide-navy-100 text-sm">
     <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-      <th class="py-2 pr-3">Label</th><th class="py-2 pr-3">Start</th><th class="py-2 pr-3">End</th><th class="py-2 pr-3">Status</th>
+      <th class="py-2 pr-3">Label</th><th class="py-2 pr-3">Start</th><th class="py-2 pr-3">End</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"></th>
     </tr></thead>
     <tbody class="divide-y divide-navy-50">
       <% sessions.forEach(function(s) { %>
@@ -14,6 +14,7 @@
           <td class="py-2 pr-3 text-navy-500"><%= new Date(s.startDate).toLocaleDateString() %></td>
           <td class="py-2 pr-3 text-navy-500"><%= new Date(s.endDate).toLocaleDateString() %></td>
           <td class="py-2 pr-3"><span class="<%= s.isActive ? 'badge-info' : 'badge-amber' %>"><%= s.isActive ? 'Active' : 'Inactive' %></span></td>
+          <td class="py-2 pr-3"><a href="/admin/sessions/<%= s.id %>/edit" class="btn-ghost text-xs">Edit</a></td>
         </tr>
       <% }) %>
       <% if (!sessions.length) { %><tr><td colspan="4" class="py-4 text-navy-400">No sessions yet.</td></tr><% } %>

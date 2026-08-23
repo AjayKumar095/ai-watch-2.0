@@ -44,6 +44,11 @@ app.use(flash());
 // Populate req.currentUser / res.locals.currentUser from the JWT cookie,
 // on every request, before routing.
 app.use(attachUser);
+// currentPath drives active-link highlighting in the sidebar.
+app.use((req, res, next) => {
+  res.locals.currentPath = req.path;
+  next();
+});
 
 app.get("/", (req, res) => {
   if (!req.currentUser) return res.redirect("/login");
@@ -63,6 +68,12 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
+  // XHR-style upload endpoints (CSV import, editor image upload) expect a
+  // JSON error body, not an HTML error page — the client-side JS checks
+  // `data.success`/`data.error`, so an HTML response would break silently.
+  if (req.path.endsWith("/upload-image")) {
+    return res.status(400).json({ success: false, error: err.message || "Upload failed." });
+  }
   if (err && err.message && (err.code === "LIMIT_FILE_SIZE" || /csv/i.test(err.message))) {
     return res.status(400).render("error", { title: "Upload problem", message: err.message });
   }

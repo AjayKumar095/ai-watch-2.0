@@ -8,7 +8,7 @@
 <div class="card">
   <table class="min-w-full divide-y divide-navy-100 text-sm">
     <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-      <th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Category</th>
+      <th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Category</th><th class="py-2 pr-3"></th>
     </tr></thead>
     <tbody class="divide-y divide-navy-50">
       <% subjects.forEach(function(s) { %>
@@ -16,6 +16,7 @@
           <td class="py-2 pr-3 font-medium text-navy-800"><%= s.name %></td>
           <td class="py-2 pr-3 text-navy-500"><%= s.code %></td>
           <td class="py-2 pr-3"><span class="<%= s.category === 'UNIVERSITY_WIDE' ? 'badge-info' : 'badge-navy' %>"><%= s.category %></span></td>
+          <td class="py-2 pr-3"><a href="/admin/subjects/<%= s.id %>/edit" class="btn-ghost text-xs">Edit</a></td>
         </tr>
       <% }) %>
       <% if (!subjects.length) { %><tr><td colspan="3" class="py-4 text-navy-400">No subjects yet.</td></tr><% } %>

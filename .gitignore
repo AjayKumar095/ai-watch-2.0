@@ -3,5 +3,3 @@ dev.sqlite3
 .env
 .DS_Store
 npm-debug.log*
-
-progress.md

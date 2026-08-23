@@ -12,7 +12,10 @@
           <% schools.forEach(function(s) { %><option value="<%= s.id %>" <%= formData.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option><% }) %>
         </select>
       </div>
-      <div><label class="form-label">Total semesters</label><input class="form-input" type="number" name="totalSemesters" min="1" max="12" value="<%= formData.totalSemesters || '' %>" required /></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="form-label">Number of semesters</label><input class="form-input" type="number" name="totalSemesters" min="1" max="12" value="<%= formData.totalSemesters || '' %>" required /></div>
+        <div><label class="form-label">Duration (years)</label><input class="form-input" type="number" name="durationYears" min="1" max="6" value="<%= formData.durationYears || '' %>" /></div>
+      </div>
       <button type="submit" class="btn-primary w-full">Create program</button>
     </form>
   </div>

@@ -3,11 +3,13 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const adminController = require("../controllers/adminController");
 const schoolController = require("../controllers/schoolController");
 const programController = require("../controllers/programController");
+const programWorkspaceController = require("../controllers/programWorkspaceController");
 const subjectPoolController = require("../controllers/subjectPoolController");
 const academicSessionController = require("../controllers/academicSessionController");
 const programOfferingController = require("../controllers/programOfferingController");
 const sectionController = require("../controllers/sectionController");
 const subjectOfferingController = require("../controllers/subjectOfferingController");
+const teacherAccountController = require("../controllers/teacherAccountController");
 const sessionCloneController = require("../controllers/sessionCloneController");
 const promotionController = require("../controllers/promotionController");
 const certificateController = require("../controllers/certificateController");
@@ -19,6 +21,10 @@ router.use(requireAuth, requireRole("SUPERADMIN"));
 router.get("/dashboard", adminController.dashboard);
 router.get("/teachers/new", adminController.showCreateTeacher);
 router.post("/teachers/new", adminController.createTeacher);
+router.get("/teachers", teacherAccountController.list);
+router.get("/teachers/:id/edit", teacherAccountController.showEdit);
+router.post("/teachers/:id/edit", teacherAccountController.edit);
+router.post("/teachers/:id/delete", teacherAccountController.delete);
 
 router.get("/mappings", adminController.listMappings);
 router.get("/mappings/new", adminController.showCreateMapping);
@@ -32,13 +38,32 @@ router.get("/schools", schoolController.list);
 router.get("/schools/new", schoolController.showCreate);
 router.post("/schools/new", schoolController.create);
 router.post("/schools/:id/toggle", schoolController.toggleActive);
+router.get("/schools/:id/edit", schoolController.showEdit);
+router.post("/schools/:id/edit", schoolController.edit);
+router.post("/schools/:id/delete", schoolController.delete);
 
-// Programs + Specializations
+// Programs — literal paths first, then the workspace catch-all (:id)
 router.get("/programs", programController.list);
 router.get("/programs/new", programController.showCreate);
 router.post("/programs/new", programController.create);
-router.get("/programs/:programId/specializations/new", programController.showCreateSpecialization);
-router.post("/programs/:programId/specializations/new", programController.createSpecialization);
+
+// Program Workspace — consolidated School->Program->Semester->Sections/
+// Subjects/Mappings workflow. Tab/session/semester state lives in the URL
+// query string so it survives a page reload.
+router.get("/programs/:id", programWorkspaceController.show);
+router.post("/programs/:id/edit", programWorkspaceController.updateOverview);
+router.post("/programs/:id/toggle", programWorkspaceController.toggleActive);
+router.post("/programs/:id/delete", programWorkspaceController.deleteProgram);
+router.post("/programs/:id/specializations/new", programWorkspaceController.createSpecialization);
+router.post("/programs/:id/specializations/:specId/edit", programWorkspaceController.updateSpecialization);
+router.post("/programs/:id/specializations/:specId/delete", programWorkspaceController.deleteSpecialization);
+router.post("/programs/:id/offerings/ensure", programWorkspaceController.ensureOffering);
+router.post("/programs/:id/sections/new", programWorkspaceController.createSection);
+router.post("/programs/:id/sections/:sectionId/delete", programWorkspaceController.deleteSection);
+router.post("/programs/:id/subject-offerings/new", programWorkspaceController.createSubjectOffering);
+router.post("/programs/:id/subject-offerings/:subjectOfferingId/delete", programWorkspaceController.deleteSubjectOffering);
+router.post("/programs/:id/subject-offerings/:subjectOfferingId/mappings/new", programWorkspaceController.createMapping);
+router.post("/programs/:id/subject-offerings/:subjectOfferingId/mappings/:mappingId/delete", programWorkspaceController.deleteMapping);
 
 // Subject Pool
 router.get("/subjects", subjectPoolController.list);
@@ -51,6 +76,10 @@ router.post("/subjects/bulk-import", upload.single("csvFile"), subjectPoolContro
 router.get("/sessions", academicSessionController.list);
 router.get("/sessions/new", academicSessionController.showCreate);
 router.post("/sessions/new", academicSessionController.create);
+router.get("/sessions/:id/edit", academicSessionController.showEdit);
+router.post("/sessions/:id/edit", academicSessionController.edit);
+router.post("/sessions/:id/toggle", academicSessionController.toggleActive);
+router.post("/sessions/:id/delete", academicSessionController.delete);
 
 // Program Offerings
 router.get("/offerings", programOfferingController.list);

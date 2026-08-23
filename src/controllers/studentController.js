@@ -4,12 +4,15 @@ const {
   SubjectOffering,
   SubjectPool,
   Assessment,
+  AssessmentSection,
   Submission,
   SemesterCertificate,
   ApprovalRequest,
   Program,
   Section,
 } = require("../models");
+const { visibleSectionIdsForStudent } = require("../services/sectionScope");
+const renderBlocks = require("../utils/renderBlocks");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 
@@ -24,12 +27,25 @@ exports.dashboard = async (req, res) => {
     include: [{ model: SubjectOffering, include: [SubjectPool] }],
   });
 
-  const offeringIds = enrollments.map((e) => e.subjectOfferingId);
-  const assessments = await Assessment.findAll({
-    where: { subjectOfferingId: offeringIds, isActive: true },
-    include: [{ model: SubjectOffering, include: [SubjectPool] }],
-    order: [["endAt", "ASC"]],
-  });
+  // An assessment is visible only if it's targeted (via AssessmentSection)
+  // at the student's own section OR that section's parent (a "whole
+  // Section" assessment is visible to every sub-group under it) — see
+  // src/services/sectionScope.js. Enrollment alone is not enough: it
+  // establishes the subject, not which section-scoped assessments apply.
+  const assessments = [];
+  for (const e of enrollments) {
+    const visibleSectionIds = await visibleSectionIdsForStudent(e.sectionId);
+    if (!visibleSectionIds.length) continue;
+    const matching = await Assessment.findAll({
+      where: { subjectOfferingId: e.subjectOfferingId, isActive: true },
+      include: [
+        { model: SubjectOffering, include: [SubjectPool] },
+        { model: AssessmentSection, where: { sectionId: visibleSectionIds }, required: true },
+      ],
+      order: [["endAt", "ASC"]],
+    });
+    assessments.push(...matching);
+  }
 
   const submissions = await Submission.findAll({ where: { studentId: studentProfile.id } });
   const submissionByAssessment = Object.fromEntries(submissions.map((s) => [s.assessmentId, s]));
@@ -51,6 +67,13 @@ exports.dashboard = async (req, res) => {
 
 const { AssessmentStudentOverride } = require("../models");
 
+async function assertVisible(assessment, enrollment) {
+  const visibleSectionIds = await visibleSectionIdsForStudent(enrollment.sectionId);
+  if (!visibleSectionIds.length) return false;
+  const match = await AssessmentSection.findOne({ where: { assessmentId: assessment.id, sectionId: visibleSectionIds } });
+  return !!match;
+}
+
 exports.showAssessment = async (req, res) => {
   const studentProfile = await StudentProfile.findOne({ where: { userId: req.currentUser.id } });
   const assessment = await Assessment.findOne({
@@ -64,10 +87,16 @@ exports.showAssessment = async (req, res) => {
   });
   if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
 
+  if (!(await assertVisible(assessment, enrollment))) {
+    return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
+  }
+
   const existingSubmission = await Submission.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
   const override = await AssessmentStudentOverride.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
 
-  res.render("student/assessment-detail", { title: assessment.title, assessment, enrollment, existingSubmission, override, error: null, breadcrumbs: [ROOT, { label: assessment.title }] });
+  const descriptionHtml = Array.isArray(assessment.description) ? renderBlocks(assessment.description) : "";
+
+  res.render("student/assessment-detail", { title: assessment.title, assessment, descriptionHtml, enrollment, existingSubmission, override, error: null, breadcrumbs: [ROOT, { label: assessment.title }] });
 };
 
 exports.submitAssessment = async (req, res) => {
@@ -79,6 +108,10 @@ exports.submitAssessment = async (req, res) => {
     where: { subjectOfferingId: assessment.subjectOfferingId, studentId: studentProfile.id },
   });
   if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
+
+  if (!(await assertVisible(assessment, enrollment))) {
+    return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
+  }
 
   const override = await AssessmentStudentOverride.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
   const windowStart = override && override.startAt ? new Date(override.startAt) : new Date(assessment.startAt);

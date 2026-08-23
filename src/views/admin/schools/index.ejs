@@ -14,9 +14,12 @@
           <td class="py-2 pr-3 text-navy-500"><%= s.code %></td>
           <td class="py-2 pr-3"><span class="<%= s.isActive ? 'badge-info' : 'badge-amber' %>"><%= s.isActive ? 'Active' : 'Inactive' %></span></td>
           <td class="py-2 pr-3">
-            <form action="/admin/schools/<%= s.id %>/toggle" method="POST">
-              <button class="btn-ghost text-xs"><%= s.isActive ? 'Deactivate' : 'Activate' %></button>
-            </form>
+            <div class="flex gap-2">
+              <a href="/admin/schools/<%= s.id %>/edit" class="btn-ghost text-xs">Edit</a>
+              <form action="/admin/schools/<%= s.id %>/toggle" method="POST">
+                <button class="btn-ghost text-xs"><%= s.isActive ? 'Deactivate' : 'Activate' %></button>
+              </form>
+            </div>
           </td>
         </tr>
       <% }) %>

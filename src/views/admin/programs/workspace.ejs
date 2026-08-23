@@ -1,0 +1,210 @@
+<div class="mb-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900"><%= program.name %></h1>
+    <p class="text-sm text-navy-500"><%= program.School.name %> · <%= program.code %> · <span class="<%= program.isActive ? 'text-info-600' : 'text-amber-600' %>"><%= program.isActive ? 'Active' : 'Inactive' %></span></p>
+  </div>
+</div>
+
+<% if (error) { %>
+  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+<% } %>
+
+<div class="mb-4 flex gap-2 border-b border-navy-100">
+  <a href="?tab=overview" class="border-b-2 px-3 py-2 text-sm font-medium <%= workspace.tab === 'overview' ? 'border-amber-500 text-navy-900' : 'border-transparent text-navy-400 hover:text-navy-600' %>">Overview</a>
+  <a href="?tab=specializations" class="border-b-2 px-3 py-2 text-sm font-medium <%= workspace.tab === 'specializations' ? 'border-amber-500 text-navy-900' : 'border-transparent text-navy-400 hover:text-navy-600' %>">Specializations</a>
+  <a href="?tab=structure" class="border-b-2 px-3 py-2 text-sm font-medium <%= workspace.tab === 'structure' ? 'border-amber-500 text-navy-900' : 'border-transparent text-navy-400 hover:text-navy-600' %>">Semesters, Sections & Subjects</a>
+</div>
+
+<% if (workspace.tab === 'overview') { %>
+  <div class="card max-w-lg">
+    <form action="/admin/programs/<%= program.id %>/edit" method="POST" class="space-y-4">
+      <div><label class="form-label">Name</label><input class="form-input" name="name" value="<%= program.name %>" required /></div>
+      <div><label class="form-label">Code</label><input class="form-input" name="code" value="<%= program.code %>" required /></div>
+      <div>
+        <label class="form-label">School</label>
+        <select class="form-input" name="schoolId" required>
+          <% schools.forEach(function(s) { %><option value="<%= s.id %>" <%= program.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="form-label">Number of semesters</label><input class="form-input" type="number" name="totalSemesters" min="1" max="12" value="<%= program.totalSemesters %>" required /></div>
+        <div><label class="form-label">Duration (years)</label><input class="form-input" type="number" name="durationYears" min="1" max="6" value="<%= program.durationYears || '' %>" /></div>
+      </div>
+      <button type="submit" class="btn-primary w-full">Save changes</button>
+    </form>
+    <form action="/admin/programs/<%= program.id %>/toggle" method="POST" class="mt-3">
+      <button class="btn-secondary w-full"><%= program.isActive ? 'Deactivate' : 'Activate' %> program</button>
+    </form>
+    <form action="/admin/programs/<%= program.id %>/delete" method="POST" class="mt-3" onsubmit="return confirm('Delete this program? This cannot be undone.');">
+      <button class="btn-secondary w-full !border-amber-300 !text-amber-700 hover:!bg-amber-50">Delete program</button>
+    </form>
+  </div>
+<% } %>
+
+<% if (workspace.tab === 'specializations') { %>
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="card">
+      <h2 class="mb-3 font-semibold text-navy-900">Add Specialization</h2>
+      <form action="/admin/programs/<%= program.id %>/specializations/new" method="POST" class="space-y-3">
+        <div><label class="form-label">Name</label><input class="form-input" name="name" required /></div>
+        <div><label class="form-label">Description</label><textarea class="form-input" name="description" rows="2"></textarea></div>
+        <button type="submit" class="btn-primary w-full">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2 class="mb-3 font-semibold text-navy-900">Existing Specializations</h2>
+      <div class="space-y-3">
+        <% workspace.specializations.forEach(function(sp) { %>
+          <form action="/admin/programs/<%= program.id %>/specializations/<%= sp.id %>/edit" method="POST" class="rounded-lg border border-navy-100 p-3">
+            <input class="form-input mb-2" name="name" value="<%= sp.name %>" />
+            <textarea class="form-input mb-2" name="description" rows="1"><%= sp.description || '' %></textarea>
+            <div class="flex gap-2">
+              <button type="submit" class="btn-secondary !px-3 !py-1 text-xs">Save</button>
+              <button type="submit" formaction="/admin/programs/<%= program.id %>/specializations/<%= sp.id %>/delete" class="btn-ghost text-xs !text-amber-700" onclick="return confirm('Delete this specialization?');">Delete</button>
+            </div>
+          </form>
+        <% }) %>
+        <% if (!workspace.specializations.length) { %><p class="text-sm text-navy-400">No specializations yet.</p><% } %>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (workspace.tab === 'structure') { %>
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <form action="" method="GET" class="flex items-center gap-2">
+      <input type="hidden" name="tab" value="structure" />
+      <label class="text-sm text-navy-500">Session:</label>
+      <select class="form-input !w-auto !py-1.5" name="session" onchange="this.form.submit()">
+        <% workspace.sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= workspace.sessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
+      </select>
+    </form>
+    <div class="flex gap-1">
+      <% for (let n = 1; n <= program.totalSemesters; n++) { %>
+        <a href="?tab=structure&session=<%= workspace.sessionId %>&semester=<%= n %>"
+           class="rounded-lg px-3 py-1.5 text-sm font-medium <%= workspace.semesterNumber === n ? 'bg-amber-500 text-white' : 'bg-white text-navy-600 hover:bg-navy-50 border border-navy-200' %>">
+          Sem <%= n %>
+        </a>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (!workspace.offering) { %>
+    <div class="card">
+      <p class="mb-3 text-sm text-navy-500">Semester <%= workspace.semesterNumber %> hasn't been enabled for this session yet.</p>
+      <form action="/admin/programs/<%= program.id %>/offerings/ensure" method="POST">
+        <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" />
+        <input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+        <button type="submit" class="btn-primary">Enable Semester <%= workspace.semesterNumber %> for this session</button>
+      </form>
+    </div>
+  <% } else { %>
+
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <!-- Sections & Sub-Groups -->
+      <div class="card">
+        <h2 class="mb-3 font-semibold text-navy-900">Sections & Sub-Groups</h2>
+        <div class="mb-4 space-y-2">
+          <% workspace.topSections.forEach(function(sec) { %>
+            <div class="rounded-lg border border-navy-100 p-2">
+              <div class="flex items-center justify-between">
+                <span class="font-medium text-navy-800">Section <%= sec.name %></span>
+                <form action="/admin/programs/<%= program.id %>/sections/<%= sec.id %>/delete" method="POST" onsubmit="return confirm('Delete Section <%= sec.name %> and its sub-groups?');">
+                  <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+                  <button class="btn-ghost text-xs !text-amber-700">Delete</button>
+                </form>
+              </div>
+              <% (sec.subGroups || []).forEach(function(g) { %>
+                <div class="ml-4 mt-1 flex items-center justify-between text-sm">
+                  <span class="badge-info"><%= g.name %></span>
+                  <form action="/admin/programs/<%= program.id %>/sections/<%= g.id %>/delete" method="POST" onsubmit="return confirm('Delete sub-group <%= g.name %>?');">
+                    <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+                    <button class="btn-ghost text-xs !text-amber-700">Delete</button>
+                  </form>
+                </div>
+              <% }) %>
+            </div>
+          <% }) %>
+          <% if (!workspace.topSections.length) { %><p class="text-sm text-navy-400">No sections yet.</p><% } %>
+        </div>
+        <form action="/admin/programs/<%= program.id %>/sections/new" method="POST" class="space-y-2 rounded-lg bg-navy-50 p-3">
+          <input type="hidden" name="programOfferingId" value="<%= workspace.offering.id %>" />
+          <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+          <div class="grid grid-cols-2 gap-2">
+            <input class="form-input" name="name" placeholder="Name (e.g. A or PG1)" required />
+            <select class="form-input" name="kind" onchange="document.getElementById('parentSel').style.display = this.value === 'GROUP' ? 'block' : 'none'">
+              <option value="SECTION">Section</option>
+              <option value="GROUP">Sub-Group</option>
+            </select>
+          </div>
+          <select class="form-input" name="parentSectionId" id="parentSel" style="display:none">
+            <option value="">Parent section</option>
+            <% workspace.topSections.forEach(function(s) { %><option value="<%= s.id %>">Section <%= s.name %></option><% }) %>
+          </select>
+          <input class="form-input" type="number" name="capacity" placeholder="Capacity (optional)" />
+          <button type="submit" class="btn-secondary w-full">Add</button>
+        </form>
+      </div>
+
+      <!-- Subjects -->
+      <div class="card">
+        <h2 class="mb-3 font-semibold text-navy-900">Subjects</h2>
+        <div class="mb-4 space-y-3">
+          <% workspace.subjectOfferings.forEach(function(so) { %>
+            <div class="rounded-lg border border-navy-100 p-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="font-medium text-navy-800"><%= so.SubjectPool.name %></span>
+                  <% if (so.Specialization) { %><span class="badge-navy ml-1"><%= so.Specialization.name %></span><% } %>
+                </div>
+                <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/delete" method="POST" onsubmit="return confirm('Delete this subject offering?');">
+                  <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+                  <button class="btn-ghost text-xs !text-amber-700">Delete</button>
+                </form>
+              </div>
+
+              <div class="mt-2 space-y-1">
+                <% so.TeacherSubjectMappings.forEach(function(m) { %>
+                  <div class="flex items-center justify-between rounded bg-navy-50 px-2 py-1 text-xs">
+                    <span><%= m.TeacherProfile.User.firstName %> <%= m.TeacherProfile.User.lastName %> — <%= m.Section ? 'Section ' + m.Section.name : 'All sections' %></span>
+                    <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/mappings/<%= m.id %>/delete" method="POST">
+                      <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+                      <button class="text-amber-700 hover:underline">Remove</button>
+                    </form>
+                  </div>
+                <% }) %>
+              </div>
+
+              <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/mappings/new" method="POST" class="mt-2 flex flex-wrap gap-1">
+                <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+                <select class="form-input !w-auto !py-1 text-xs" name="teacherId" required>
+                  <option value="">Teacher</option>
+                  <% workspace.allTeachers.forEach(function(t) { %><option value="<%= t.id %>"><%= t.User.firstName %> <%= t.User.lastName %></option><% }) %>
+                </select>
+                <select class="form-input !w-auto !py-1 text-xs" name="sectionId">
+                  <option value="">All sections</option>
+                  <% workspace.allSectionsFlat.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+                </select>
+                <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Map</button>
+              </form>
+            </div>
+          <% }) %>
+          <% if (!workspace.subjectOfferings.length) { %><p class="text-sm text-navy-400">No subjects assigned yet.</p><% } %>
+        </div>
+
+        <form action="/admin/programs/<%= program.id %>/subject-offerings/new" method="POST" class="space-y-2 rounded-lg bg-navy-50 p-3">
+          <input type="hidden" name="sessionId" value="<%= workspace.sessionId %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+          <select class="form-input" name="subjectId" required>
+            <option value="">Select a subject from the pool</option>
+            <% workspace.allSubjects.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %> (<%= s.code %>)</option><% }) %>
+          </select>
+          <select class="form-input" name="specializationId">
+            <option value="">All specializations</option>
+            <% workspace.specializations.forEach(function(sp) { %><option value="<%= sp.id %>"><%= sp.name %></option><% }) %>
+          </select>
+          <button type="submit" class="btn-secondary w-full">Add subject to this semester</button>
+        </form>
+      </div>
+    </div>
+  <% } %>
+<% } %>

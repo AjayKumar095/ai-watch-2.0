@@ -14,7 +14,7 @@ exports.showCreate = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-  const { name, code, schoolId, totalSemesters } = req.body;
+  const { name, code, schoolId, totalSemesters, durationYears } = req.body;
   const schools = await School.findAll({ where: { isActive: true } });
   const breadcrumbs = [ROOT, PROGRAMS, { label: "Add Program" }];
   const rerender = (error) => res.status(400).render("admin/programs/new", { title: "Add Program", schools, error, formData: req.body, breadcrumbs });
@@ -23,7 +23,12 @@ exports.create = async (req, res) => {
   const existing = await Program.findOne({ where: { code } });
   if (existing) return rerender("A program with this code already exists.");
 
-  const program = await Program.create({ name, code, schoolId, totalSemesters: parseInt(totalSemesters, 10), isActive: true });
+  const program = await Program.create({
+    name, code, schoolId,
+    totalSemesters: parseInt(totalSemesters, 10),
+    durationYears: durationYears ? parseInt(durationYears, 10) : null,
+    isActive: true,
+  });
   await AuditLog.create({ userId: req.currentUser.id, action: "CREATE_PROGRAM", entityType: "Program", entityId: program.id, metadata: { name, code } });
   res.redirect("/admin/programs");
 };

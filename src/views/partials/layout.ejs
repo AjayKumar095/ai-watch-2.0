@@ -5,12 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><%= typeof title !== 'undefined' ? title + ' · AI-Watch' : 'AI-Watch' %></title>
   <link rel="stylesheet" href="/css/output.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 </head>
 <body class="min-h-screen bg-navy-50 font-sans text-navy-900 antialiased">
-  <%- include('navbar') %>
-  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-    <%- include('breadcrumbs') %>
-    <%- body %>
-  </main>
+  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+    <div class="flex min-h-screen">
+      <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-navy-900/50 md:hidden"></div>
+      <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full bg-navy-900 transition-transform duration-200 ease-in-out md:static md:translate-x-0 md:shrink-0">
+        <%- include('sidebar') %>
+      </aside>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <header class="flex items-center justify-between border-b border-navy-100 bg-white px-4 py-3 md:hidden">
+          <button id="sidebar-toggle" class="text-xl text-navy-600"><i class="fa-solid fa-bars"></i></button>
+          <span class="font-bold text-navy-900">AI-Watch</span>
+          <div style="width: 1.5rem"></div>
+        </header>
+        <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <%- include('breadcrumbs') %>
+          <%- body %>
+        </main>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        var toggle = document.getElementById('sidebar-toggle');
+        function close() {
+          sidebar.classList.add('-translate-x-full');
+          overlay.classList.add('hidden');
+        }
+        function open() {
+          sidebar.classList.remove('-translate-x-full');
+          overlay.classList.remove('hidden');
+        }
+        if (toggle) toggle.addEventListener('click', open);
+        overlay.addEventListener('click', close);
+      })();
+    </script>
+  <% } else { %>
+    <%- include('navbar') %>
+    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <%- include('breadcrumbs') %>
+      <%- body %>
+    </main>
+  <% } %>
 </body>
 </html>

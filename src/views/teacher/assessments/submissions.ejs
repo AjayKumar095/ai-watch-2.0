@@ -1,6 +1,9 @@
 <div class="mb-4">
   <h1 class="text-2xl font-bold text-navy-900"><%= assessment.title %></h1>
   <p class="text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= assessment.maxMarks %></p>
+  <% if (descriptionHtml) { %>
+    <div class="prose-content mt-3 rounded-lg border border-navy-100 bg-navy-50 p-3"><%- descriptionHtml %></div>
+  <% } %>
 </div>
 
 <div class="mb-4 flex flex-wrap gap-2">

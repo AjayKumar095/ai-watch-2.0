@@ -4,6 +4,10 @@
     <p class="mt-1 text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= assessment.maxMarks %></p>
     <p class="mt-1 text-xs text-navy-400">Window: <%= new Date(assessment.startAt).toLocaleString() %> → <%= new Date(assessment.endAt).toLocaleString() %></p>
 
+    <% if (descriptionHtml) { %>
+      <div class="prose-content mt-4 border-t border-navy-100 pt-4"><%- descriptionHtml %></div>
+    <% } %>
+
     <% if (existingSubmission && existingSubmission.status === 'EVALUATED') { %>
       <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
         Evaluated: <%= existingSubmission.marksObtained %>/<%= assessment.maxMarks %>

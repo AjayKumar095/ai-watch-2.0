@@ -1,0 +1,70 @@
+<%
+  let navGroups = [];
+  if (currentUser.role === 'SUPERADMIN') {
+    navGroups = [
+      { section: null, items: [
+        { href: '/admin/dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+      ]},
+      { section: 'Academic Structure', items: [
+        { href: '/admin/schools', icon: 'fa-building-columns', label: 'Schools' },
+        { href: '/admin/programs', icon: 'fa-graduation-cap', label: 'Programs' },
+        { href: '/admin/subjects', icon: 'fa-book', label: 'Subject Pool' },
+        { href: '/admin/sessions', icon: 'fa-calendar-days', label: 'Academic Sessions' },
+      ]},
+      { section: 'People', items: [
+        { href: '/admin/teachers', icon: 'fa-chalkboard-user', label: 'Teachers' },
+        { href: '/admin/mappings', icon: 'fa-diagram-project', label: 'Teacher Mappings' },
+        { href: '/admin/enroll', icon: 'fa-user-plus', label: 'Enroll Students' },
+      ]},
+      { section: 'Term Rollover', items: [
+        { href: '/admin/session-clone', icon: 'fa-clone', label: 'Clone Session' },
+        { href: '/admin/promotions', icon: 'fa-arrow-trend-up', label: 'Promotions' },
+        { href: '/admin/certificates', icon: 'fa-certificate', label: 'Certificates' },
+        { href: '/admin/audit-log', icon: 'fa-clipboard-list', label: 'Audit Log' },
+      ]},
+    ];
+  } else if (currentUser.role === 'TEACHER') {
+    navGroups = [
+      { section: null, items: [
+        { href: '/teacher/dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+        { href: '/teacher/roster', icon: 'fa-users', label: 'My Roster' },
+        { href: '/teacher/assessments', icon: 'fa-file-lines', label: 'Assessments' },
+      ]},
+    ];
+  } else if (currentUser.role === 'STUDENT') {
+    navGroups = [
+      { section: null, items: [
+        { href: '/student/dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+      ]},
+    ];
+  }
+%>
+<div class="flex h-full flex-col text-navy-100">
+  <div class="flex items-center gap-2 px-4 py-4 text-lg font-bold text-white">
+    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-navy-900">AI</span>
+    AI-Watch
+  </div>
+  <nav class="flex-1 space-y-4 overflow-y-auto px-2 pb-4">
+    <% navGroups.forEach(function(group) { %>
+      <div>
+        <% if (group.section) { %><p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy-500"><%= group.section %></p><% } %>
+        <% group.items.forEach(function(item) {
+             const isActive = typeof currentPath !== 'undefined' && currentPath && currentPath.startsWith(item.href);
+        %>
+          <a href="<%= item.href %>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium <%= isActive ? 'bg-amber-500 text-navy-900' : 'text-navy-100 hover:bg-navy-800' %>">
+            <i class="fa-solid <%= item.icon %> w-4 text-center"></i>
+            <%= item.label %>
+          </a>
+        <% }) %>
+      </div>
+    <% }) %>
+  </nav>
+  <div class="border-t border-navy-800 px-4 py-3">
+    <p class="truncate text-xs text-navy-400"><%= currentUser.email %></p>
+    <form action="/logout" method="POST" class="mt-2">
+      <button type="submit" class="w-full rounded-lg border border-navy-700 px-3 py-1.5 text-xs font-medium text-navy-100 hover:bg-navy-800">
+        <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Log out
+      </button>
+    </form>
+  </div>
+</div>

@@ -34,6 +34,29 @@ public/css/                 Tailwind output (rebuild with npm run build:css afte
 scripts/seed.js             Superadmin + sample academic data
 ```
 
+## Assessment content editor (BlockNote)
+
+Assessment descriptions use a real block-based rich text editor (BlockNote,
+via React) instead of a plain textarea:
+
+- `src/client/assessmentEditorEntry.jsx` — the React/BlockNote mount point,
+  bundled with esbuild to `public/js/assessmentEditorEntry.{js,css}`.
+  Rebuild after editing it: `npm run build:editor`.
+- `src/utils/renderBlocks.js` + `src/utils/escapeHtml.js` — the shared
+  server-side renderer that turns the stored block JSON into HTML. Used on
+  both the teacher submissions view and the student assessment-detail view
+  (`assessment.description` is stored as-is via Sequelize's JSON column type).
+- `src/middleware/uploadImage.js` — handles in-editor image uploads (pasted/
+  dropped images), saving to `public/uploads/assessment-content/` and
+  returning `{ success, file: { url } }` as BlockNote's `uploadFile` expects.
+- The editor mounts in `src/views/teacher/assessments/new.ejs`; on form
+  submit, a small inline script serializes `editor.document` into a hidden
+  `descriptionBlocks` input, which the controller `JSON.parse`s before saving.
+
+If you add more places that need to *display* assessment content (e.g. a
+future assessment-detail page for teachers), reuse `renderBlocks` the same
+way — don't reimplement rendering per view.
+
 ## Migrating to PostgreSQL
 
 Set in `.env`:
@@ -71,6 +94,44 @@ Use `sequelize-cli` migrations for the real cutover rather than `sync()` in prod
   bulk "open submission window" override
 - Student: dashboard, assessment detail + submit (link-based; swap for signed
   object-storage upload in production per the architecture report)
+
+## Layout & navigation
+
+- Sidebar shell (`src/views/partials/sidebar.ejs`) with role-based nav groups
+  (Superadmin/Teacher/Student see different links), active-link highlighting
+  driven by `res.locals.currentPath` (set in `app.js`), and icons via the
+  Font Awesome CDN. Mobile: hamburger toggle slides the sidebar in/out.
+- Tab and drill-down state (Program Workspace's tab/session/semester) lives
+  entirely in the URL query string, so reloading the page preserves exactly
+  where you were — no client-side state needed.
+
+## Program Workspace (consolidated admin workflow)
+
+`/admin/programs/:id` replaces the old disconnected Program Offerings /
+Subject Offerings / Sections tabs with one hub page per program:
+
+- **Overview** — edit name/code/school/total semesters/duration in years,
+  activate/deactivate, delete (guarded if dependents exist)
+- **Specializations** — add/edit/delete, scoped to this program
+- **Semesters, Sections & Subjects** — pick an Academic Session, pick a
+  semester number, "enable" it if not yet active (creates the underlying
+  ProgramOffering), then manage Sections & Sub-Groups, assign Subjects from
+  the pool, and map Teachers to those subjects (with the conflict flag) —
+  all in one screen, all for that exact session+semester.
+
+The old standalone `/admin/offerings`, `/admin/subject-offerings`,
+`/admin/sections`, `/admin/mappings` pages are still there as read-only
+cross-program listings; day-to-day management happens through the workspace.
+
+## Edit / Delete
+
+Schools, Programs, Specializations, Subject Pool, Academic Sessions,
+Teachers, Sections, Subject Offerings, and Teacher Mappings all support
+edit and/or delete now. Deletes that would orphan dependent records (e.g.
+deleting a School that still has Programs) are guarded with a friendly
+error instead of a raw foreign-key crash — deactivate instead in those
+cases. Teacher deletion additionally checks for existing subject mappings
+and approval requests before allowing a hard delete.
 
 ## Not yet built
 
