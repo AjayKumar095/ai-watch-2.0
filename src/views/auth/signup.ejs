@@ -1,5 +1,8 @@
 <div class="mx-auto mt-8 max-w-xl">
   <div class="card">
+    <div class="mb-2 flex items-center gap-2">
+      <img src="/images/gu-logo.webp" alt="Geeta University" class="h-8 w-auto rounded bg-white p-0.5" />
+    </div>
     <h1 class="text-xl font-bold text-navy-900">Student Onboarding</h1>
     <p class="mt-1 text-sm text-navy-500">
       Your account is activated once the teacher you select below approves your request.
@@ -9,7 +12,7 @@
       <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
     <% } %>
 
-    <form action="/signup/student" method="POST" class="mt-6 space-y-4">
+    <form id="signup-form" action="/signup/student" method="POST" class="mt-6 space-y-4">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label class="form-label" for="firstName">First name</label>
@@ -39,23 +42,27 @@
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label class="form-label" for="programId">Program</label>
-          <select class="form-input" id="programId" name="programId" required>
-            <option value="">Select a program</option>
-            <% programs.forEach(function(p) { %>
-              <option value="<%= p.id %>" <%= formData.programId === p.id ? 'selected' : '' %>><%= p.name %></option>
+          <label class="form-label" for="schoolId">School</label>
+          <select class="form-input" id="schoolId" name="schoolId" required>
+            <option value="">Select a school</option>
+            <% schools.forEach(function(s) { %>
+              <option value="<%= s.id %>" <%= formData.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option>
             <% }) %>
           </select>
         </div>
         <div>
-          <label class="form-label" for="specializationId">Specialization (if any)</label>
-          <select class="form-input" id="specializationId" name="specializationId">
-            <option value="">None</option>
-            <% programs.forEach(function(p) { p.Specializations && p.Specializations.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= formData.specializationId === s.id ? 'selected' : '' %>><%= p.name %> — <%= s.name %></option>
-            <% }) }) %>
+          <label class="form-label" for="programId">Program</label>
+          <select class="form-input" id="programId" name="programId" required disabled>
+            <option value="">Select a school first</option>
           </select>
         </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="specializationId">Specialization (if any)</label>
+        <select class="form-input" id="specializationId" name="specializationId" disabled>
+          <option value="">Select a program first</option>
+        </select>
       </div>
 
       <div>
@@ -75,3 +82,75 @@
     </form>
   </div>
 </div>
+
+<script>
+  (function () {
+    var schoolSelect = document.getElementById('schoolId');
+    var programSelect = document.getElementById('programId');
+    var specializationSelect = document.getElementById('specializationId');
+
+    // Re-render state, so a validation-error re-render can restore the
+    // student's previous selections instead of resetting the cascade.
+    var prefillProgramId = <%- JSON.stringify(formData.programId || '') %>;
+    var prefillSpecializationId = <%- JSON.stringify(formData.specializationId || '') %>;
+
+    function setOptions(select, items, placeholder, selectedId) {
+      select.innerHTML = '';
+      var placeholderOpt = document.createElement('option');
+      placeholderOpt.value = '';
+      placeholderOpt.textContent = placeholder;
+      select.appendChild(placeholderOpt);
+      items.forEach(function (item) {
+        var opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (selectedId && item.id === selectedId) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function loadPrograms(schoolId, selectedProgramId) {
+      if (!schoolId) {
+        programSelect.disabled = true;
+        setOptions(programSelect, [], 'Select a school first');
+        specializationSelect.disabled = true;
+        setOptions(specializationSelect, [], 'Select a program first');
+        return;
+      }
+      fetch('/api/schools/' + schoolId + '/programs')
+        .then(function (r) { return r.json(); })
+        .then(function (programs) {
+          programSelect.disabled = false;
+          setOptions(programSelect, programs, 'Select a program', selectedProgramId);
+          if (selectedProgramId) loadSpecializations(selectedProgramId, prefillSpecializationId);
+        });
+    }
+
+    function loadSpecializations(programId, selectedSpecializationId) {
+      if (!programId) {
+        specializationSelect.disabled = true;
+        setOptions(specializationSelect, [], 'Select a program first');
+        return;
+      }
+      fetch('/api/programs/' + programId + '/specializations')
+        .then(function (r) { return r.json(); })
+        .then(function (specializations) {
+          specializationSelect.disabled = false;
+          setOptions(specializationSelect, specializations, 'None', selectedSpecializationId);
+        });
+    }
+
+    schoolSelect.addEventListener('change', function () {
+      loadPrograms(this.value, null);
+    });
+    programSelect.addEventListener('change', function () {
+      loadSpecializations(this.value, null);
+    });
+
+    // On initial load (e.g. re-render after a validation error), restore
+    // the cascade from whatever was previously selected.
+    if (schoolSelect.value) {
+      loadPrograms(schoolSelect.value, prefillProgramId);
+    }
+  })();
+</script>

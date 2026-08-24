@@ -51,7 +51,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
-  if (!req.currentUser) return res.redirect("/login");
+  if (!req.currentUser) return res.render("landing", { title: "Welcome" });
   const dashboard = { SUPERADMIN: "/admin/dashboard", TEACHER: "/teacher/dashboard", STUDENT: "/student/dashboard" };
   res.redirect(dashboard[req.currentUser.role] || "/login");
 });

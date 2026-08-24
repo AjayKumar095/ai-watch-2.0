@@ -2,6 +2,7 @@ const {
   User,
   TeacherProfile,
   StudentProfile,
+  School,
   Program,
   Specialization,
   ApprovalRequest,
@@ -103,20 +104,41 @@ exports.logout = async (req, res) => {
 // --- Student onboarding -----------------------------------------------------
 
 exports.showStudentSignup = async (req, res) => {
-  const programs = await Program.findAll({ where: { isActive: true }, include: [Specialization] });
+  const schools = await School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
   const teachers = await TeacherProfile.findAll({ include: [User] });
-  res.render("auth/signup", { title: "Student Onboarding", programs, teachers, error: null, formData: {} });
+  res.render("auth/signup", { title: "Student Onboarding", schools, teachers, error: null, formData: {} });
+};
+
+// Public JSON endpoints powering the School -> Program -> Specialization
+// cascading dropdowns on the signup form (no auth — the form is filled out
+// before the student has an account).
+exports.programsForSchool = async (req, res) => {
+  const programs = await Program.findAll({
+    where: { schoolId: req.params.schoolId, isActive: true },
+    order: [["name", "ASC"]],
+    attributes: ["id", "name"],
+  });
+  res.json(programs);
+};
+
+exports.specializationsForProgram = async (req, res) => {
+  const specializations = await Specialization.findAll({
+    where: { programId: req.params.programId, isActive: true },
+    order: [["name", "ASC"]],
+    attributes: ["id", "name"],
+  });
+  res.json(specializations);
 };
 
 exports.studentSignup = async (req, res) => {
-  const { email, firstName, lastName, password, rollNo, programId, specializationId, requestedTeacherId } = req.body;
+  const { email, firstName, lastName, password, rollNo, schoolId, programId, specializationId, requestedTeacherId } = req.body;
 
-  const programs = await Program.findAll({ where: { isActive: true }, include: [Specialization] });
+  const schools = await School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
   const teachers = await TeacherProfile.findAll({ include: [User] });
   const rerender = (error) =>
-    res.status(400).render("auth/signup", { title: "Student Onboarding", programs, teachers, error, formData: req.body });
+    res.status(400).render("auth/signup", { title: "Student Onboarding", schools, teachers, error, formData: req.body });
 
-  if (!email || !firstName || !lastName || !password || !rollNo || !programId || !requestedTeacherId) {
+  if (!email || !firstName || !lastName || !password || !rollNo || !schoolId || !programId || !requestedTeacherId) {
     return rerender("Please fill in all required fields.");
   }
 
