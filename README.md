@@ -27,10 +27,10 @@ src/config/database.js     Sequelize connection (SQLITE now, POSTGRES later via 
 src/models/                One file per model + index.js wiring all associations
 src/controllers/           MVC controllers (auth, admin, teacher, student, assessment, evaluation)
 src/services/              Business logic kept out of controllers (e.g. mapping conflict check)
-src/middleware/             JWT auth + role-gating middleware
-src/routes/                 Route files per area, mounted in app.js
-src/views/                  EJS templates; views/partials/ holds the shared layout + navbar
-public/css/                 Tailwind output (rebuild with npm run build:css after editing src/input.css)
+src/middleware/            JWT auth + role-gating middleware
+src/routes/                Route files per area, mounted in app.js
+src/views/                 EJS templates; views/partials/ holds the shared layout + navbar
+public/css/                Tailwind output (rebuild with npm run build:css after editing src/input.css)
 scripts/seed.js             Superadmin + sample academic data
 ```
 
