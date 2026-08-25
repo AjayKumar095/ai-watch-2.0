@@ -65,10 +65,18 @@ Section.hasMany(Section, { as: "subGroups", foreignKey: "parentSectionId", onDel
 Section.belongsTo(Section, { as: "parentSection", foreignKey: "parentSectionId" });
 
 // Subjects
-SubjectPool.hasMany(SubjectOffering, { foreignKey: "subjectId", onDelete: "CASCADE" });
+// SubjectPool <-> SubjectOffering: RESTRICT, not CASCADE — a subject that's
+// actively offered somewhere must have those offerings removed first. This
+// is what makes the admin "delete subject" guard actually block instead of
+// silently cascading away every offering, assessment, and submission tied
+// to it (a data-loss bug caught in testing before this was fixed).
+SubjectPool.hasMany(SubjectOffering, { foreignKey: "subjectId", onDelete: "RESTRICT" });
 SubjectOffering.belongsTo(SubjectPool, { foreignKey: "subjectId" });
 
-Program.hasMany(SubjectOffering, { foreignKey: "programId", onDelete: "CASCADE" });
+// RESTRICT for the same reason as SubjectPool above — deleting a program
+// that still has subject offerings configured (assessments, enrollments,
+// mappings) must be blocked, not silently cascaded away.
+Program.hasMany(SubjectOffering, { foreignKey: "programId", onDelete: "RESTRICT" });
 SubjectOffering.belongsTo(Program, { foreignKey: "programId" });
 
 Specialization.hasMany(SubjectOffering, { foreignKey: "specializationId", onDelete: "SET NULL" });
@@ -86,7 +94,9 @@ TeacherSubjectMapping.belongsTo(SubjectOffering, { foreignKey: "subjectOfferingI
 Section.hasMany(TeacherSubjectMapping, { foreignKey: "sectionId", onDelete: "CASCADE" });
 TeacherSubjectMapping.belongsTo(Section, { foreignKey: "sectionId" }); // nullable = all sections
 
-SubjectOffering.hasMany(SubjectEnrollment, { foreignKey: "subjectOfferingId", onDelete: "CASCADE" });
+// RESTRICT: deleting a subject offering that already has enrolled students
+// must be blocked, not silently un-enrolled.
+SubjectOffering.hasMany(SubjectEnrollment, { foreignKey: "subjectOfferingId", onDelete: "RESTRICT" });
 SubjectEnrollment.belongsTo(SubjectOffering, { foreignKey: "subjectOfferingId" });
 
 StudentProfile.hasMany(SubjectEnrollment, { foreignKey: "studentId", onDelete: "CASCADE" });
@@ -119,7 +129,9 @@ User.hasMany(ApprovalRequest, { as: "decidedApprovals", foreignKey: "decidedByUs
 ApprovalRequest.belongsTo(User, { as: "decidedBy", foreignKey: "decidedByUserId" });
 
 // Assessments & submissions
-SubjectOffering.hasMany(Assessment, { foreignKey: "subjectOfferingId", onDelete: "CASCADE" });
+// RESTRICT: deleting a subject offering that already has assessments
+// (with real student submissions) must be blocked, not cascaded away.
+SubjectOffering.hasMany(Assessment, { foreignKey: "subjectOfferingId", onDelete: "RESTRICT" });
 Assessment.belongsTo(SubjectOffering, { foreignKey: "subjectOfferingId" });
 
 User.hasMany(Assessment, { as: "createdAssessments", foreignKey: "createdById", onDelete: "RESTRICT" });

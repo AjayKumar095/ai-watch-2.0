@@ -71,6 +71,9 @@ router.get("/subjects/new", subjectPoolController.showCreate);
 router.post("/subjects/new", subjectPoolController.create);
 router.get("/subjects/bulk-import", subjectPoolController.showBulkImport);
 router.post("/subjects/bulk-import", upload.single("csvFile"), subjectPoolController.bulkImport);
+router.get("/subjects/:id/edit", subjectPoolController.showEdit);
+router.post("/subjects/:id/edit", subjectPoolController.edit);
+router.post("/subjects/:id/delete", subjectPoolController.delete);
 
 // Academic Sessions
 router.get("/sessions", academicSessionController.list);

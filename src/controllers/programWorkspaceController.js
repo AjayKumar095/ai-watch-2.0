@@ -160,8 +160,9 @@ exports.updateSpecialization = async (req, res) => {
 
 exports.deleteSpecialization = async (req, res) => {
   const spec = await Specialization.findOne({ where: { id: req.params.specId, programId: req.params.id } });
-  if (spec) await safeDestroy(spec, res, `/admin/programs/${req.params.id}?tab=specializations`, "specialization");
-  if (!res.headersSent) res.redirect(`/admin/programs/${req.params.id}?tab=specializations`);
+  const redirectTo = `/admin/programs/${req.params.id}?tab=specializations`;
+  if (!spec) return res.redirect(redirectTo);
+  if (await safeDestroy(spec, res, redirectTo, "specialization")) res.redirect(redirectTo);
 };
 
 // --- Structure tab: ensure a ProgramOffering exists for session+semester ---
@@ -190,8 +191,11 @@ exports.deleteSection = async (req, res) => {
   const { sessionId, semesterNumber } = req.body;
   const section = await Section.findByPk(req.params.sectionId);
   const redirectTo = `/admin/programs/${req.params.id}?tab=structure&session=${sessionId}&semester=${semesterNumber}`;
-  if (section) await safeDestroy(section, res, redirectTo, "section");
-  if (!res.headersSent) res.redirect(redirectTo);
+  if (!section) return res.redirect(redirectTo);
+  // safeDestroy sends its own (409) response when blocked — only redirect
+  // on the success path, never based on a racy headersSent check against
+  // an async render() call.
+  if (await safeDestroy(section, res, redirectTo, "section")) res.redirect(redirectTo);
 };
 
 // --- Subject offerings, scoped to the current program+semester+session ---
@@ -214,8 +218,8 @@ exports.deleteSubjectOffering = async (req, res) => {
   const { sessionId, semesterNumber } = req.body;
   const offering = await SubjectOffering.findByPk(req.params.subjectOfferingId);
   const redirectTo = `/admin/programs/${req.params.id}?tab=structure&session=${sessionId}&semester=${semesterNumber}`;
-  if (offering) await safeDestroy(offering, res, redirectTo, "subject offering");
-  if (!res.headersSent) res.redirect(redirectTo);
+  if (!offering) return res.redirect(redirectTo);
+  if (await safeDestroy(offering, res, redirectTo, "subject offering")) res.redirect(redirectTo);
 };
 
 // --- Teacher mappings, scoped to a subject offering within the workspace ---
