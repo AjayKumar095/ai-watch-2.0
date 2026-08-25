@@ -10,6 +10,7 @@ const programOfferingController = require("../controllers/programOfferingControl
 const sectionController = require("../controllers/sectionController");
 const subjectOfferingController = require("../controllers/subjectOfferingController");
 const teacherAccountController = require("../controllers/teacherAccountController");
+const studentAdminController = require("../controllers/studentAdminController");
 const sessionCloneController = require("../controllers/sessionCloneController");
 const promotionController = require("../controllers/promotionController");
 const certificateController = require("../controllers/certificateController");
@@ -25,10 +26,12 @@ router.get("/teachers", teacherAccountController.list);
 router.get("/teachers/:id/edit", teacherAccountController.showEdit);
 router.post("/teachers/:id/edit", teacherAccountController.edit);
 router.post("/teachers/:id/delete", teacherAccountController.delete);
+router.get("/students", studentAdminController.list);
 
 router.get("/mappings", adminController.listMappings);
 router.get("/mappings/new", adminController.showCreateMapping);
 router.post("/mappings/new", adminController.createMapping);
+router.post("/mappings/:id/delete", adminController.deleteMapping);
 
 router.get("/enroll", adminController.showEnroll);
 router.post("/enroll/auto", adminController.autoEnroll);
@@ -74,6 +77,8 @@ router.post("/subjects/bulk-import", upload.single("csvFile"), subjectPoolContro
 router.get("/subjects/:id/edit", subjectPoolController.showEdit);
 router.post("/subjects/:id/edit", subjectPoolController.edit);
 router.post("/subjects/:id/delete", subjectPoolController.delete);
+router.post("/subjects/:id/toggle", subjectPoolController.toggleActive);
+router.post("/subjects/bulk-delete", subjectPoolController.bulkDelete);
 
 // Academic Sessions
 router.get("/sessions", academicSessionController.list);

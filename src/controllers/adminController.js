@@ -7,6 +7,8 @@ const {
   SubjectPool,
   AcademicSession,
   AuditLog,
+  ApprovalRequest,
+  Submission,
 } = require("../models");
 const { hashPassword } = require("../utils/password");
 const crypto = require("crypto");
@@ -23,9 +25,43 @@ exports.dashboard = async (req, res) => {
     AcademicSession.count(),
   ]);
 
+  // Students-by-program, for the chart.
+  const programsWithCounts = await Program.findAll({
+    include: [{ model: StudentProfile, attributes: [] }],
+    attributes: ["id", "name", [User.sequelize.fn("COUNT", User.sequelize.col("StudentProfiles.id")), "studentCount"]],
+    group: ["Program.id"],
+    raw: true,
+  });
+  const programChart = {
+    labels: programsWithCounts.map((p) => p.name),
+    data: programsWithCounts.map((p) => parseInt(p.studentCount, 10)),
+  };
+
+  // Submission status breakdown, for the chart.
+  const [pendingSubs, evaluatedSubs, rejectedSubs] = await Promise.all([
+    Submission.count({ where: { status: "PENDING" } }),
+    Submission.count({ where: { status: "EVALUATED" } }),
+    Submission.count({ where: { status: "REJECTED" } }),
+  ]);
+  const submissionChart = { pending: pendingSubs, evaluated: evaluatedSubs, rejected: rejectedSubs };
+
+  // Notifications — things that might need admin attention.
+  const pendingApprovalsCount = await ApprovalRequest.count({ where: { status: "PENDING" } });
+
+  // Recent activity feed.
+  const recentActivity = await AuditLog.findAll({
+    include: [User],
+    order: [["createdAt", "DESC"]],
+    limit: 8,
+  });
+
   res.render("admin/dashboard", {
     title: "Superadmin Dashboard",
     stats: { teacherCount, studentCount, schoolCount, programCount, subjectCount, sessionCount },
+    programChart,
+    submissionChart,
+    pendingApprovalsCount,
+    recentActivity,
     breadcrumbs: [{ label: "Dashboard" }],
   });
 };
@@ -186,4 +222,14 @@ exports.listMappings = async (req, res) => {
     order: [["createdAt", "DESC"]],
   });
   res.render("admin/mappings/index", { title: "Teacher-Subject Mappings", mappings, breadcrumbs: [ROOT, { label: "Teacher Mappings" }] });
+};
+
+// Standalone delete (outside the Program Workspace's session/semester
+// context). Mappings aren't otherwise "edited" — changing a teacher or
+// section is a remove-and-recreate via the Add Mapping form, since the
+// valid section options depend on which subject offering is picked.
+exports.deleteMapping = async (req, res) => {
+  const mapping = await TeacherSubjectMapping.findByPk(req.params.id);
+  if (mapping) await mapping.destroy();
+  res.redirect("/admin/mappings");
 };

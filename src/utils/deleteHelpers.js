@@ -17,4 +17,20 @@ async function safeDestroy(instance, res, redirectTo, entityLabel) {
   }
 }
 
-module.exports = { safeDestroy };
+// Bulk-safe variant: never touches `res` (bulk operations process many
+// rows and can't have each one render its own response). Returns a plain
+// {ok, reason} result so the caller can aggregate outcomes into a single
+// summary rendered once at the end.
+async function tryDestroy(instance) {
+  try {
+    await instance.destroy();
+    return { ok: true };
+  } catch (err) {
+    if (err.name === "SequelizeForeignKeyConstraintError") {
+      return { ok: false, reason: "still in use" };
+    }
+    throw err;
+  }
+}
+
+module.exports = { safeDestroy, tryDestroy };

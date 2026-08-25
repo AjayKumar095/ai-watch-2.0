@@ -5,7 +5,7 @@
 <div class="card">
   <table class="min-w-full divide-y divide-navy-100 text-sm">
     <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-      <th class="py-2 pr-3">Teacher</th><th class="py-2 pr-3">Subject</th><th class="py-2 pr-3">Program</th><th class="py-2 pr-3">Section</th>
+      <th class="py-2 pr-3">Teacher</th><th class="py-2 pr-3">Subject</th><th class="py-2 pr-3">Program</th><th class="py-2 pr-3">Section</th><th class="py-2 pr-3"></th>
     </tr></thead>
     <tbody class="divide-y divide-navy-50">
       <% mappings.forEach(function(m) { %>
@@ -14,9 +14,14 @@
           <td class="py-2 pr-3 text-navy-500"><%= m.SubjectOffering.SubjectPool.name %></td>
           <td class="py-2 pr-3 text-navy-500"><%= m.SubjectOffering.Program.name %> Sem <%= m.SubjectOffering.semesterNumber %></td>
           <td class="py-2 pr-3"><span class="<%= m.Section ? 'badge-navy' : 'badge-info' %>"><%= m.Section ? m.Section.name : 'All sections' %></span></td>
+          <td class="py-2 pr-3">
+            <form action="/admin/mappings/<%= m.id %>/delete" method="POST" onsubmit="return confirm('Remove this mapping? The teacher will lose access to this subject/section.');">
+              <button class="btn-ghost text-xs !text-amber-700">Remove</button>
+            </form>
+          </td>
         </tr>
       <% }) %>
-      <% if (!mappings.length) { %><tr><td colspan="4" class="py-4 text-navy-400">No mappings yet.</td></tr><% } %>
+      <% if (!mappings.length) { %><tr><td colspan="5" class="py-4 text-navy-400">No mappings yet.</td></tr><% } %>
     </tbody>
   </table>
 </div>

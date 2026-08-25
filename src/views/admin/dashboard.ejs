@@ -6,11 +6,6 @@
   <a href="/admin/teachers/new" class="btn-primary">+ Create Teacher</a>
 </div>
 
-<div class="mb-6 flex flex-wrap gap-3">
-  <a href="/admin/mappings/new" class="btn-secondary">+ Map Teacher to Subject</a>
-  <a href="/admin/enroll" class="btn-secondary">+ Enroll Students</a>
-</div>
-
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
   <div class="card"><p class="text-xs uppercase text-navy-400">Schools</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.schoolCount %></p></div>
   <div class="card"><p class="text-xs uppercase text-navy-400">Programs</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.programCount %></p></div>
@@ -20,28 +15,76 @@
   <div class="card"><p class="text-xs uppercase text-navy-400">Students</p><p class="mt-2 text-2xl font-bold text-amber-600"><%= stats.studentCount %></p></div>
 </div>
 
-<div class="card mt-6">
-  <h2 class="mb-3 text-lg font-semibold text-navy-900">Academic Structure</h2>
-  <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-    <a href="/admin/schools" class="btn-secondary justify-start">Schools</a>
-    <a href="/admin/programs" class="btn-secondary justify-start">Programs & Specializations</a>
-    <a href="/admin/teachers" class="btn-secondary justify-start">Teachers</a>
-    <a href="/admin/sessions" class="btn-secondary justify-start">Academic Sessions</a>
-    <a href="/admin/offerings" class="btn-secondary justify-start">Program Offerings</a>
-    <a href="/admin/sections" class="btn-secondary justify-start">Sections & Sub-Groups</a>
-    <a href="/admin/subjects" class="btn-secondary justify-start">Subject Pool</a>
-    <a href="/admin/subject-offerings" class="btn-secondary justify-start">Subject Offerings</a>
-    <a href="/admin/mappings" class="btn-secondary justify-start">Teacher Mappings</a>
-    <a href="/admin/enroll" class="btn-secondary justify-start">Enroll Students</a>
+<% if (pendingApprovalsCount > 0) { %>
+  <div class="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    <i class="fa-solid fa-bell"></i>
+    <span><strong><%= pendingApprovalsCount %></strong> student approval request<%= pendingApprovalsCount === 1 ? '' : 's' %> currently pending across all teachers.</span>
+  </div>
+<% } %>
+
+<div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+  <div class="card lg:col-span-2">
+    <h2 class="mb-3 text-sm font-semibold text-navy-900">Students by Program</h2>
+    <canvas id="programChart" height="120"></canvas>
+  </div>
+  <div class="card">
+    <h2 class="mb-3 text-sm font-semibold text-navy-900">Submission Status</h2>
+    <canvas id="submissionChart" height="160"></canvas>
   </div>
 </div>
 
 <div class="card mt-6">
-  <h2 class="mb-3 text-lg font-semibold text-navy-900">Term Rollover & Records</h2>
-  <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-    <a href="/admin/session-clone" class="btn-secondary justify-start">Clone Academic Session Forward</a>
-    <a href="/admin/promotions" class="btn-secondary justify-start">Promotion Batches</a>
-    <a href="/admin/certificates" class="btn-secondary justify-start">Certificates</a>
-    <a href="/admin/audit-log" class="btn-secondary justify-start">Audit Log</a>
-  </div>
+  <h2 class="mb-3 text-sm font-semibold text-navy-900">Recent Activity</h2>
+  <% if (!recentActivity.length) { %>
+    <p class="text-sm text-navy-400">No activity recorded yet.</p>
+  <% } else { %>
+    <div class="divide-y divide-navy-50">
+      <% recentActivity.forEach(function(a) { %>
+        <div class="flex items-center justify-between py-2 text-sm">
+          <div>
+            <span class="badge-navy mr-2"><%= a.action %></span>
+            <span class="text-navy-500"><%= a.entityType %></span>
+          </div>
+          <div class="text-right text-xs text-navy-400">
+            <%= a.User ? a.User.firstName + ' ' + a.User.lastName : 'System' %> · <%= new Date(a.createdAt).toLocaleString() %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+    <a href="/admin/audit-log" class="mt-3 inline-block text-xs text-info-600 hover:underline">View full audit log →</a>
+  <% } %>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+  (function () {
+    var navy = '#203A63';
+    var amber = '#F79009';
+    var info = '#2E90FA';
+
+    new Chart(document.getElementById('programChart'), {
+      type: 'bar',
+      data: {
+        labels: <%- JSON.stringify(programChart.labels) %>,
+        datasets: [{ label: 'Students', data: <%- JSON.stringify(programChart.data) %>, backgroundColor: info, borderRadius: 6 }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+
+    new Chart(document.getElementById('submissionChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Pending', 'Evaluated', 'Rejected'],
+        datasets: [{
+          data: [<%= submissionChart.pending %>, <%= submissionChart.evaluated %>, <%= submissionChart.rejected %>],
+          backgroundColor: [amber, info, navy],
+        }],
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } },
+    });
+  })();
+</script>

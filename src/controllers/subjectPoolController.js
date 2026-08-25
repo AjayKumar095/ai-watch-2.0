@@ -1,13 +1,13 @@
 const { parse } = require("csv-parse/sync");
 const { SubjectPool, AuditLog } = require("../models");
-const { safeDestroy } = require("../utils/deleteHelpers");
+const { safeDestroy, tryDestroy } = require("../utils/deleteHelpers");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const SUBJECTS = { label: "Subject Pool", url: "/admin/subjects" };
 
 exports.list = async (req, res) => {
   const subjects = await SubjectPool.findAll({ order: [["name", "ASC"]] });
-  res.render("admin/subjects/index", { title: "Subject Pool", subjects, breadcrumbs: [ROOT, { label: "Subject Pool" }] });
+  res.render("admin/subjects/index", { title: "Subject Pool", subjects, bulkMessage: null, breadcrumbs: [ROOT, { label: "Subject Pool" }] });
 };
 
 exports.showCreate = (req, res) => {
@@ -66,6 +66,56 @@ exports.delete = async (req, res) => {
     await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT", entityType: "SubjectPool", entityId: req.params.id, metadata: {} });
     res.redirect("/admin/subjects");
   }
+};
+
+exports.toggleActive = async (req, res) => {
+  const subject = await SubjectPool.findByPk(req.params.id);
+  if (subject) {
+    subject.isActive = !subject.isActive;
+    await subject.save();
+    await AuditLog.create({
+      userId: req.currentUser.id,
+      action: subject.isActive ? "ACTIVATE_SUBJECT" : "DEACTIVATE_SUBJECT",
+      entityType: "SubjectPool",
+      entityId: subject.id,
+      metadata: {},
+    });
+  }
+  res.redirect("/admin/subjects");
+};
+
+// Bulk delete — uses tryDestroy (never touches `res` per-row) so a mix of
+// deletable and in-use subjects in the same selection doesn't crash or
+// short-circuit; renders one summary at the end instead.
+exports.bulkDelete = async (req, res) => {
+  let ids = req.body.subjectIds || [];
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.filter(Boolean);
+
+  if (!ids.length) return res.redirect("/admin/subjects");
+
+  const subjects = await SubjectPool.findAll({ where: { id: ids } });
+  let deletedCount = 0;
+  const blocked = [];
+  for (const subject of subjects) {
+    const result = await tryDestroy(subject);
+    if (result.ok) {
+      deletedCount++;
+      await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT", entityType: "SubjectPool", entityId: subject.id, metadata: { bulk: true } });
+    } else {
+      blocked.push(subject.name);
+    }
+  }
+
+  const subjectsAfter = await SubjectPool.findAll({ order: [["name", "ASC"]] });
+  let message = null;
+  if (blocked.length) {
+    message = `${deletedCount} deleted. ${blocked.length} skipped because still in use: ${blocked.join(", ")}. Deactivate those instead, or remove their subject offerings first.`;
+  }
+  res.render("admin/subjects/index", {
+    title: "Subject Pool", subjects: subjectsAfter, bulkMessage: message,
+    breadcrumbs: [ROOT, { label: "Subject Pool" }],
+  });
 };
 
 // --- Bulk import: pasted CSV text OR an uploaded .csv file, same underlying
