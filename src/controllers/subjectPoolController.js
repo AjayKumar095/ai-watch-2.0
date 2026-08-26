@@ -1,5 +1,5 @@
 const { parse } = require("csv-parse/sync");
-const { SubjectPool, AuditLog } = require("../models");
+const { SubjectPool, SubjectOffering, Program, AuditLog } = require("../models");
 const { safeDestroy, tryDestroy } = require("../utils/deleteHelpers");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
@@ -62,6 +62,19 @@ exports.edit = async (req, res) => {
 exports.delete = async (req, res) => {
   const subject = await SubjectPool.findByPk(req.params.id);
   if (!subject) return res.redirect("/admin/subjects");
+
+  // Check the actual blocker up front so the message names it specifically
+  // (e.g. "still offered in BBA, LLB") instead of a generic "still in use"
+  // that leaves the admin guessing which dependency to go remove.
+  const offerings = await SubjectOffering.findAll({ where: { subjectId: subject.id }, include: [Program] });
+  if (offerings.length) {
+    const programNames = [...new Set(offerings.map((o) => o.Program.name))].join(", ");
+    return res.status(409).render("error", {
+      title: "Can't delete",
+      message: `"${subject.name}" is still offered in: ${programNames} (${offerings.length} subject offering${offerings.length === 1 ? "" : "s"} total). Remove those subject offerings from each program's workspace first, or deactivate this subject instead of deleting it.`,
+    });
+  }
+
   if (await safeDestroy(subject, res, "/admin/subjects", "subject")) {
     await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT", entityType: "SubjectPool", entityId: req.params.id, metadata: {} });
     res.redirect("/admin/subjects");
@@ -98,6 +111,11 @@ exports.bulkDelete = async (req, res) => {
   let deletedCount = 0;
   const blocked = [];
   for (const subject of subjects) {
+    const offeringCount = await SubjectOffering.count({ where: { subjectId: subject.id } });
+    if (offeringCount > 0) {
+      blocked.push(`${subject.name} (${offeringCount} offering${offeringCount === 1 ? "" : "s"} still exist)`);
+      continue;
+    }
     const result = await tryDestroy(subject);
     if (result.ok) {
       deletedCount++;

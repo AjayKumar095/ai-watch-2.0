@@ -1,2 +1,1 @@
-DELETE from users
-WHERE role = 'STUDENT';
+DELETE from submissions;

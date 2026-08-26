@@ -2,8 +2,8 @@
   <div class="card">
     <h1 class="text-xl font-bold text-navy-900">Bulk Attach Subject to Programs</h1>
     <p class="mt-1 text-sm text-navy-500">
-      For university-wide subjects (e.g. "AI for All") — select one subject and every program it's taught in,
-      and create all the offerings in one action.
+      Select one subject and every program it's taught in — each program can be at a <strong>different semester</strong>
+      (e.g. HTML at BCA Semester 2 and B.Tech Semester 1, in one action).
     </p>
 
     <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
@@ -11,6 +11,11 @@
       <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
         <%= result.createdCount %> created, <%= result.skippedCount %> already existed (of <%= result.totalRequested %> programs selected).
       </div>
+      <% if (result.invalid && result.invalid.length) { %>
+        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Skipped — missing or out-of-range semester number: <%= result.invalid.join(', ') %>
+        </div>
+      <% } %>
     <% } %>
 
     <form action="/admin/subject-offerings/bulk-attach" method="POST" class="mt-6 space-y-4">
@@ -21,7 +26,6 @@
           <% subjects.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %> (<%= s.code %>)</option><% }) %>
         </select>
       </div>
-      <div><label class="form-label">Semester number</label><input class="form-input" type="number" name="semesterNumber" min="1" required /></div>
       <div>
         <label class="form-label">Academic Session</label>
         <select class="form-input" name="academicSessionId" required>
@@ -30,12 +34,15 @@
         </select>
       </div>
       <div>
-        <label class="form-label">Programs (select all that apply)</label>
-        <div class="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
+        <label class="form-label">Programs — check to include, then set that program's semester</label>
+        <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
           <% programs.forEach(function(p) { %>
             <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
-              <input type="checkbox" name="programIds" value="<%= p.id %>" />
-              <%= p.name %>
+              <input type="checkbox" name="programIds" value="<%= p.id %>"
+                     onchange="document.getElementById('sem_<%= p.id %>').disabled = !this.checked" />
+              <span class="flex-1"><%= p.name %> <span class="text-xs text-navy-400">(<%= p.totalSemesters %> semesters)</span></span>
+              <input id="sem_<%= p.id %>" class="form-input !w-24 !py-1 text-xs" type="number" min="1" max="<%= p.totalSemesters %>"
+                     name="semesterFor_<%= p.id %>" placeholder="Sem #" disabled />
             </label>
           <% }) %>
         </div>

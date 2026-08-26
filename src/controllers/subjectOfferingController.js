@@ -64,7 +64,7 @@ exports.showBulkAttach = async (req, res) => {
 };
 
 exports.bulkAttach = async (req, res) => {
-  const { subjectId, semesterNumber, academicSessionId } = req.body;
+  const { subjectId, academicSessionId } = req.body;
   let programIds = req.body.programIds || [];
   if (!Array.isArray(programIds)) programIds = [programIds];
 
@@ -74,17 +74,29 @@ exports.bulkAttach = async (req, res) => {
     AcademicSession.findAll({ where: { isActive: true } }),
   ]);
 
-  if (!subjectId || !semesterNumber || !academicSessionId || !programIds.length) {
+  if (!subjectId || !academicSessionId || !programIds.length) {
     return res.status(400).render("admin/subject-offerings/bulk-attach", {
       title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null,
-      error: "Subject, semester, session, and at least one program are required.",
+      error: "Subject, session, and at least one program are required.",
       breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
     });
   }
 
+  // Each selected program gets its OWN semester number field
+  // (semesterFor_<programId>) — this is what makes "HTML in BCA Sem 2 AND
+  // BTECH Sem 1, in one action" actually possible, instead of forcing the
+  // same semester across every selected program.
   const created = [];
   const skipped = [];
+  const invalid = [];
   for (const programId of programIds) {
+    const semesterRaw = req.body[`semesterFor_${programId}`];
+    const semesterNumber = parseInt(semesterRaw, 10);
+    const program = programs.find((p) => p.id === programId);
+    if (!semesterRaw || isNaN(semesterNumber) || semesterNumber < 1 || (program && semesterNumber > program.totalSemesters)) {
+      invalid.push(program ? program.name : programId);
+      continue;
+    }
     const [offering, wasCreated] = await SubjectOffering.findOrCreate({
       where: { subjectId, programId, semesterNumber, specializationId: null, academicSessionId },
       defaults: {},
@@ -98,12 +110,12 @@ exports.bulkAttach = async (req, res) => {
     action: "BULK_ATTACH_SUBJECT",
     entityType: "SubjectPool",
     entityId: subjectId,
-    metadata: { createdCount: created.length, skippedCount: skipped.length, programIds },
+    metadata: { createdCount: created.length, skippedCount: skipped.length, invalidCount: invalid.length, programIds },
   });
 
   res.render("admin/subject-offerings/bulk-attach", {
     title: "Bulk Attach Subject to Programs", subjects, programs, sessions,
-    result: { createdCount: created.length, skippedCount: skipped.length, totalRequested: programIds.length },
+    result: { createdCount: created.length, skippedCount: skipped.length, invalid, totalRequested: programIds.length },
     error: null,
     breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
   });
