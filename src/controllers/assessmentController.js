@@ -12,8 +12,10 @@ const {
   TeacherProfile,
   Submission,
   StudentProfile,
+  SubjectEnrollment,
   User,
 } = require("../models");
+const { notifyAssessmentCreated } = require("../services/notificationService");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
@@ -96,6 +98,21 @@ exports.showCreate = async (req, res) => {
   });
 };
 
+// Given the section ids an assessment was targeted at (top-level and/or
+// sub-group), returns the matching SubjectOffering enrollments — including
+// students enrolled directly in a targeted top-level section's sub-groups,
+// mirroring the visibility rule in services/sectionScope.js.
+async function enrolledStudentsForTarget(subjectOfferingId, sectionIds) {
+  const childSections = await Section.findAll({ where: { parentSectionId: sectionIds } });
+  const allSectionIds = [...new Set([...sectionIds, ...childSections.map((s) => s.id)])];
+
+  const enrollments = await SubjectEnrollment.findAll({
+    where: { subjectOfferingId, sectionId: allSectionIds },
+    include: [{ model: StudentProfile, include: [User] }],
+  });
+  return enrollments.map((e) => e.StudentProfile.User);
+}
+
 exports.create = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
   const targetOptions = await buildTargetOptions(teacherProfile);
@@ -134,6 +151,8 @@ exports.create = async (req, res) => {
   }
 
   const created = [];
+  const mentorName = req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName;
+
   for (const [subjectOfferingId, sectionIds] of Object.entries(grouped)) {
     const assessment = await Assessment.create({
       subjectOfferingId,
@@ -150,6 +169,18 @@ exports.create = async (req, res) => {
       await AssessmentSection.create({ assessmentId: assessment.id, sectionId });
     }
     created.push(assessment);
+
+    const subjectOffering = await SubjectOffering.findByPk(subjectOfferingId, { include: [SubjectPool] });
+    const studentUsers = await enrolledStudentsForTarget(subjectOfferingId, sectionIds);
+    if (studentUsers.length) {
+      notifyAssessmentCreated({
+        studentUsers,
+        title,
+        subjectName: subjectOffering.SubjectPool.name,
+        mentorName,
+        dueAt: endAt,
+      });
+    }
   }
 
   res.redirect("/teacher/assessments");

@@ -12,6 +12,7 @@ const flash = require("connect-flash");
 
 const { attachUser } = require("./src/middleware/auth");
 const authRoutes = require("./src/routes/auth");
+const accountRoutes = require("./src/routes/account");
 const teacherRoutes = require("./src/routes/teacher");
 const studentRoutes = require("./src/routes/student");
 const adminRoutes = require("./src/routes/admin");
@@ -57,6 +58,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/", authRoutes);
+app.use("/account", accountRoutes);
 app.use("/teacher", teacherRoutes);
 app.use("/student", studentRoutes);
 app.use("/admin", adminRoutes);

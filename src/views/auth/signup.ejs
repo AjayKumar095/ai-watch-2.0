@@ -29,15 +29,14 @@
         <input class="form-input" type="email" id="email" name="email" value="<%= formData.email || '' %>" required />
       </div>
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label class="form-label" for="password">Password</label>
-          <input class="form-input" type="password" id="password" name="password" required />
-        </div>
-        <div>
-          <label class="form-label" for="rollNo">Roll number</label>
-          <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
-        </div>
+      <p class="text-xs text-navy-400">
+        No password to set here — once your requested teacher approves your account, we'll email you a
+        temporary login password.
+      </p>
+
+      <div>
+        <label class="form-label" for="rollNo">Roll number</label>
+        <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
       </div>
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

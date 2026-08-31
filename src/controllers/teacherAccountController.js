@@ -6,10 +6,7 @@ const TEACHERS = { label: "Teachers", url: "/admin/teachers" };
 
 exports.list = async (req, res) => {
   const teachers = await TeacherProfile.findAll({ include: [User, School], order: [["employeeCode", "ASC"]] });
-  console.log(teachers);
-
   res.render("admin/teachers/index", { title: "Teachers", teachers, breadcrumbs: [ROOT, { label: "Teachers" }] });
-
 };
 
 exports.showEdit = async (req, res) => {

@@ -1,0 +1,6 @@
+{
+  "subject": "We've received your AI-Watch account request",
+  "title": "Request submitted",
+  "subtitle": "Sent to {{teacherName}} for approval.",
+  "body": "<p>Hi {{firstName}},</p><p>Your AI-Watch account request has been sent to <strong>{{teacherName}}</strong> for approval.</p><p>Once approved, you'll receive another email at this address with your login ID and a temporary password.</p><p>No action is needed from you right now.</p>"
+}

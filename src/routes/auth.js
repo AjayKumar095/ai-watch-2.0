@@ -6,6 +6,9 @@ router.post("/login", authController.login);
 router.post("/logout", authController.logout);
 router.post("/auth/refresh", authController.refresh);
 
+router.get("/forgot-password", authController.showForgotPassword);
+router.post("/forgot-password", authController.forgotPassword);
+
 router.get("/signup/student", authController.showStudentSignup);
 router.post("/signup/student", authController.studentSignup);
 

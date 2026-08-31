@@ -19,6 +19,11 @@ function getTransporter() {
   if (cachedTransporter) return cachedTransporter;
 
   const auth = { user: process.env.MAIL_USER, pass: process.env.MAIL_APP_PASSWORD };
+  // Nodemailer's defaults can leave a request hanging for minutes if the
+  // mail server is unreachable (e.g. misconfigured host, blocked outbound
+  // port). Bounding these means a bad mail config fails fast instead of
+  // stalling whatever action triggered the email (an approval, a signup...).
+  const timeouts = { connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 10000 };
 
   cachedTransporter = process.env.MAIL_HOST
     ? nodemailer.createTransport({
@@ -26,8 +31,9 @@ function getTransporter() {
         port: Number(process.env.MAIL_PORT) || 587,
         secure: Number(process.env.MAIL_PORT) === 465,
         auth,
+        ...timeouts,
       })
-    : nodemailer.createTransport({ service: process.env.MAIL_SERVICE || "gmail", auth });
+    : nodemailer.createTransport({ service: process.env.MAIL_SERVICE || "gmail", auth, ...timeouts });
 
   return cachedTransporter;
 }

@@ -12,35 +12,8 @@ const {
   Assessment,
   Submission,
 } = require("../models");
-const { hashPassword } = require("../utils/password");
-const { sendTemplateMail } = require("../plugins/mailer");
-
-// Fire-and-forget: a failed/unconfigured mailer should never block an
-// approval decision. Errors are logged, not thrown.
-async function notifyApprovalDecision({ studentUser, rollNo, decision, decidedByName, note }) {
-  try {
-    if (decision === "APPROVED") {
-      await sendTemplateMail({
-        to: studentUser.email,
-        template: "welcome",
-        data: {
-          firstName: studentUser.firstName,
-          rollNo: rollNo || "",
-          approvedBy: decidedByName,
-          loginUrl: `${process.env.APP_URL || "http://localhost:3000"}/login`,
-        },
-      });
-    } else {
-      await sendTemplateMail({
-        to: studentUser.email,
-        template: "approval-decision",
-        data: { firstName: studentUser.firstName, decidedBy: decidedByName, decision: decision.toLowerCase(), note: note || "" },
-      });
-    }
-  } catch (err) {
-    console.error("[mailer] Failed to send approval-decision email:", err.message);
-  }
-}
+const { hashPassword, generateTempPassword } = require("../utils/password");
+const { notifyApprovalDecision } = require("../services/notificationService");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 
@@ -129,17 +102,20 @@ exports.approveRequest = async (req, res) => {
   await request.StudentProfile.save();
 
   const studentUser = request.StudentProfile.User;
+  const tempPassword = generateTempPassword();
+  studentUser.passwordHash = await hashPassword(tempPassword);
   studentUser.isActive = true;
   await studentUser.save();
 
-  // Sent inline via the mailer plugin (src/plugins/mailer) — swap for a
-  // background job queue per the architecture report §4.2 if approval
-  // volume ever makes inline sending too slow.
-  await notifyApprovalDecision({
+  // Fire-and-forget via the mailer plugin (src/plugins/mailer) — not
+  // awaited, so a slow/unreachable mail server can't stall this approval.
+  // Errors are caught and logged inside notificationService.js.
+  notifyApprovalDecision({
     studentUser,
     rollNo: request.StudentProfile.rollNo,
     decision: "APPROVED",
     decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+    tempPassword,
   });
 
   res.redirect("/teacher/dashboard");
@@ -158,7 +134,7 @@ exports.rejectRequest = async (req, res) => {
   request.decidedAt = new Date();
   await request.save();
 
-  await notifyApprovalDecision({
+  notifyApprovalDecision({
     studentUser: request.StudentProfile.User,
     decision: "REJECTED",
     decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
@@ -186,13 +162,17 @@ exports.bulkApprove = async (req, res) => {
     await request.save();
     request.StudentProfile.isVerified = true;
     await request.StudentProfile.save();
+    const tempPassword = generateTempPassword();
+    request.StudentProfile.User.passwordHash = await hashPassword(tempPassword);
     request.StudentProfile.User.isActive = true;
     await request.StudentProfile.User.save();
 
-    await notifyApprovalDecision({
+    notifyApprovalDecision({
       studentUser: request.StudentProfile.User,
+      rollNo: request.StudentProfile.rollNo,
       decision: "APPROVED",
       decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+      tempPassword,
     });
   }
 

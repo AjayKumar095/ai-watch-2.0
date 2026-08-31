@@ -117,12 +117,31 @@ await sendTemplateMail({
   password — needs 2-Step Verification on the account), plus `MAIL_FROM_NAME`.
   Set `MAIL_HOST`/`MAIL_PORT` instead to use a non-Gmail SMTP provider.
 - **If unconfigured**, `sendTemplateMail` logs what it would have sent and
-  returns `{ skipped: true }` instead of throwing — mail failures never take
-  down a request. It's already wired into
-  `teacherController.js`'s approve/reject flow (wrapped in try/catch)
-  to notify students when their account is approved or rejected.
+  returns `{ skipped: true }` instead of throwing.
+- **Never blocks a request.** Every call site (below) fires the email
+  without `await`-ing it, and the SMTP connection/greeting/socket timeouts
+  are capped at 10s (`src/plugins/mailer/transporter.js`) — so an
+  unreachable or misconfigured mail server can't stall an approval, signup,
+  password reset, or assessment post. Errors are caught and logged inside
+  `src/services/notificationService.js`, which is the single place all four
+  flows below go through.
 - **Test your setup:** `npm run mail:test -- you@example.com` (add a
   template name as a second arg to try the others).
+
+**Wired-in flows** (all in `src/services/notificationService.js`):
+
+| When | Template | Where |
+|---|---|---|
+| Student submits the signup form | `signup-received` | `authController.studentSignup` |
+| Teacher approves an account | `welcome` (login email + system-generated temp password) | `teacherController.approveRequest` / `bulkApprove` |
+| Teacher rejects an account | `approval-decision` | `teacherController.rejectRequest` |
+| Student/teacher/admin uses "Forgot password" | `password-reset` (new temp password) | `authController.forgotPassword` |
+| Teacher posts a new assessment | `assessment-created` (subject, mentor, due date) | `assessmentController.create`, to every student enrolled in the targeted section(s) |
+
+Note the signup form no longer has a password field — a student's real
+password is always the system-generated one emailed on approval (or on a
+password reset). `/account/change-password` (linked from the navbar once
+logged in) is where they set their own password afterward.
 
 ## Migrating to PostgreSQL
 
