@@ -13,6 +13,34 @@ const {
   Submission,
 } = require("../models");
 const { hashPassword } = require("../utils/password");
+const { sendTemplateMail } = require("../plugins/mailer");
+
+// Fire-and-forget: a failed/unconfigured mailer should never block an
+// approval decision. Errors are logged, not thrown.
+async function notifyApprovalDecision({ studentUser, rollNo, decision, decidedByName, note }) {
+  try {
+    if (decision === "APPROVED") {
+      await sendTemplateMail({
+        to: studentUser.email,
+        template: "welcome",
+        data: {
+          firstName: studentUser.firstName,
+          rollNo: rollNo || "",
+          approvedBy: decidedByName,
+          loginUrl: `${process.env.APP_URL || "http://localhost:3000"}/login`,
+        },
+      });
+    } else {
+      await sendTemplateMail({
+        to: studentUser.email,
+        template: "approval-decision",
+        data: { firstName: studentUser.firstName, decidedBy: decidedByName, decision: decision.toLowerCase(), note: note || "" },
+      });
+    }
+  } catch (err) {
+    console.error("[mailer] Failed to send approval-decision email:", err.message);
+  }
+}
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 
@@ -104,18 +132,39 @@ exports.approveRequest = async (req, res) => {
   studentUser.isActive = true;
   await studentUser.save();
 
-  // TODO: enqueue credentials/welcome email via the background job queue
-  // (see architecture report §4.2 — BullMQ) instead of sending inline.
+  // Sent inline via the mailer plugin (src/plugins/mailer) — swap for a
+  // background job queue per the architecture report §4.2 if approval
+  // volume ever makes inline sending too slow.
+  await notifyApprovalDecision({
+    studentUser,
+    rollNo: request.StudentProfile.rollNo,
+    decision: "APPROVED",
+    decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+  });
 
   res.redirect("/teacher/dashboard");
 };
 
 exports.rejectRequest = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
-  await ApprovalRequest.update(
-    { status: "REJECTED", decidedByUserId: req.currentUser.id, decidedAt: new Date() },
-    { where: { id: req.params.id, requestedTeacherId: teacherProfile.id } }
-  );
+  const request = await ApprovalRequest.findOne({
+    where: { id: req.params.id, requestedTeacherId: teacherProfile.id },
+    include: [{ model: StudentProfile, include: [User] }],
+  });
+  if (!request) return res.redirect("/teacher/dashboard");
+
+  request.status = "REJECTED";
+  request.decidedByUserId = req.currentUser.id;
+  request.decidedAt = new Date();
+  await request.save();
+
+  await notifyApprovalDecision({
+    studentUser: request.StudentProfile.User,
+    decision: "REJECTED",
+    decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+    note: req.body.note,
+  });
+
   res.redirect("/teacher/dashboard");
 };
 
@@ -139,6 +188,12 @@ exports.bulkApprove = async (req, res) => {
     await request.StudentProfile.save();
     request.StudentProfile.User.isActive = true;
     await request.StudentProfile.User.save();
+
+    await notifyApprovalDecision({
+      studentUser: request.StudentProfile.User,
+      decision: "APPROVED",
+      decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+    });
   }
 
   res.redirect("/teacher/dashboard");

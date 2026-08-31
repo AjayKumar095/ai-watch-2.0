@@ -10,7 +10,7 @@
     <tbody class="divide-y divide-navy-50">
       <% teachers.forEach(function(t) { %>
         <tr>
-          <td class="py-2 pr-3 font-medium text-navy-800"><%= t.User.firstName %> <%= t.User.lastName %></td>
+          <td class="py-2 pr-3 font-medium text-navy-800"><%= t.User.title %> <%= t.User.firstName %> <%= t.User.lastName %></td>
           <td class="py-2 pr-3 text-navy-500"><%= t.employeeCode %></td>
           <td class="py-2 pr-3 text-navy-500"><%= t.School.name %></td>
           <td class="py-2 pr-3"><span class="<%= t.User.isActive ? 'badge-info' : 'badge-amber' %>"><%= t.User.isActive ? 'Active' : 'Inactive' %></span></td>

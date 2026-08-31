@@ -1,0 +1,6 @@
+{
+  "subject": "Welcome to AI-Watch, {{firstName}}!",
+  "title": "Your account is approved",
+  "subtitle": "You can now sign in and get started.",
+  "body": "<p>Hi {{firstName}},</p><p>Good news — <strong>{{approvedBy}}</strong> approved your AI-Watch account. You can now log in with your registered email and password.</p><p>Roll No: <strong>{{rollNo}}</strong></p><p><a href=\"{{loginUrl}}\" style=\"color:#2563eb;\">Sign in to AI-Watch</a></p>"
+}

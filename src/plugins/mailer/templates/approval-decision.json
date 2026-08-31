@@ -1,0 +1,6 @@
+{
+  "subject": "Update on your AI-Watch account request",
+  "title": "Account request update",
+  "subtitle": "{{decision}}",
+  "body": "<p>Hi {{firstName}},</p><p>Your AI-Watch account request reviewed by <strong>{{decidedBy}}</strong> was <strong>{{decision}}</strong>.</p><p>{{note}}</p><p>If you believe this is a mistake, please contact your institution's administrator.</p>"
+}

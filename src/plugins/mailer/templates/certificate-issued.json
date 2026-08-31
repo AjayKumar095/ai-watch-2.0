@@ -1,0 +1,6 @@
+{
+  "subject": "Your Semester {{semesterNumber}} certificate is ready",
+  "title": "Certificate issued",
+  "subtitle": "Semester {{semesterNumber}} — {{programName}}",
+  "body": "<p>Hi {{firstName}},</p><p>Your semester certificate has been issued.</p><p>Verification code: <strong>{{verificationCode}}</strong></p><p><a href=\"{{certificateUrl}}\" style=\"color:#2563eb;\">View / download certificate</a></p>"
+}
