@@ -10,20 +10,39 @@
   <link rel="stylesheet" href="/css/output.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
 </head>
-<body class="min-h-screen bg-navy-50 font-sans text-navy-900 antialiased">
+<body class="h-screen overflow-hidden bg-navy-50 font-sans text-navy-900 antialiased">
   <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-    <div class="flex min-h-screen">
+    <div class="flex h-screen">
       <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-navy-900/50 md:hidden"></div>
-      <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full bg-navy-900 transition-transform duration-200 ease-in-out md:static md:translate-x-0 md:shrink-0">
+
+      <!-- Sidebar: fixed to viewport height. Its own header/footer stay put;
+           only the middle nav list (see partials/sidebar.ejs) scrolls. -->
+      <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 h-screen w-64 -translate-x-full transform bg-navy-900 transition-transform duration-200 ease-in-out md:static md:h-screen md:translate-x-0 md:shrink-0">
         <%- include('sidebar') %>
       </aside>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <header class="flex items-center justify-between border-b border-navy-100 bg-white px-4 py-3 md:hidden">
-          <button id="sidebar-toggle" class="text-xl text-navy-600"><i class="fa-solid fa-bars"></i></button>
-          <span class="font-bold text-navy-900">AI-Watch</span>
-          <div style="width: 1.5rem"></div>
+
+      <!-- Right column: also capped to viewport height. Header is fixed in
+           place; only <main> below it scrolls. -->
+      <div class="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+        <header class="flex shrink-0 items-center justify-between border-b border-navy-100 bg-white px-4 py-3">
+          <div class="flex items-center gap-4">
+            <button id="sidebar-toggle" class="text-xl text-navy-600 md:hidden"><i class="fa-solid fa-bars"></i></button>
+            <div class="hidden items-center gap-2 text-sm text-navy-500 sm:flex">
+              <i class="fa-regular fa-clock text-navy-400"></i>
+              <span id="live-clock"></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="hidden text-right sm:block">
+              <p class="text-sm font-semibold leading-tight text-navy-900"><%= currentUser.firstName %> <%= currentUser.lastName %></p>
+              <p class="text-xs leading-tight text-navy-400"><%= currentUser.role.charAt(0) + currentUser.role.slice(1).toLowerCase() %></p>
+            </div>
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">
+              <%= (currentUser.firstName.charAt(0) + currentUser.lastName.charAt(0)).toUpperCase() %>
+            </div>
+          </div>
         </header>
-        <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main class="mx-auto w-full max-w-7xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <%- include('breadcrumbs') %>
           <%- body %>
         </main>
@@ -44,6 +63,17 @@
         }
         if (toggle) toggle.addEventListener('click', open);
         overlay.addEventListener('click', close);
+
+        var clockEl = document.getElementById('live-clock');
+        function updateClock() {
+          if (!clockEl) return;
+          var now = new Date();
+          var datePart = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+          var timePart = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          clockEl.textContent = datePart + ' · ' + timePart;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
       })();
     </script>
   <% } else { %>

@@ -1,4 +1,5 @@
 const { SubjectOffering, SubjectPool, Program, Specialization, AcademicSession, AuditLog } = require("../models");
+const { safeDestroy, tryDestroy } = require("../utils/deleteHelpers");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const OFFERINGS = { label: "Subject Offerings", url: "/admin/subject-offerings" };
@@ -8,7 +9,7 @@ exports.list = async (req, res) => {
     include: [SubjectPool, Program, Specialization, AcademicSession],
     order: [["semesterNumber", "ASC"]],
   });
-  res.render("admin/subject-offerings/index", { title: "Subject Offerings", offerings, breadcrumbs: [ROOT, { label: "Subject Offerings" }] });
+  res.render("admin/subject-offerings/index", { title: "Subject Offerings", offerings, bulkMessage: null, breadcrumbs: [ROOT, { label: "Subject Offerings" }] });
 };
 
 exports.showCreate = async (req, res) => {
@@ -118,5 +119,92 @@ exports.bulkAttach = async (req, res) => {
     result: { createdCount: created.length, skippedCount: skipped.length, invalid, totalRequested: programIds.length },
     error: null,
     breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
+  });
+};
+
+// --- Edit / Delete / Deactivate / Bulk-delete ---
+// Only specialization and active-state are editable — the identity fields
+// (subject/program/semester/session) are covered by the unique index, so
+// "changing" one of those is really "delete and recreate," not an edit.
+
+exports.showEdit = async (req, res) => {
+  const offering = await SubjectOffering.findByPk(req.params.id, { include: [SubjectPool, Program, AcademicSession] });
+  if (!offering) return res.redirect("/admin/subject-offerings");
+  const specializations = await Specialization.findAll({ where: { programId: offering.programId } });
+  res.render("admin/subject-offerings/edit", {
+    title: "Edit Subject Offering", offering, specializations, error: null,
+    breadcrumbs: [ROOT, OFFERINGS, { label: `${offering.SubjectPool.name} — ${offering.Program.name}` }],
+  });
+};
+
+exports.edit = async (req, res) => {
+  const offering = await SubjectOffering.findByPk(req.params.id);
+  if (!offering) return res.redirect("/admin/subject-offerings");
+  const { specializationId, isActive } = req.body;
+  offering.specializationId = specializationId || null;
+  offering.isActive = isActive === "on";
+  await offering.save();
+  await AuditLog.create({ userId: req.currentUser.id, action: "UPDATE_SUBJECT_OFFERING", entityType: "SubjectOffering", entityId: offering.id, metadata: {} });
+  res.redirect("/admin/subject-offerings");
+};
+
+exports.toggleActive = async (req, res) => {
+  const offering = await SubjectOffering.findByPk(req.params.id);
+  if (offering) {
+    offering.isActive = !offering.isActive;
+    await offering.save();
+    await AuditLog.create({
+      userId: req.currentUser.id,
+      action: offering.isActive ? "ACTIVATE_SUBJECT_OFFERING" : "DEACTIVATE_SUBJECT_OFFERING",
+      entityType: "SubjectOffering", entityId: offering.id, metadata: {},
+    });
+  }
+  res.redirect("/admin/subject-offerings");
+};
+
+exports.delete = async (req, res) => {
+  const offering = await SubjectOffering.findByPk(req.params.id, { include: [SubjectPool, Program] });
+  if (!offering) return res.redirect("/admin/subject-offerings");
+  if (
+    await safeDestroy(
+      offering, res, "/admin/subject-offerings",
+      `subject offering (${offering.SubjectPool.name} — ${offering.Program.name})`
+    )
+  ) {
+    await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT_OFFERING", entityType: "SubjectOffering", entityId: req.params.id, metadata: {} });
+    res.redirect("/admin/subject-offerings");
+  }
+};
+
+// Bulk delete — tryDestroy never touches `res`, so a mixed batch (some
+// deletable, some blocked by real assessments/enrollments) can't crash the
+// server the way a synchronous headersSent check on a render() would.
+exports.bulkDelete = async (req, res) => {
+  let ids = req.body.offeringIds || [];
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.filter(Boolean);
+  if (!ids.length) return res.redirect("/admin/subject-offerings");
+
+  const offerings = await SubjectOffering.findAll({ where: { id: ids }, include: [SubjectPool, Program] });
+  let deletedCount = 0;
+  const blocked = [];
+  for (const offering of offerings) {
+    const result = await tryDestroy(offering);
+    if (result.ok) {
+      deletedCount++;
+      await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_SUBJECT_OFFERING", entityType: "SubjectOffering", entityId: offering.id, metadata: { bulk: true } });
+    } else {
+      blocked.push(`${offering.SubjectPool.name} (${offering.Program.name})`);
+    }
+  }
+
+  const offeringsAfter = await SubjectOffering.findAll({ include: [SubjectPool, Program, Specialization, AcademicSession], order: [["semesterNumber", "ASC"]] });
+  let message = null;
+  if (blocked.length) {
+    message = `${deletedCount} deleted. ${blocked.length} skipped because still in use (has assessments or enrolled students): ${blocked.join(", ")}. Deactivate those instead.`;
+  }
+  res.render("admin/subject-offerings/index", {
+    title: "Subject Offerings", offerings: offeringsAfter, bulkMessage: message,
+    breadcrumbs: [ROOT, { label: "Subject Offerings" }],
   });
 };

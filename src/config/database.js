@@ -21,7 +21,7 @@ function resolveSqliteStorage() {
   const configured = process.env.DB_STORAGE || "dev.sqlite3";
   return path.isAbsolute(configured) ? configured : path.join(__dirname, "..", "..", configured);
 }
-
+ 
 let sequelize;
 
 if (dialect === "postgres") {

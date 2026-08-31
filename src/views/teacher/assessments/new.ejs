@@ -1,63 +1,82 @@
-<div class="mx-auto mt-4 max-w-2xl">
-  <div class="card">
-    <h1 class="text-xl font-bold text-navy-900">Create Assessment</h1>
+<div class="mx-auto mt-2 max-w-5xl">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-navy-900">Create Assessment</h1>
     <p class="mt-1 text-sm text-navy-500">
-      Select exactly the sections you're targeting — across one subject or several programs at once
-      (global subjects), all in one assessment.
+      Select exactly the sections you're targeting — across one subject or several programs at once, all in one assessment.
     </p>
-
-    <% if (error) { %>
-      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
-    <% } %>
-
-    <form id="assessment-form" action="/teacher/assessments/new" method="POST" class="mt-6 space-y-4">
-      <div>
-        <label class="form-label">Title</label>
-        <input class="form-input" name="title" value="<%= formData.title || '' %>" required />
-      </div>
-      <div>
-        <label class="form-label">Description</label>
-        <div id="assessment-editor" class="rounded-lg border border-navy-200"></div>
-        <input type="hidden" id="descriptionBlocks" name="descriptionBlocks" />
-      </div>
-      <div>
-        <label class="form-label">Attachment URL (optional)</label>
-        <input class="form-input" name="attachmentUrl" value="<%= formData.attachmentUrl || '' %>" />
-      </div>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <label class="form-label">Opens</label>
-          <input class="form-input" type="datetime-local" name="startAt" required />
-        </div>
-        <div>
-          <label class="form-label">Closes</label>
-          <input class="form-input" type="datetime-local" name="endAt" required />
-        </div>
-        <div>
-          <label class="form-label">Max marks</label>
-          <input class="form-input" type="number" step="0.5" name="maxMarks" value="<%= formData.maxMarks || '' %>" required />
-        </div>
-      </div>
-
-      <div>
-        <label class="form-label">Target sections</label>
-        <% if (!targetOptions.length) { %>
-          <p class="text-sm text-navy-400">You have no subject mappings yet — ask the admin to map you to a subject.</p>
-        <% } %>
-        <div class="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
-          <% targetOptions.forEach(function(opt) { %>
-            <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
-              <input type="checkbox" name="targets" value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>" />
-              <span class="font-medium text-navy-800"><%= opt.subjectOffering.SubjectPool.name %></span>
-              <span class="text-navy-400">— <%= opt.subjectOffering.Program.name %> Sem <%= opt.subjectOffering.semesterNumber %> · Section <%= opt.section.name %></span>
-            </label>
-          <% }) %>
-        </div>
-      </div>
-
-      <button type="submit" class="btn-primary w-full">Create assessment</button>
-    </form>
   </div>
+
+  <% if (error) { %>
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+  <% } %>
+
+  <form id="assessment-form" action="/teacher/assessments/new" method="POST" class="space-y-6">
+    <!-- Details -->
+    <div class="card">
+      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-circle-info text-info-500"></i> Details
+      </h2>
+      <div class="space-y-4">
+        <div>
+          <label class="form-label">Title</label>
+          <input class="form-input" name="title" value="<%= formData.title || '' %>" required placeholder="e.g. Week 3 Quiz" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="form-label">Opens</label>
+            <input class="form-input" type="datetime-local" name="startAt" required />
+          </div>
+          <div>
+            <label class="form-label">Closes</label>
+            <input class="form-input" type="datetime-local" name="endAt" required />
+          </div>
+          <div>
+            <label class="form-label">Max marks</label>
+            <input class="form-input" type="number" step="0.5" name="maxMarks" value="<%= formData.maxMarks || '' %>" required placeholder="e.g. 10" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Attachment URL (optional)</label>
+          <input class="form-input" name="attachmentUrl" value="<%= formData.attachmentUrl || '' %>" placeholder="https://..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="card">
+      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-file-lines text-info-500"></i> Assessment Content
+      </h2>
+      <div id="assessment-editor" class="editor-shell overflow-hidden rounded-lg border border-navy-200"></div>
+      <input type="hidden" id="descriptionBlocks" name="descriptionBlocks" />
+      <p class="mt-2 text-xs text-navy-400">Use "/" inside the editor for headings, lists, images, code blocks, and more.</p>
+    </div>
+
+    <!-- Target sections -->
+    <div class="card">
+      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-bullseye text-info-500"></i> Target Sections
+      </h2>
+      <% if (!targetOptions.length) { %>
+        <p class="text-sm text-navy-400">You have no subject mappings yet — ask the admin to map you to a subject.</p>
+      <% } %>
+      <div class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-navy-100 p-3 sm:grid-cols-2">
+        <% targetOptions.forEach(function(opt) { %>
+          <label class="flex items-start gap-2 rounded-lg border border-transparent px-3 py-2 text-sm hover:border-navy-100 hover:bg-navy-50">
+            <input type="checkbox" class="mt-0.5" name="targets" value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>" />
+            <span>
+              <span class="block font-medium text-navy-800"><%= opt.subjectOffering.SubjectPool.name %></span>
+              <span class="text-xs text-navy-400"><%= opt.subjectOffering.Program.name %> · Sem <%= opt.subjectOffering.semesterNumber %> · Section <%= opt.section.name %></span>
+            </span>
+          </label>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="btn-primary !px-8">Create assessment</button>
+    </div>
+  </form>
 </div>
 
 <link rel="stylesheet" href="/js/assessmentEditorEntry.css" />

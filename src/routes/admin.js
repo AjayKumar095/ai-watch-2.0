@@ -105,6 +105,11 @@ router.get("/subject-offerings/new", subjectOfferingController.showCreate);
 router.post("/subject-offerings/new", subjectOfferingController.create);
 router.get("/subject-offerings/bulk-attach", subjectOfferingController.showBulkAttach);
 router.post("/subject-offerings/bulk-attach", subjectOfferingController.bulkAttach);
+router.post("/subject-offerings/bulk-delete", subjectOfferingController.bulkDelete);
+router.get("/subject-offerings/:id/edit", subjectOfferingController.showEdit);
+router.post("/subject-offerings/:id/edit", subjectOfferingController.edit);
+router.post("/subject-offerings/:id/toggle", subjectOfferingController.toggleActive);
+router.post("/subject-offerings/:id/delete", subjectOfferingController.delete);
 
 // Session Clone Forward
 router.get("/session-clone", sessionCloneController.showClone);

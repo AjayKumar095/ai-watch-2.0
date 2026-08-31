@@ -30,6 +30,12 @@
   .form-label {
     @apply mb-1 block text-sm font-medium text-navy-700;
   }
+  .editor-shell {
+    min-height: 380px;
+  }
+  .editor-shell .bn-editor {
+    min-height: 380px;
+  }
   .prose-content {
     @apply text-sm text-navy-700;
   }

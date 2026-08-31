@@ -4,6 +4,7 @@ module.exports = (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
       semesterNumber: { type: DataTypes.INTEGER, allowNull: false },
+      isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     },
     {
       tableName: "subject_offerings",
