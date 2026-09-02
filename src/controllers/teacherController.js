@@ -12,7 +12,8 @@ const {
   Assessment,
   Submission,
 } = require("../models");
-const { hashPassword } = require("../utils/password");
+const { hashPassword, generateTempPassword } = require("../utils/password");
+const { notifyApprovalDecision } = require("../services/notificationService");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 
@@ -101,21 +102,45 @@ exports.approveRequest = async (req, res) => {
   await request.StudentProfile.save();
 
   const studentUser = request.StudentProfile.User;
+  const tempPassword = generateTempPassword();
+  studentUser.passwordHash = await hashPassword(tempPassword);
   studentUser.isActive = true;
   await studentUser.save();
 
-  // TODO: enqueue credentials/welcome email via the background job queue
-  // (see architecture report §4.2 — BullMQ) instead of sending inline.
+  // Fire-and-forget via the mailer plugin (src/plugins/mailer) — not
+  // awaited, so a slow/unreachable mail server can't stall this approval.
+  // Errors are caught and logged inside notificationService.js.
+  notifyApprovalDecision({
+    studentUser,
+    rollNo: request.StudentProfile.rollNo,
+    decision: "APPROVED",
+    decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+    tempPassword,
+  });
 
   res.redirect("/teacher/dashboard");
 };
 
 exports.rejectRequest = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
-  await ApprovalRequest.update(
-    { status: "REJECTED", decidedByUserId: req.currentUser.id, decidedAt: new Date() },
-    { where: { id: req.params.id, requestedTeacherId: teacherProfile.id } }
-  );
+  const request = await ApprovalRequest.findOne({
+    where: { id: req.params.id, requestedTeacherId: teacherProfile.id },
+    include: [{ model: StudentProfile, include: [User] }],
+  });
+  if (!request) return res.redirect("/teacher/dashboard");
+
+  request.status = "REJECTED";
+  request.decidedByUserId = req.currentUser.id;
+  request.decidedAt = new Date();
+  await request.save();
+
+  notifyApprovalDecision({
+    studentUser: request.StudentProfile.User,
+    decision: "REJECTED",
+    decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+    note: req.body.note,
+  });
+
   res.redirect("/teacher/dashboard");
 };
 
@@ -137,8 +162,18 @@ exports.bulkApprove = async (req, res) => {
     await request.save();
     request.StudentProfile.isVerified = true;
     await request.StudentProfile.save();
+    const tempPassword = generateTempPassword();
+    request.StudentProfile.User.passwordHash = await hashPassword(tempPassword);
     request.StudentProfile.User.isActive = true;
     await request.StudentProfile.User.save();
+
+    notifyApprovalDecision({
+      studentUser: request.StudentProfile.User,
+      rollNo: request.StudentProfile.rollNo,
+      decision: "APPROVED",
+      decidedByName: req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName,
+      tempPassword,
+    });
   }
 
   res.redirect("/teacher/dashboard");

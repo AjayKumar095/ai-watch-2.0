@@ -12,8 +12,10 @@ const {
   TeacherProfile,
   Submission,
   StudentProfile,
+  SubjectEnrollment,
   User,
 } = require("../models");
+const { notifyAssessmentCreated } = require("../services/notificationService");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
@@ -42,8 +44,19 @@ async function buildTargetOptions(teacherProfile) {
     if (m.sectionId) {
       options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: m.Section });
     } else {
+      // Scoped by academicSessionId, not just programId+semesterNumber:
+      // a program+semester pair is no longer unique to one cohort once
+      // academicSessionId represents "admission cohort" rather than "the
+      // current year" — e.g. a fresh Sem-1 admit this year and a held-back
+      // Sem-1 repeater from an earlier cohort can both exist at once. This
+      // keeps "all sections" mappings pointed at the SAME cohort as the
+      // subject offering itself, not every same-numbered semester ever run.
       const offerings = await ProgramOffering.findAll({
-        where: { programId: m.SubjectOffering.programId, semesterNumber: m.SubjectOffering.semesterNumber },
+        where: {
+          programId: m.SubjectOffering.programId,
+          semesterNumber: m.SubjectOffering.semesterNumber,
+          academicSessionId: m.SubjectOffering.academicSessionId,
+        },
       });
       for (const po of offerings) {
         const topSections = await targetableSectionsForMapping(null, po.id);
@@ -96,6 +109,21 @@ exports.showCreate = async (req, res) => {
   });
 };
 
+// Given the section ids an assessment was targeted at (top-level and/or
+// sub-group), returns the matching SubjectOffering enrollments — including
+// students enrolled directly in a targeted top-level section's sub-groups,
+// mirroring the visibility rule in services/sectionScope.js.
+async function enrolledStudentsForTarget(subjectOfferingId, sectionIds) {
+  const childSections = await Section.findAll({ where: { parentSectionId: sectionIds } });
+  const allSectionIds = [...new Set([...sectionIds, ...childSections.map((s) => s.id)])];
+
+  const enrollments = await SubjectEnrollment.findAll({
+    where: { subjectOfferingId, sectionId: allSectionIds },
+    include: [{ model: StudentProfile, include: [User] }],
+  });
+  return enrollments.map((e) => e.StudentProfile.User);
+}
+
 exports.create = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
   const targetOptions = await buildTargetOptions(teacherProfile);
@@ -134,6 +162,8 @@ exports.create = async (req, res) => {
   }
 
   const created = [];
+  const mentorName = req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName;
+
   for (const [subjectOfferingId, sectionIds] of Object.entries(grouped)) {
     const assessment = await Assessment.create({
       subjectOfferingId,
@@ -150,6 +180,18 @@ exports.create = async (req, res) => {
       await AssessmentSection.create({ assessmentId: assessment.id, sectionId });
     }
     created.push(assessment);
+
+    const subjectOffering = await SubjectOffering.findByPk(subjectOfferingId, { include: [SubjectPool] });
+    const studentUsers = await enrolledStudentsForTarget(subjectOfferingId, sectionIds);
+    if (studentUsers.length) {
+      notifyAssessmentCreated({
+        studentUsers,
+        title,
+        subjectName: subjectOffering.SubjectPool.name,
+        mentorName,
+        dueAt: endAt,
+      });
+    }
   }
 
   res.redirect("/teacher/assessments");

@@ -77,11 +77,13 @@
       })();
     </script>
   <% } else { %>
-    <%- include('navbar') %>
-    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <%- include('breadcrumbs') %>
-      <%- body %>
-    </main>
+    <div class="flex h-screen flex-col overflow-hidden">
+      <%- include('navbar') %>
+      <main class="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <%- include('breadcrumbs') %>
+        <%- body %>
+      </main>
+    </div>
   <% } %>
 </body>
 </html>

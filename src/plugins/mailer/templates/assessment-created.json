@@ -1,0 +1,6 @@
+{
+  "subject": "New assessment posted: {{title}}",
+  "title": "New assessment posted",
+  "subtitle": "{{subjectName}}",
+  "body": "<p>Hi {{firstName}},</p><p><strong>{{mentorName}}</strong> has posted a new assessment for <strong>{{subjectName}}</strong>:</p><p style=\"font-size:16px;\"><strong>{{title}}</strong></p><p>Due: <strong>{{dueDate}}</strong></p><p><a href=\"{{loginUrl}}\" style=\"color:#2563eb;\">View it on AI-Watch</a></p>"
+}

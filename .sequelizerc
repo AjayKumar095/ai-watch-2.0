@@ -1,0 +1,12 @@
+// Tells sequelize-cli where everything lives, since this project doesn't
+// use the CLI's default `config/config.json` layout (we already have
+// src/config/database.js for the app itself — this points the CLI at a
+// sibling config that reads the SAME .env vars, so dev/prod stay in sync).
+const path = require("path");
+
+module.exports = {
+  config: path.resolve("src", "config", "sequelize-cli.config.js"),
+  "models-path": path.resolve("src", "models"),
+  "seeders-path": path.resolve("seeders"),
+  "migrations-path": path.resolve("migrations"),
+};

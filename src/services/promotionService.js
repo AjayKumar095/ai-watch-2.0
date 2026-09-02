@@ -1,7 +1,18 @@
 // Promotion engine: preview -> commit, never a direct irreversible bulk
 // update. For every ACTIVE student in the given program+fromSemester+
-// fromSession: promote to fromSemester+1 in toSession, or GRADUATE if
-// fromSemester was the program's last semester. See architecture report §7.5.
+// fromSession: advance to fromSemester+1, or GRADUATE if fromSemester was
+// the program's last semester. See architecture report §7.5.
+//
+// IMPORTANT: `academicSessionId` on StudentProfile is the student's fixed
+// admission cohort, not "which year is it right now" — it never changes
+// after promotion. This is what lets a 2026-27 fresh admit (Sem 1, new
+// AI-coded credit curriculum) and a 2023-24 admit now in Sem 7 (still on
+// the old VA-coded non-credit curriculum) coexist correctly: each keeps
+// its own SubjectOffering lookups scoped to its own cohort session, even
+// though both are attending classes in the same real-world calendar year.
+// `toSessionId` below is kept only as a record of which real-world session
+// this promotion event was run in (shown in the batch history) — it is
+// deliberately NOT written onto the student.
 const { StudentProfile, Program, PromotionBatch, PromotionRecord, User } = require("../models");
 
 async function previewPromotion({ programId, fromSemesterNumber, fromSessionId }) {
@@ -35,8 +46,11 @@ async function commitPromotion({ programId, fromSemesterNumber, fromSessionId, t
       { transaction: t }
     );
 
+    // Scoped by academicSessionId too (not just id/program/semester) so a
+    // promotion run can never accidentally pull in a same-numbered student
+    // from a different cohort session.
     const students = await StudentProfile.findAll({
-      where: { id: studentIds, programId, currentSemesterNumber: fromSemesterNumber, status: "ACTIVE" },
+      where: { id: studentIds, programId, currentSemesterNumber: fromSemesterNumber, academicSessionId: fromSessionId, status: "ACTIVE" },
       transaction: t,
     });
 
@@ -54,7 +68,7 @@ async function commitPromotion({ programId, fromSemesterNumber, fromSessionId, t
         graduatedCount++;
       } else {
         student.currentSemesterNumber = toSemesterNumber;
-        student.academicSessionId = toSessionId;
+        // academicSessionId intentionally left unchanged — see note above.
         student.currentSectionId = null; // admin re-assigns section for the new term
         await student.save({ transaction: t });
         await PromotionRecord.create(

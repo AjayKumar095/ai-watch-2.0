@@ -1,83 +1,71 @@
-<!-- Hero -->
-<section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy-900 via-navy-800 to-navy-900 px-6 py-16 text-white shadow-lg sm:px-10">
-  <div class="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-amber-500/20 blur-3xl"></div>
-  <div class="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-info-500/10 blur-3xl"></div>
+<div class="flex w-full flex-1 flex-col">
+  <div class="flex flex-1 flex-col justify-center gap-3 sm:gap-6">
 
-  <div class="relative mx-auto max-w-5xl text-center">
-    <img src="/images/gu-logo.webp" alt="Geeta University" class="mx-auto mb-6 h-20 w-auto rounded-lg bg-white p-2 shadow-lg sm:h-24" />
-    <p class="text-xs font-semibold uppercase tracking-widest text-amber-400">A Geeta University Initiative</p>
-    <h1 class="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
-      AI-Watch <span class="text-amber-400">Assessment Portal</span>
-    </h1>
-    <p class="mx-auto mt-4 max-w-2xl text-base text-navy-100 sm:text-lg">
-      A single home for AI-focused coursework across every program at Geeta University — assignments, evaluation,
-      and progress tracking for students, teachers, and administrators alike.
-    </p>
-    <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-      <a href="/signup/student" class="btn-primary !px-6 !py-3 text-base">Student Sign Up</a>
-      <a href="/login" class="inline-flex items-center justify-center rounded-lg border border-white/30 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10">
-        Log in
-      </a>
-    </div>
+    <!-- Hero -->
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy-900 via-navy-800 to-navy-900 px-5 py-4 text-white shadow-lg sm:px-10 sm:py-8">
+      <div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl"></div>
+      <div class="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-info-500/10 blur-3xl"></div>
+
+      <div class="relative mx-auto max-w-3xl text-center">
+        <img src="/images/gu-logo.webp" alt="Geeta University" class="mx-auto mb-2 h-9 w-auto rounded-lg bg-white p-1 shadow-lg sm:mb-3 sm:h-14" />
+        <p class="text-[10px] font-semibold uppercase tracking-widest text-amber-400 sm:text-[11px]">A Geeta University Initiative</p>
+        <h1 class="mt-1.5 text-xl font-bold leading-tight tracking-tight sm:mt-2 sm:text-4xl">
+          AI-Watch <span class="text-amber-400">Assessment Portal</span>
+        </h1>
+        <p class="mx-auto mt-1.5 hidden max-w-xl text-sm text-navy-100 sm:mt-2 sm:block sm:text-base">
+          One home for AI-focused coursework at Geeta University — assignments, evaluation, and progress
+          tracking for students, teachers, and administrators.
+        </p>
+        <p class="mx-auto mt-1.5 max-w-xs text-xs text-navy-100 sm:hidden">
+          AI-focused coursework, evaluation, and progress tracking at Geeta University.
+        </p>
+
+        <div class="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4 sm:gap-3">
+          <a href="/signup/student" class="btn-primary !px-5 !py-2 text-xs sm:!px-6 sm:!py-2.5 sm:text-base">Student Sign Up</a>
+          <a href="/login" class="inline-flex items-center justify-center rounded-lg border border-white/30 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:px-6 sm:py-2.5 sm:text-base">
+            Log in
+          </a>
+        </div>
+
+        <div class="mt-3 hidden flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11px] text-navy-200 sm:mt-4 sm:flex sm:text-xs">
+          <span><i class="fa-solid fa-layer-group mr-1 text-amber-400"></i>University-wide subjects</span>
+          <span><i class="fa-solid fa-diagram-project mr-1 text-info-400"></i>Section-aware assignments</span>
+          <span><i class="fa-solid fa-certificate mr-1 text-amber-400"></i>Verified certificates</span>
+          <span><i class="fa-solid fa-shield-halved mr-1 text-info-400"></i>Teacher-approved onboarding</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Role highlights -->
+    <section class="mx-auto w-full max-w-6xl">
+      <div class="grid grid-cols-3 gap-2 sm:gap-4">
+        <div class="card !p-2.5 text-center sm:!p-4 sm:text-left">
+          <div class="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg bg-info-100 text-info-700 sm:mx-0 sm:mb-2 sm:h-9 sm:w-9">
+            <i class="fa-solid fa-user-graduate text-xs sm:text-base"></i>
+          </div>
+          <h3 class="text-xs font-semibold text-navy-900 sm:text-sm">For Students</h3>
+          <p class="mt-1 hidden text-xs leading-snug text-navy-500 sm:block">See assessments for your section, submit work, and track evaluated results.</p>
+        </div>
+        <div class="card !p-2.5 text-center sm:!p-4 sm:text-left">
+          <div class="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 sm:mx-0 sm:mb-2 sm:h-9 sm:w-9">
+            <i class="fa-solid fa-chalkboard-user text-xs sm:text-base"></i>
+          </div>
+          <h3 class="text-xs font-semibold text-navy-900 sm:text-sm">For Teachers</h3>
+          <p class="mt-1 hidden text-xs leading-snug text-navy-500 sm:block">Create and grade assessments, approve student accounts, manage submissions in bulk.</p>
+        </div>
+        <div class="card !p-2.5 text-center sm:!p-4 sm:text-left">
+          <div class="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg bg-navy-100 text-navy-700 sm:mx-0 sm:mb-2 sm:h-9 sm:w-9">
+            <i class="fa-solid fa-building-columns text-xs sm:text-base"></i>
+          </div>
+          <h3 class="text-xs font-semibold text-navy-900 sm:text-sm">For Admins</h3>
+          <p class="mt-1 hidden text-xs leading-snug text-navy-500 sm:block">Manage schools, programs, and sessions; run promotions; generate certificates.</p>
+        </div>
+      </div>
+    </section>
   </div>
-</section>
 
-<!-- Role highlights -->
-<section class="mx-auto mt-12 max-w-6xl">
-  <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
-    <div class="card">
-      <div class="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-info-100 text-info-700">
-        <i class="fa-solid fa-user-graduate text-lg"></i>
-      </div>
-      <h3 class="font-semibold text-navy-900">For Students</h3>
-      <p class="mt-1 text-sm text-navy-500">See every assessment assigned to your section, submit your work, and track evaluated results — all in one dashboard.</p>
-    </div>
-    <div class="card">
-      <div class="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-        <i class="fa-solid fa-chalkboard-user text-lg"></i>
-      </div>
-      <h3 class="font-semibold text-navy-900">For Teachers</h3>
-      <p class="mt-1 text-sm text-navy-500">Create and grade assessments across every class you teach, approve new student accounts, and manage submissions in bulk.</p>
-    </div>
-    <div class="card">
-      <div class="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-navy-100 text-navy-700">
-        <i class="fa-solid fa-building-columns text-lg"></i>
-      </div>
-      <h3 class="font-semibold text-navy-900">For Administrators</h3>
-      <p class="mt-1 text-sm text-navy-500">Manage schools, programs, and academic sessions; run semester promotions; and generate certificates — all from one console.</p>
-    </div>
-  </div>
-</section>
-
-<!-- Why AI-Watch -->
-<section class="mx-auto mt-12 max-w-6xl">
-  <div class="card">
-    <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-      <div>
-        <p class="text-2xl font-bold text-navy-900"><i class="fa-solid fa-layer-group mr-1 text-amber-500"></i></p>
-        <h4 class="mt-2 text-sm font-semibold text-navy-900">University-wide subjects</h4>
-        <p class="mt-1 text-xs text-navy-500">One AI subject, offered consistently across every program and school.</p>
-      </div>
-      <div>
-        <p class="text-2xl font-bold text-navy-900"><i class="fa-solid fa-diagram-project mr-1 text-info-500"></i></p>
-        <h4 class="mt-2 text-sm font-semibold text-navy-900">Section-aware assignments</h4>
-        <p class="mt-1 text-xs text-navy-500">Assessments target exactly the sections and sub-groups they belong to.</p>
-      </div>
-      <div>
-        <p class="text-2xl font-bold text-navy-900"><i class="fa-solid fa-certificate mr-1 text-amber-500"></i></p>
-        <h4 class="mt-2 text-sm font-semibold text-navy-900">Verified certificates</h4>
-        <p class="mt-1 text-xs text-navy-500">Semester completion certificates, issued only once every assessment is evaluated.</p>
-      </div>
-      <div>
-        <p class="text-2xl font-bold text-navy-900"><i class="fa-solid fa-shield-halved mr-1 text-info-500"></i></p>
-        <h4 class="mt-2 text-sm font-semibold text-navy-900">Secure by design</h4>
-        <p class="mt-1 text-xs text-navy-500">Role-based access with teacher-approved onboarding for every student account.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<footer class="mx-auto mt-12 max-w-6xl border-t border-navy-100 py-6 text-center text-xs text-navy-400">
-  <img src="/images/gu-logo.webp" alt="Geeta University" class="mx-auto mb-2 h-8 w-auto rounded bg-white p-1" />
-  &copy; <%= new Date().getFullYear() %> Geeta University. AI-Watch Assessment Portal.
-</footer>
+  <footer class="mx-auto mt-2 flex w-full max-w-6xl shrink-0 items-center justify-center gap-2 border-t border-navy-100 py-2 text-[10px] text-navy-400 sm:mt-3 sm:text-[11px]">
+    <img src="/images/gu-logo.webp" alt="Geeta University" class="h-4 w-auto rounded bg-white p-0.5 sm:h-5" />
+    <span>&copy; <%= new Date().getFullYear() %> Geeta University. AI-Watch Assessment Portal.</span>
+  </footer>
+</div>

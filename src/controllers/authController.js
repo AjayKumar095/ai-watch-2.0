@@ -8,7 +8,11 @@ const {
   ApprovalRequest,
   RefreshToken,
 } = require("../models");
-const { hashPassword, verifyPassword } = require("../utils/password");
+const { hashPassword, verifyPassword, generateTempPassword } = require("../utils/password");
+const {
+  notifySignupReceived,
+  notifyPasswordReset,
+} = require("../services/notificationService");
 const {
   signAccessToken,
   signRefreshToken,
@@ -31,13 +35,18 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ where: { email } });
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user) {
     return res.status(401).render("auth/login", {
       title: "Login",
       error: "Invalid email or password.",
     });
   }
 
+  // Checked before the password: a newly-signed-up student has a
+  // system-assigned password they don't know yet (it's emailed on
+  // approval), so they'd never be able to pass a password check anyway.
+  // Showing the real reason here (instead of "invalid email or password")
+  // avoids a confusing dead end while they're waiting on approval.
   if (!user.isActive) {
     return res.status(403).render("auth/login", {
       title: "Login",
@@ -45,6 +54,13 @@ exports.login = async (req, res) => {
         user.role === "STUDENT"
           ? "Your account is awaiting teacher approval. You'll get an email once it's approved."
           : "Your account isn't active yet. Contact the administrator.",
+    });
+  }
+
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    return res.status(401).render("auth/login", {
+      title: "Login",
+      error: "Invalid email or password.",
     });
   }
 
@@ -131,14 +147,14 @@ exports.specializationsForProgram = async (req, res) => {
 };
 
 exports.studentSignup = async (req, res) => {
-  const { email, firstName, lastName, password, rollNo, schoolId, programId, specializationId, requestedTeacherId } = req.body;
+  const { email, firstName, lastName, rollNo, schoolId, programId, specializationId, requestedTeacherId } = req.body;
 
   const schools = await School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
   const teachers = await TeacherProfile.findAll({ include: [User] });
   const rerender = (error) =>
     res.status(400).render("auth/signup", { title: "Student Onboarding", schools, teachers, error, formData: req.body });
 
-  if (!email || !firstName || !lastName || !password || !rollNo || !schoolId || !programId || !requestedTeacherId) {
+  if (!email || !firstName || !lastName || !rollNo || !schoolId || !programId || !requestedTeacherId) {
     return rerender("Please fill in all required fields.");
   }
 
@@ -148,7 +164,15 @@ exports.studentSignup = async (req, res) => {
   const existingRoll = await StudentProfile.findOne({ where: { rollNo } });
   if (existingRoll) return rerender("This roll number is already registered.");
 
-  const passwordHash = await hashPassword(password);
+  const requestedTeacher = await TeacherProfile.findOne({ where: { id: requestedTeacherId }, include: [User] });
+  if (!requestedTeacher) return rerender("Please select a valid teacher to review your request.");
+
+  // No password field on this form on purpose: the account's real password
+  // is a system-generated one, sent by email once a teacher approves (see
+  // teacherController.approveRequest). This hash is just a random,
+  // never-disclosed placeholder so the column isn't left empty — login is
+  // blocked anyway while isActive is false (see authController.login).
+  const passwordHash = await hashPassword(generateTempPassword());
 
   const user = await User.create({
     email,
@@ -174,5 +198,33 @@ exports.studentSignup = async (req, res) => {
     status: "PENDING",
   });
 
+  notifySignupReceived({ studentUser: user, teacherName: requestedTeacher.User.fullName() });
+
   res.render("auth/signup-success", { title: "Request Submitted" });
+};
+
+// --- Forgot password ---------------------------------------------------------
+
+exports.showForgotPassword = (req, res) => {
+  res.render("auth/forgot-password", { title: "Forgot Password", error: null, submitted: false });
+};
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).render("auth/forgot-password", { title: "Forgot Password", error: "Please enter your email.", submitted: false });
+  }
+
+  const user = await User.findOne({ where: { email } });
+
+  // Always show the same "check your email" message whether or not the
+  // account exists — avoids leaking which emails are registered.
+  if (user && user.isActive) {
+    const tempPassword = generateTempPassword();
+    user.passwordHash = await hashPassword(tempPassword);
+    await user.save();
+    notifyPasswordReset({ user, tempPassword });
+  }
+
+  res.render("auth/forgot-password", { title: "Forgot Password", error: null, submitted: true });
 };

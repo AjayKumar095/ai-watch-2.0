@@ -7,7 +7,7 @@
     <div class="card flex flex-wrap items-center justify-between gap-2">
       <div>
         <h2 class="font-semibold text-navy-900"><%= b.Program.name %></h2>
-        <p class="text-xs text-navy-400"><%= b.fromSession.label %> → <%= b.toSession.label %> · <%= new Date(b.executedAt).toLocaleString() %></p>
+        <p class="text-xs text-navy-400">Cohort: <%= b.fromSession.label %> · Promoted during <%= b.toSession.label %> · <%= new Date(b.executedAt).toLocaleString() %></p>
       </div>
       <div class="flex gap-2">
         <span class="badge-info"><%= b.PromotionRecords.filter(r => r.result === 'PROMOTED').length %> promoted</span>

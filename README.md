@@ -11,6 +11,7 @@ JWT auth (access + refresh, httpOnly cookies), three role-based dashboards
 npm install
 cp .env.example .env        # adjust secrets/DB settings as needed
 npm run build:css           # builds public/css/output.css from src/input.css
+npm run migrate               # creates the schema (see "Database migrations" below)
 npm run seed                 # creates the one superadmin + sample data
 npm run dev                  # http://localhost:3000
 ```
@@ -24,6 +25,9 @@ Seeded logins (change these in production):
 ```
 app.js                     Express entry point
 src/config/database.js     Sequelize connection (SQLITE now, POSTGRES later via env)
+src/config/sequelize-cli.config.js  Same env-driven config, for sequelize-cli
+migrations/                Schema migrations (see "Database migrations" below)
+src/plugins/mailer/        Email plugin — JSON templates + nodemailer (see "Email plugin" below)
 src/models/                One file per model + index.js wiring all associations
 src/controllers/           MVC controllers (auth, admin, teacher, student, assessment, evaluation)
 src/services/              Business logic kept out of controllers (e.g. mapping conflict check)
@@ -31,7 +35,7 @@ src/middleware/             JWT auth + role-gating middleware
 src/routes/                 Route files per area, mounted in app.js
 src/views/                  EJS templates; views/partials/ holds the shared layout + navbar
 public/css/                 Tailwind output (rebuild with npm run build:css after editing src/input.css)
-scripts/seed.js             Superadmin + sample academic data
+scripts/seed.js             Superadmin + sample academic data (schema comes from migrations, not sync)
 ```
 
 ## Assessment content editor (BlockNote)
@@ -56,6 +60,119 @@ via React) instead of a plain textarea:
 If you add more places that need to *display* assessment content (e.g. a
 future assessment-detail page for teachers), reuse `renderBlocks` the same
 way — don't reimplement rendering per view.
+
+## Database migrations
+
+Schema changes now go through `sequelize-cli` migrations instead of
+`sequelize.sync({ alter: true })`. That matters because on SQLite, `alter`
+works by rebuilding the whole table and copying rows back in — a fragile
+operation that could silently drop or mangle data you'd edited after
+seeding. Migrations change the schema in place, so re-seeding (or just
+running the app) never touches structure and never risks your data.
+
+**One-time step, only if you already have a `dev.sqlite3` from before this
+change:**
+```bash
+npm run db:baseline   # marks the existing schema as migrated, touches no data
+npm run migrate        # applies anything newer than the baseline
+```
+
+**Fresh clone / new environment:** just run `npm run migrate` — the
+baseline migration (`migrations/…-baseline-schema.js`) creates every table
+from scratch.
+
+**When you change a model** (add a column, new table, etc.):
+```bash
+npx sequelize-cli migration:generate --name add-foo-to-bar
+# hand-write the up()/down() in the generated file using queryInterface
+npm run migrate
+```
+
+Other scripts: `npm run migrate:status`, `npm run migrate:undo`,
+`npm run migrate:undo:all`.
+
+Config: `.sequelizerc` points the CLI at `src/config/sequelize-cli.config.js`,
+which reads the same `.env` vars as `src/config/database.js` (same
+sqlite/postgres switch, same `underscored: true` column naming) — so a
+migration written against it produces exactly the columns the models expect.
+
+## Email plugin (`src/plugins/mailer`)
+
+A small, self-contained mailer: pick a JSON template, hand it data, send.
+
+```js
+const { sendTemplateMail } = require("./src/plugins/mailer");
+await sendTemplateMail({
+  to: user.email,
+  template: "welcome",          // src/plugins/mailer/templates/welcome.json, no extension
+  data: { firstName: "Alex", loginUrl: "https://..." },
+});
+```
+
+- **Add a new email kind** by dropping a new `templates/<name>.json` file
+  with `subject`, `title`, `subtitle`, `body` (HTML) — `{{token}}` placeholders
+  get filled from `data` and HTML-escaped. No code changes needed.
+- **Config** lives in `.env`: `MAIL_USER` + `MAIL_APP_PASSWORD` (a Gmail
+  [App Password](https://myaccount.google.com/apppasswords), not your normal
+  password — needs 2-Step Verification on the account), plus `MAIL_FROM_NAME`.
+  Set `MAIL_HOST`/`MAIL_PORT` instead to use a non-Gmail SMTP provider.
+- **If unconfigured**, `sendTemplateMail` logs what it would have sent and
+  returns `{ skipped: true }` instead of throwing.
+- **Never blocks a request.** Every call site (below) fires the email
+  without `await`-ing it, and the SMTP connection/greeting/socket timeouts
+  are capped at 10s (`src/plugins/mailer/transporter.js`) — so an
+  unreachable or misconfigured mail server can't stall an approval, signup,
+  password reset, or assessment post. Errors are caught and logged inside
+  `src/services/notificationService.js`, which is the single place all four
+  flows below go through.
+- **Test your setup:** `npm run mail:test -- you@example.com` (add a
+  template name as a second arg to try the others).
+
+**Wired-in flows** (all in `src/services/notificationService.js`):
+
+| When | Template | Where |
+|---|---|---|
+| Student submits the signup form | `signup-received` | `authController.studentSignup` |
+| Teacher approves an account | `welcome` (login email + system-generated temp password) | `teacherController.approveRequest` / `bulkApprove` |
+| Teacher rejects an account | `approval-decision` | `teacherController.rejectRequest` |
+| Student/teacher/admin uses "Forgot password" | `password-reset` (new temp password) | `authController.forgotPassword` |
+| Teacher posts a new assessment | `assessment-created` (subject, mentor, due date) | `assessmentController.create`, to every student enrolled in the targeted section(s) |
+
+Note the signup form no longer has a password field — a student's real
+password is always the system-generated one emailed on approval (or on a
+password reset). `/account/change-password` (linked from the navbar once
+logged in) is where they set their own password afterward.
+
+## Academic sessions represent admission cohorts, not calendar years
+
+`StudentProfile.academicSessionId` is fixed at admission and **never changes**,
+including across promotions. This is deliberate: it's what lets two curricula
+run side by side once a program's syllabus changes — e.g. a subject that
+switches from a non-credit "VA"-coded course to a credit-bearing "AI"-coded
+one starting a given session. A fresh Semester 1 admit that year and a
+continuing student from an earlier session can both be attending classes in
+the same real-world year, in different semester numbers, each correctly
+scoped to their own cohort's `SubjectOffering`s (`subject_id` is part of the
+offering's uniqueness, so two different subjects can occupy the same
+program+semester+session slot without conflict).
+
+Practical implications:
+- `promotionService.commitPromotion` advances `currentSemesterNumber` only.
+  It never touches `academicSessionId` — see the comment at the top of that
+  file for the full reasoning.
+- `assessmentController.buildTargetOptions`'s "all sections" branch is scoped
+  by the subject offering's own `academicSessionId`, not just
+  `programId`+`semesterNumber` — necessary once two different cohorts can
+  share the same semester number (e.g. a fresh admit and an unrelated
+  repeater), so a mapping never leaks sections from the wrong cohort.
+- Keep every `AcademicSession` with continuing active students marked
+  active in `/admin/sessions` — don't deactivate a session just because a
+  newer one exists; deactivate it once its last cohort has graduated.
+- Use `/admin/session-clone` for standing up a **new** session's structure
+  (fresh Semester 1 intake); use `/admin/promotions` for advancing existing
+  cohorts. The promotion form's "Promotion running in (this year)" field is
+  recorded on the `PromotionBatch` for history only — it's never written to
+  the student.
 
 ## Migrating to PostgreSQL
 
@@ -137,7 +254,4 @@ and approval requests before allowing a hard delete.
 
 - Admin CRUD for editing/deleting existing records (currently create + list;
   edit/delete follow the same pattern, just not scaffolded yet)
-- Real email delivery for credentials/notifications (currently shown on-screen;
-  swap in a background job queue + transactional email provider per the
-  architecture report §4.2)
 - Signed object-storage uploads for submissions (currently a plain URL field)

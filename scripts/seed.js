@@ -41,12 +41,26 @@ const { hashPassword } = require("../src/utils/password");
 const DEFAULT_PASSWORD = "ChangeMe123!";
 
 async function main() {
-  // alter: true safely adds/adjusts columns on existing tables (e.g. when a
-  // model gains a new field like Program.durationYears) instead of only
-  // creating tables that don't exist yet — avoids "no such column" errors
-  // on a database that predates a schema change. Fine for dev; real
-  // migrations should replace this before the Postgres cutover.
-  await sequelize.sync({ alter: true });
+  // Schema is now owned by sequelize-cli migrations (see migrations/), NOT
+  // by sync(). `sync({ alter: true })` used to run here, but on SQLite
+  // "alter" works by rebuilding the whole table and copying rows back in —
+  // which is exactly what could silently drop/mangle data you'd already
+  // edited after the first seed. Migrations change the schema in place
+  // instead, so re-seeding never touches structure and never risks data.
+  //
+  // This just confirms the DB is reachable and reminds you if you forgot
+  // to run migrations first.
+  await sequelize.authenticate();
+  const qi = sequelize.getQueryInterface();
+  try {
+    await qi.describeTable("users");
+  } catch (err) {
+    console.error("\n❌ The `users` table doesn't exist yet.");
+    console.error("   Run migrations before seeding:");
+    console.error("     npm run migrate       # fresh DB");
+    console.error("     npm run db:baseline   # existing pre-migrations DB, once — then npm run migrate\n");
+    process.exit(1);
+  }
 
   // --- Superadmin (structurally: only ever create this once) ---
   const existingSuperadmin = await User.findOne({ where: { role: "SUPERADMIN" } });
