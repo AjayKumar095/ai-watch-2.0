@@ -26,4 +26,5 @@ jobs:
           port: ${{ secrets.VM_PORT }}
 
           script: |
-            cd /var/www/deploy-aiwatch.sh
+            cd /var/www/
+            ./deploy-aiwatch.sh
