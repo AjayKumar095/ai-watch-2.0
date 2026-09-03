@@ -8,13 +8,10 @@ echo "======================================"
 echo "Starting deployment..."
 echo "======================================"
 
-echo "Changing directory..."
-
 cd "$PROJECT_DIR"
 
-OLD_COMMIT=$(git rev-parse HEAD)
-
 echo "Current commit:"
+OLD_COMMIT=$(git rev-parse HEAD)
 echo "$OLD_COMMIT"
 
 echo "Fetching latest code..."
@@ -52,13 +49,17 @@ else
 
 fi
 
-echo "Building assets..."
+echo "Building CSS..."
 
-npm run build
+npm run build:css
+
+echo "Building assessment editor..."
+
+npm run build:editor
 
 echo "Running database migrations..."
 
-npx sequelize-cli db:migrate --env production
+npm run migrate
 
 echo "Reloading PM2..."
 
