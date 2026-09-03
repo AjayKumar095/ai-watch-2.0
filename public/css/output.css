@@ -134,30 +134,6 @@ html {
     -webkit-tap-highlight-color: transparent
 }
 
-/* 1. The container/overall scrollbar area */
-::-webkit-scrollbar {
-    width: 5px;
-    /* Width of vertical scrollbar */
-    height: 5px;
-    /* Height of horizontal scrollbar */
-}
-
-/* 2. The background track behind the draggable bar */
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-/* 3. The draggable handle bar itself */
-::-webkit-scrollbar-thumb {
-    background: transparent;
-
-}
-
-/* 4. Hover state for the draggable bar */
-::-webkit-scrollbar-thumb:hover {
-    background: transparent;
-}
-
 body {
     margin: 0;
     line-height: inherit

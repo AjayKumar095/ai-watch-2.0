@@ -1,23 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><%= typeof title !== 'undefined' ? title + ' · AI-Watch' : 'AI-Watch' %></title>
+  <title>
+    <%= typeof title !=='undefined' ? title + ' · AI-Watch' : 'AI-Watch' %>
+  </title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="/css/output.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    body {
+
+      /* 1. The container/overall scrollbar area */
+      ::-webkit-scrollbar {
+        width: 5px;
+        /* Width of vertical scrollbar */
+        height: 5px;
+        /* Height of horizontal scrollbar */
+      }
+
+      /* 2. The background track behind the draggable bar */
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* 3. The draggable handle bar itself */
+      ::-webkit-scrollbar-thumb {
+        background: transparent;
+
+      }
+
+      /* 4. Hover state for the draggable bar */
+      ::-webkit-scrollbar-thumb:hover {
+        background: transparent;
+      }
+    }
+  </style>
 </head>
+
 <body class="h-screen overflow-hidden bg-navy-50 font-sans text-navy-900 antialiased">
-  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+  <% if (typeof currentUser !=='undefined' && currentUser) { %>
     <div class="flex h-screen">
       <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-navy-900/50 md:hidden"></div>
 
       <!-- Sidebar: fixed to viewport height. Its own header/footer stay put;
            only the middle nav list (see partials/sidebar.ejs) scrolls. -->
-      <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 h-screen w-64 -translate-x-full transform bg-navy-900 transition-transform duration-200 ease-in-out md:static md:h-screen md:translate-x-0 md:shrink-0">
+      <aside id="sidebar"
+        class="fixed inset-y-0 left-0 z-40 h-screen w-64 -translate-x-full transform bg-navy-900 transition-transform duration-200 ease-in-out md:static md:h-screen md:translate-x-0 md:shrink-0">
         <%- include('sidebar') %>
       </aside>
 
@@ -26,7 +60,8 @@
       <div class="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <header class="flex shrink-0 items-center justify-between border-b border-navy-100 bg-white px-4 py-3">
           <div class="flex items-center gap-4">
-            <button id="sidebar-toggle" class="text-xl text-navy-600 md:hidden"><i class="fa-solid fa-bars"></i></button>
+            <button id="sidebar-toggle" class="text-xl text-navy-600 md:hidden"><i
+                class="fa-solid fa-bars"></i></button>
             <div class="hidden items-center gap-2 text-sm text-navy-500 sm:flex">
               <i class="fa-regular fa-clock text-navy-400"></i>
               <span id="live-clock"></span>
@@ -34,17 +69,23 @@
           </div>
           <div class="flex items-center gap-3">
             <div class="hidden text-right sm:block">
-              <p class="text-sm font-semibold leading-tight text-navy-900"><%= currentUser.firstName %> <%= currentUser.lastName %></p>
-              <p class="text-xs leading-tight text-navy-400"><%= currentUser.role.charAt(0) + currentUser.role.slice(1).toLowerCase() %></p>
+              <p class="text-sm font-semibold leading-tight text-navy-900">
+                <%= currentUser.firstName %>
+                  <%= currentUser.lastName %>
+              </p>
+              <p class="text-xs leading-tight text-navy-400">
+                <%= currentUser.role.charAt(0) + currentUser.role.slice(1).toLowerCase() %>
+              </p>
             </div>
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">
+            <div
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">
               <%= (currentUser.firstName.charAt(0) + currentUser.lastName.charAt(0)).toUpperCase() %>
             </div>
           </div>
         </header>
         <main class="mx-auto w-full max-w-7xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <%- include('breadcrumbs') %>
-          <%- body %>
+            <%- body %>
         </main>
       </div>
     </div>
@@ -76,14 +117,15 @@
         setInterval(updateClock, 1000);
       })();
     </script>
-  <% } else { %>
-    <div class="flex h-screen flex-col overflow-hidden">
-      <%- include('navbar') %>
-      <main class="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        <%- include('breadcrumbs') %>
-        <%- body %>
-      </main>
-    </div>
-  <% } %>
+    <% } else { %>
+      <div class="flex h-screen flex-col overflow-hidden">
+        <%- include('navbar') %>
+          <main class="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+            <%- include('breadcrumbs') %>
+              <%- body %>
+          </main>
+      </div>
+      <% } %>
 </body>
+
 </html>
