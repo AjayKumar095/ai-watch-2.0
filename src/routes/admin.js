@@ -11,6 +11,7 @@ const sectionController = require("../controllers/sectionController");
 const subjectOfferingController = require("../controllers/subjectOfferingController");
 const teacherAccountController = require("../controllers/teacherAccountController");
 const studentAdminController = require("../controllers/studentAdminController");
+const userAdminController = require("../controllers/userAdminController");
 const sessionCloneController = require("../controllers/sessionCloneController");
 const promotionController = require("../controllers/promotionController");
 const certificateController = require("../controllers/certificateController");
@@ -27,6 +28,11 @@ router.get("/teachers/:id/edit", teacherAccountController.showEdit);
 router.post("/teachers/:id/edit", teacherAccountController.edit);
 router.post("/teachers/:id/delete", teacherAccountController.delete);
 router.get("/students", studentAdminController.list);
+
+router.get("/users", userAdminController.list);
+router.get("/users/:id/edit", userAdminController.showEdit);
+router.post("/users/:id/edit", userAdminController.edit);
+router.post("/users/:id/delete", userAdminController.delete);
 
 router.get("/mappings", adminController.listMappings);
 router.get("/mappings/new", adminController.showCreateMapping);

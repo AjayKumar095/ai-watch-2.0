@@ -143,88 +143,6 @@ password is always the system-generated one emailed on approval (or on a
 password reset). `/account/change-password` (linked from the navbar once
 logged in) is where they set their own password afterward.
 
-## Database migrations
-
-Schema changes now go through `sequelize-cli` migrations instead of
-`sequelize.sync({ alter: true })`. That matters because on SQLite, `alter`
-works by rebuilding the whole table and copying rows back in — a fragile
-operation that could silently drop or mangle data you'd edited after
-seeding. Migrations change the schema in place, so re-seeding (or just
-running the app) never touches structure and never risks your data.
-
-**One-time step, only if you already have a `dev.sqlite3` from before this
-change:**
-```bash
-npm run db:baseline   # marks the existing schema as migrated, touches no data
-npm run migrate        # applies anything newer than the baseline
-```
-
-**Fresh clone / new environment:** just run `npm run migrate` — the
-baseline migration (`migrations/…-baseline-schema.js`) creates every table
-from scratch.
-
-**When you change a model** (add a column, new table, etc.):
-```bash
-npx sequelize-cli migration:generate --name add-foo-to-bar
-# hand-write the up()/down() in the generated file using queryInterface
-npm run migrate
-```
-
-Other scripts: `npm run migrate:status`, `npm run migrate:undo`,
-`npm run migrate:undo:all`.
-
-Config: `.sequelizerc` points the CLI at `src/config/sequelize-cli.config.js`,
-which reads the same `.env` vars as `src/config/database.js` (same
-sqlite/postgres switch, same `underscored: true` column naming) — so a
-migration written against it produces exactly the columns the models expect.
-
-## Email plugin (`src/plugins/mailer`)
-
-A small, self-contained mailer: pick a JSON template, hand it data, send.
-
-```js
-const { sendTemplateMail } = require("./src/plugins/mailer");
-await sendTemplateMail({
-  to: user.email,
-  template: "welcome",          // src/plugins/mailer/templates/welcome.json, no extension
-  data: { firstName: "Alex", loginUrl: "https://..." },
-});
-```
-
-- **Add a new email kind** by dropping a new `templates/<name>.json` file
-  with `subject`, `title`, `subtitle`, `body` (HTML) — `{{token}}` placeholders
-  get filled from `data` and HTML-escaped. No code changes needed.
-- **Config** lives in `.env`: `MAIL_USER` + `MAIL_APP_PASSWORD` (a Gmail
-  [App Password](https://myaccount.google.com/apppasswords), not your normal
-  password — needs 2-Step Verification on the account), plus `MAIL_FROM_NAME`.
-  Set `MAIL_HOST`/`MAIL_PORT` instead to use a non-Gmail SMTP provider.
-- **If unconfigured**, `sendTemplateMail` logs what it would have sent and
-  returns `{ skipped: true }` instead of throwing.
-- **Never blocks a request.** Every call site (below) fires the email
-  without `await`-ing it, and the SMTP connection/greeting/socket timeouts
-  are capped at 10s (`src/plugins/mailer/transporter.js`) — so an
-  unreachable or misconfigured mail server can't stall an approval, signup,
-  password reset, or assessment post. Errors are caught and logged inside
-  `src/services/notificationService.js`, which is the single place all four
-  flows below go through.
-- **Test your setup:** `npm run mail:test -- you@example.com` (add a
-  template name as a second arg to try the others).
-
-**Wired-in flows** (all in `src/services/notificationService.js`):
-
-| When | Template | Where |
-|---|---|---|
-| Student submits the signup form | `signup-received` | `authController.studentSignup` |
-| Teacher approves an account | `welcome` (login email + system-generated temp password) | `teacherController.approveRequest` / `bulkApprove` |
-| Teacher rejects an account | `approval-decision` | `teacherController.rejectRequest` |
-| Student/teacher/admin uses "Forgot password" | `password-reset` (new temp password) | `authController.forgotPassword` |
-| Teacher posts a new assessment | `assessment-created` (subject, mentor, due date) | `assessmentController.create`, to every student enrolled in the targeted section(s) |
-
-Note the signup form no longer has a password field — a student's real
-password is always the system-generated one emailed on approval (or on a
-password reset). `/account/change-password` (linked from the navbar once
-logged in) is where they set their own password afterward.
-
 ## Academic sessions represent admission cohorts, not calendar years
 
 `StudentProfile.academicSessionId` is fixed at admission and **never changes**,
@@ -331,6 +249,21 @@ deleting a School that still has Programs) are guarded with a friendly
 error instead of a raw foreign-key crash — deactivate instead in those
 cases. Teacher deletion additionally checks for existing subject mappings
 and approval requests before allowing a hard delete.
+
+**`/admin/users`** is a role-agnostic account directory (name, email, role,
+active status) across all three roles, separate from the role-specific
+Teachers/Students pages — search and filter by role, edit basic account
+fields, or delete the account outright. Deletion here is deliberately
+careful: `student_profiles`/`teacher_profiles` and most of their dependents
+(`SubjectEnrollment`, `Submission`, `SemesterCertificate`,
+`PromotionRecord`, teacher mappings) cascade-delete at the DB level, which
+means a raw delete would silently wipe a student's or teacher's entire
+history with no error to catch. So `userAdminController.delete` counts
+those dependents *before* calling destroy and blocks with a clear message
+if any exist, on top of blocking self-deletion and deleting the last active
+superadmin. Role can't be changed from this page — swap it here and the
+account is left without the matching profile row; use the Teachers/Students
+pages for anything role-specific.
 
 ## Not yet built
 
