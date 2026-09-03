@@ -53,13 +53,13 @@ echo "Building CSS..."
 
 npm run build:css
 
-echo "Building assessment editor..."
+# echo "Building assessment editor..."
 
-npm run build:editor
+# npm run build:editor
 
-echo "Running database migrations..."
+# echo "Running database migrations..."
 
-npm run migrate
+# npm run migrate
 
 echo "Reloading PM2..."
 
