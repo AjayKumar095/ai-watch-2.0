@@ -141,38 +141,79 @@ await sendTemplateMail({
 Note the signup form no longer has a password field — a student's real
 password is always the system-generated one emailed on approval (or on a
 password reset). `/account/change-password` (linked from the navbar once
-logged in) is where they set their own password afterward.
+logged in) is where they set their own password afterward. The form itself
+(`src/views/auth/signup.ejs`) is a 4-step wizard (About you → Program →
+Class → Mentor) with a progress bar and cascading dropdowns, rather than
+one long traditional form — see the next section for what "Class" collects.
 
-## Academic sessions represent admission cohorts, not calendar years
+## Admission year is a fixed cohort marker, not a calendar year
 
-`StudentProfile.academicSessionId` is fixed at admission and **never changes**,
-including across promotions. This is deliberate: it's what lets two curricula
-run side by side once a program's syllabus changes — e.g. a subject that
-switches from a non-credit "VA"-coded course to a credit-bearing "AI"-coded
-one starting a given session. A fresh Semester 1 admit that year and a
-continuing student from an earlier session can both be attending classes in
-the same real-world year, in different semester numbers, each correctly
-scoped to their own cohort's `SubjectOffering`s (`subject_id` is part of the
-offering's uniqueness, so two different subjects can occupy the same
-program+semester+session slot without conflict).
+There used to be a separate `AcademicSession` table (label like "2026-2027",
+with start/end dates) that `ProgramOffering`, `SubjectOffering`,
+`StudentProfile`, `SemesterCertificate`, and `PromotionBatch` all pointed at
+via a foreign key. It's gone — `migrations/20260904000000-…` replaced it
+with a plain `admission_year` INTEGER column directly on each of those
+tables. The session's dates were only ever used for display, and a plain
+year does everything the FK did, with one fewer join and one fewer table to
+keep in sync.
+
+`StudentProfile.admissionYear` is fixed at signup and **never changes**,
+including across promotions. This is deliberate: it's what lets two
+curricula run side by side once a program's syllabus changes — e.g. a
+subject that switches from a non-credit "VA"-coded course to a
+credit-bearing "AI"-coded one starting a given year. A fresh Semester 1
+admit that year and a continuing student from an earlier year can both be
+attending classes in the same real-world year, in different semester
+numbers, each correctly scoped to their own cohort's `SubjectOffering`s
+(`subject_id` is part of the offering's uniqueness, so two different
+subjects can occupy the same program+semester+year slot without conflict).
 
 Practical implications:
 - `promotionService.commitPromotion` advances `currentSemesterNumber` only.
-  It never touches `academicSessionId` — see the comment at the top of that
+  It never touches `admissionYear` — see the comment at the top of that
   file for the full reasoning.
-- `assessmentController.buildTargetOptions`'s "all sections" branch is scoped
-  by the subject offering's own `academicSessionId`, not just
+- `assessmentController.buildTargetOptions`'s "all sections" branch is
+  scoped by the subject offering's own `admissionYear`, not just
   `programId`+`semesterNumber` — necessary once two different cohorts can
   share the same semester number (e.g. a fresh admit and an unrelated
   repeater), so a mapping never leaks sections from the wrong cohort.
-- Keep every `AcademicSession` with continuing active students marked
-  active in `/admin/sessions` — don't deactivate a session just because a
-  newer one exists; deactivate it once its last cohort has graduated.
-- Use `/admin/session-clone` for standing up a **new** session's structure
-  (fresh Semester 1 intake); use `/admin/promotions` for advancing existing
-  cohorts. The promotion form's "Promotion running in (this year)" field is
-  recorded on the `PromotionBatch` for history only — it's never written to
-  the student.
+- There's no admin page to manage "which years exist" anymore —
+  `src/services/admissionYearService.js` derives the dropdown list on the
+  fly from whatever years are already in use, plus the current and next
+  calendar year (so you can set up a brand-new year's structure before
+  anyone has signed up under it).
+- Use `/admin/session-clone` ("Clone to New Year") for standing up a
+  **new** admission year's structure (fresh Semester 1 intake); use
+  `/admin/promotions` for advancing existing cohorts. `PromotionBatch`
+  keeps `admissionYear` (the cohort) plus `executedAt` (a real timestamp of
+  when the promotion ran) — there's no second "which year did this happen
+  in" field, since `executedAt` already answers that precisely.
+- The student signup form (`/signup/student`) now collects `admissionYear`
+  and, if the program already has sections set up for that year, a
+  `sectionId`/`subGroupId` too — via `GET
+  /api/programs/:programId/years/:admissionYear/sections`. Both are
+  optional: a program's very first cohort of a new year will often sign up
+  before an admin has created any sections yet, and the form treats that as
+  normal, not an error.
+
+**A real bug this replaced:** the student signup form never used to set
+`academicSessionId` at all, even though the column was `NOT NULL` at the DB
+level — meaning `/signup/student` would have thrown a constraint violation
+in practice. Collecting `admissionYear` on the form fixes this as a side
+effect.
+
+**A subtle SQLite bug found and fixed while building this migration:**
+`queryInterface.removeColumn`/`changeColumn` rebuild the table under the
+hood on SQLite (there's no native `ALTER COLUMN`), and dropping the
+*original* table mid-rebuild is enough to trigger `ON DELETE CASCADE`
+against it — so removing a column from `student_profiles` that way
+silently deleted every row in `semester_certificates`,
+`subject_enrollments`, etc., with no error thrown. Verified by seeding one
+row in each table and watching them disappear. The fix, used throughout
+the migration: raw `ALTER TABLE ... DROP COLUMN` (SQLite 3.35+, this
+project runs 3.52), which doesn't rebuild the table at all. Worth knowing
+if you write a future migration that removes a column from a table with
+`CASCADE`-referencing children.
 
 ## Migrating to PostgreSQL
 
@@ -250,20 +291,54 @@ error instead of a raw foreign-key crash — deactivate instead in those
 cases. Teacher deletion additionally checks for existing subject mappings
 and approval requests before allowing a hard delete.
 
+Program and Subject Offering deletion show the *specific* records blocking
+them (student count, subject offering count, enrollment count, assessment
+count, etc.) instead of a generic "still has dependents" message — deleting
+a Program can otherwise feel like a confusing loop (blocked by a Subject
+Offering, which is blocked by something else, with no indication what) when
+it's actually just a straightforward top-down chain: Program → Subject
+Offerings → Enrollments/Assessments. Fix the innermost blocker first.
+
 **`/admin/users`** is a role-agnostic account directory (name, email, role,
 active status) across all three roles, separate from the role-specific
 Teachers/Students pages — search and filter by role, edit basic account
-fields, or delete the account outright. Deletion here is deliberately
-careful: `student_profiles`/`teacher_profiles` and most of their dependents
+fields, or delete the account. Deletion is a two-step flow, not a hard
+wall: `student_profiles`/`teacher_profiles` and most of their dependents
 (`SubjectEnrollment`, `Submission`, `SemesterCertificate`,
-`PromotionRecord`, teacher mappings) cascade-delete at the DB level, which
-means a raw delete would silently wipe a student's or teacher's entire
-history with no error to catch. So `userAdminController.delete` counts
-those dependents *before* calling destroy and blocks with a clear message
-if any exist, on top of blocking self-deletion and deleting the last active
-superadmin. Role can't be changed from this page — swap it here and the
-account is left without the matching profile row; use the Teachers/Students
-pages for anything role-specific.
+`PromotionRecord`, teacher mappings) cascade-delete at the DB level, so a
+raw delete would silently wipe a student's or teacher's entire history
+with no error to catch. The first delete attempt shows exactly what's
+attached and redirects to a confirm screen; from there, "delete everything
+anyway" (`force=1`) actually does it — for students that's just the
+DB cascade doing its job, for teachers one non-cascading relation
+(pending approval requests referencing them) is cleared explicitly in the
+same transaction first. Self-deletion and deleting the last active
+superadmin stay hard blocks regardless of force, since either would lock
+you out of the portal. Real academic content a TEACHER/SUPERADMIN created
+themselves (assessments, executed promotion batches) also stays hard
+blocked even under force — those use FK `RESTRICT` on purpose, since
+force-deleting through them would silently orphan grades or promotion
+history. Every deletion (forced or not) is written to both the Audit Log
+and System Logs below. Role can't be changed from this page — swap it here
+and the account is left without the matching profile row; use the
+Teachers/Students pages for anything role-specific.
+
+## System Logs
+
+`/admin/system-logs`, separate from the Audit Log (which records discrete
+admin actions like "created a program"). This is the operational log
+stream: every request, unhandled errors, failed logins, mailer failures,
+and blocked/forced deletes — the kind of thing you'd `tail -f` in
+production, independent of who did what to which academic record.
+
+Implemented with `winston` (`src/utils/logger.js`), writing size-rotated
+JSON-lines files to `logs/` (gitignored): 5MB per file, 3 files kept, oldest
+dropped. The active file is always `logs/app.log`; rotated-out ones become
+`app1.log`, `app2.log`. The admin page lets you pick which file to view and
+filter by level (info / warning / error / all); each row's extra fields
+(request path, user id, stack trace, etc.) are in a collapsible detail
+toggle rather than cluttering the table.
+
 
 ## Not yet built
 

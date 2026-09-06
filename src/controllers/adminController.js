@@ -5,25 +5,26 @@ const {
   School,
   Program,
   SubjectPool,
-  AcademicSession,
   AuditLog,
   ApprovalRequest,
   Submission,
 } = require("../models");
 const { hashPassword } = require("../utils/password");
+const { distinctAdmissionYears } = require("../services/admissionYearService");
 const crypto = require("crypto");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 
 exports.dashboard = async (req, res) => {
-  const [teacherCount, studentCount, schoolCount, programCount, subjectCount, sessionCount] = await Promise.all([
+  const [teacherCount, studentCount, schoolCount, programCount, subjectCount, admissionYears] = await Promise.all([
     TeacherProfile.count(),
     StudentProfile.count(),
     School.count(),
     Program.count(),
     SubjectPool.count(),
-    AcademicSession.count(),
+    distinctAdmissionYears(),
   ]);
+  const sessionCount = admissionYears.length;
 
   // Students-by-program, for the chart.
   const programsWithCounts = await Program.findAll({

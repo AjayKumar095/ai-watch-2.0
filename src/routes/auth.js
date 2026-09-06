@@ -15,5 +15,6 @@ router.post("/signup/student", authController.studentSignup);
 // Public JSON endpoints for the signup form's cascading dropdowns.
 router.get("/api/schools/:schoolId/programs", authController.programsForSchool);
 router.get("/api/programs/:programId/specializations", authController.specializationsForProgram);
+router.get("/api/programs/:programId/years/:admissionYear/sections", authController.sectionsForProgram);
 
 module.exports = router;

@@ -4,6 +4,7 @@ module.exports = (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
       semesterNumber: { type: DataTypes.INTEGER, allowNull: false },
+      admissionYear: { type: DataTypes.INTEGER, allowNull: false },
       isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     },
     {
@@ -11,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ["subject_id", "program_id", "semester_number", "specialization_id", "academic_session_id"],
+          fields: ["subject_id", "program_id", "semester_number", "specialization_id", "admission_year"],
         },
       ],
     }

@@ -59,7 +59,7 @@
       <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
         <th class="py-2 pr-3">Roll No</th><th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Program</th>
         <th class="py-2 pr-3">Specialization</th><th class="py-2 pr-3">Section</th><th class="py-2 pr-3">Sem</th>
-        <th class="py-2 pr-3">Session</th><th class="py-2 pr-3">Status</th>
+        <th class="py-2 pr-3">Admission Year</th><th class="py-2 pr-3">Status</th>
       </tr></thead>
       <tbody class="divide-y divide-navy-50">
         <% students.forEach(function(s) { %>
@@ -70,7 +70,7 @@
             <td class="py-2 pr-3 text-navy-500"><%= s.Specialization ? s.Specialization.name : '—' %></td>
             <td class="py-2 pr-3 text-navy-500"><%= s.currentSection ? s.currentSection.name : '—' %></td>
             <td class="py-2 pr-3 text-navy-500"><%= s.currentSemesterNumber %></td>
-            <td class="py-2 pr-3 text-navy-400"><%= s.AcademicSession ? s.AcademicSession.label : '—' %></td>
+            <td class="py-2 pr-3 text-navy-400"><%= s.admissionYear %></td>
             <td class="py-2 pr-3">
               <% if (s.status === 'GRADUATED') { %><span class="badge-navy">Graduated</span>
               <% } else if (!s.isVerified) { %><span class="badge-amber">Pending</span>

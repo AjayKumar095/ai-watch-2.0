@@ -22,7 +22,6 @@ const {
   School,
   Program,
   Specialization,
-  AcademicSession,
   ProgramOffering,
   Section,
   SubjectPool,
@@ -134,26 +133,23 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------
-  // Academic Session
+  // Admission year (fixed cohort marker — see migrations/…-admission-year)
   // ---------------------------------------------------------------------
-  const [session] = await AcademicSession.findOrCreate({
-    where: { label: "2026-2027" },
-    defaults: { startDate: "2026-07-01", endDate: "2027-06-30", isActive: true },
-  });
+  const admissionYear = 2026;
 
   // ---------------------------------------------------------------------
   // Program Offerings
   // ---------------------------------------------------------------------
   const [bbaOffering] = await ProgramOffering.findOrCreate({
-    where: { programId: bba.id, semesterNumber: 3, academicSessionId: session.id },
+    where: { programId: bba.id, semesterNumber: 3, admissionYear },
     defaults: {},
   });
   const [llbOffering] = await ProgramOffering.findOrCreate({
-    where: { programId: llb.id, semesterNumber: 1, academicSessionId: session.id },
+    where: { programId: llb.id, semesterNumber: 1, admissionYear },
     defaults: {},
   });
   const [bcaOffering] = await ProgramOffering.findOrCreate({
-    where: { programId: bca.id, semesterNumber: 1, academicSessionId: session.id },
+    where: { programId: bca.id, semesterNumber: 1, admissionYear },
     defaults: {},
   });
 
@@ -223,28 +219,28 @@ async function main() {
   // ---------------------------------------------------------------------
   // "AI for All" offered across all three programs — the university-wide subject.
   const [aiOfferingBBA] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectAI.id, programId: bba.id, semesterNumber: 3, specializationId: null, academicSessionId: session.id },
+    where: { subjectId: subjectAI.id, programId: bba.id, semesterNumber: 3, specializationId: null, admissionYear },
     defaults: {},
   });
   const [aiOfferingLLB] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectAI.id, programId: llb.id, semesterNumber: 1, specializationId: null, academicSessionId: session.id },
+    where: { subjectId: subjectAI.id, programId: llb.id, semesterNumber: 1, specializationId: null, admissionYear },
     defaults: {},
   });
   const [aiOfferingBCA] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectAI.id, programId: bca.id, semesterNumber: 1, specializationId: null, academicSessionId: session.id },
+    where: { subjectId: subjectAI.id, programId: bca.id, semesterNumber: 1, specializationId: null, admissionYear },
     defaults: {},
   });
 
   const [financeOffering] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectFinance.id, programId: bba.id, semesterNumber: 3, specializationId: specFinance.id, academicSessionId: session.id },
+    where: { subjectId: subjectFinance.id, programId: bba.id, semesterNumber: 3, specializationId: specFinance.id, admissionYear },
     defaults: {},
   });
   const [legalWritingOffering] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectLegalWriting.id, programId: llb.id, semesterNumber: 1, specializationId: null, academicSessionId: session.id },
+    where: { subjectId: subjectLegalWriting.id, programId: llb.id, semesterNumber: 1, specializationId: null, admissionYear },
     defaults: {},
   });
   const [dataStructuresOffering] = await SubjectOffering.findOrCreate({
-    where: { subjectId: subjectDataStructures.id, programId: bca.id, semesterNumber: 1, specializationId: null, academicSessionId: session.id },
+    where: { subjectId: subjectDataStructures.id, programId: bca.id, semesterNumber: 1, specializationId: null, admissionYear },
     defaults: {},
   });
 
@@ -352,7 +348,7 @@ async function main() {
         specializationId: plan.specialization ? plan.specialization.id : null,
         currentSemesterNumber: plan.offering.semesterNumber,
         currentSectionId: plan.section.id,
-        academicSessionId: session.id,
+        admissionYear,
         status: "ACTIVE",
         isVerified: false,
       },

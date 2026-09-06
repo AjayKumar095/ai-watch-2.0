@@ -1,97 +1,216 @@
-<div class="mx-auto mt-8 max-w-xl">
-  <div class="card">
-    <div class="mb-2 flex items-center gap-2">
-      <img src="/images/gu-logo.webp" alt="Geeta University" class="h-8 w-auto rounded bg-white p-0.5" />
+<div class="mx-auto mt-4 max-w-xl">
+  <div class="card overflow-hidden !p-0">
+
+    <!-- Progress -->
+    <div class="border-b border-navy-100 bg-navy-50/60 px-6 py-4 sm:px-8">
+      <div class="flex items-center justify-between text-xs font-medium text-navy-400">
+        <span id="step-label">Step 1 of 4</span>
+        <span id="step-title" class="text-navy-600">About you</span>
+      </div>
+      <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-navy-100">
+        <div id="progress-bar" class="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out" style="width: 25%"></div>
+      </div>
     </div>
-    <h1 class="text-xl font-bold text-navy-900">Student Onboarding</h1>
-    <p class="mt-1 text-sm text-navy-500">
-      Your account is activated once the teacher you select below approves your request.
-    </p>
 
     <% if (error) { %>
-      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+      <div class="mx-6 mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 sm:mx-8"><%= error %></div>
     <% } %>
 
-    <form id="signup-form" action="/signup/student" method="POST" class="mt-6 space-y-4">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label class="form-label" for="firstName">First name</label>
-          <input class="form-input" id="firstName" name="firstName" value="<%= formData.firstName || '' %>" required />
+    <form id="signup-form" action="/signup/student" method="POST" class="px-6 py-6 sm:px-8 sm:py-8">
+
+      <!-- Step 1: About you -->
+      <section class="signup-step" data-step="1">
+        <img src="/images/gu-logo.webp" alt="Geeta University" class="h-9 w-auto rounded bg-white p-0.5 shadow-sm" />
+        <h1 class="mt-4 text-2xl font-bold text-navy-900">Hey there. Let's get you set up.</h1>
+        <p class="mt-1 text-sm text-navy-500">Four quick steps — should take about a minute.</p>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="form-label" for="firstName">First name</label>
+            <input class="form-input" id="firstName" name="firstName" value="<%= formData.firstName || '' %>" required autofocus />
+          </div>
+          <div>
+            <label class="form-label" for="lastName">Last name</label>
+            <input class="form-input" id="lastName" name="lastName" value="<%= formData.lastName || '' %>" required />
+          </div>
         </div>
-        <div>
-          <label class="form-label" for="lastName">Last name</label>
-          <input class="form-input" id="lastName" name="lastName" value="<%= formData.lastName || '' %>" required />
+        <div class="mt-4">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-input" type="email" id="email" name="email" value="<%= formData.email || '' %>" required />
         </div>
-      </div>
+        <p class="mt-3 text-xs text-navy-400">
+          No password to set here — once your requested teacher approves your account, we'll email you a temporary login password.
+        </p>
+      </section>
 
-      <div>
-        <label class="form-label" for="email">Email</label>
-        <input class="form-input" type="email" id="email" name="email" value="<%= formData.email || '' %>" required />
-      </div>
+      <!-- Step 2: Program -->
+      <section class="signup-step hidden" data-step="2">
+        <h1 class="text-2xl font-bold text-navy-900">Where are you studying?</h1>
+        <p class="mt-1 text-sm text-navy-500">We'll use this to line you up with the right subjects.</p>
 
-      <p class="text-xs text-navy-400">
-        No password to set here — once your requested teacher approves your account, we'll email you a
-        temporary login password.
-      </p>
-
-      <div>
-        <label class="form-label" for="rollNo">Roll number</label>
-        <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
-      </div>
-
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label class="form-label" for="schoolId">School</label>
-          <select class="form-input" id="schoolId" name="schoolId" required>
-            <option value="">Select a school</option>
-            <% schools.forEach(function(s) { %>
-              <option value="<%= s.id %>" <%= formData.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option>
-            <% }) %>
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="form-label" for="schoolId">School</label>
+            <select class="form-input" id="schoolId" name="schoolId" required>
+              <option value="">Select a school</option>
+              <% schools.forEach(function(s) { %>
+                <option value="<%= s.id %>" <%= formData.schoolId === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="programId">Program</label>
+            <select class="form-input" id="programId" name="programId" required disabled>
+              <option value="">Select a school first</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-4">
+          <label class="form-label" for="specializationId">Specialization <span class="font-normal text-navy-400">(if any)</span></label>
+          <select class="form-input" id="specializationId" name="specializationId" disabled>
+            <option value="">Select a program first</option>
           </select>
         </div>
-        <div>
-          <label class="form-label" for="programId">Program</label>
-          <select class="form-input" id="programId" name="programId" required disabled>
-            <option value="">Select a school first</option>
+      </section>
+
+      <!-- Step 3: Class details -->
+      <section class="signup-step hidden" data-step="3">
+        <h1 class="text-2xl font-bold text-navy-900">What's your class?</h1>
+        <p class="mt-1 text-sm text-navy-500">Your admission year stays fixed for your whole program — it's how we track which curriculum applies to you.</p>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class="form-label" for="rollNo">Roll number</label>
+            <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
+          </div>
+          <div>
+            <label class="form-label" for="admissionYear">Admission year</label>
+            <select class="form-input" id="admissionYear" name="admissionYear" required>
+              <option value="">Select a year</option>
+              <% years.forEach(function(y) { %>
+                <option value="<%= y %>" <%= String(formData.admissionYear) === String(y) ? 'selected' : '' %>><%= y %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <label class="form-label" for="sectionId">Section <span class="font-normal text-navy-400">(optional — pick later if you're not sure)</span></label>
+          <select class="form-input" id="sectionId" name="sectionId" disabled>
+            <option value="">Select school, program &amp; year first</option>
           </select>
         </div>
-      </div>
+        <div class="mt-4 hidden" id="subgroup-wrapper">
+          <label class="form-label" for="subGroupId">Sub-group</label>
+          <select class="form-input" id="subGroupId" name="subGroupId">
+            <option value="">None</option>
+          </select>
+        </div>
+        <p id="no-sections-note" class="mt-3 hidden text-xs text-navy-400">
+          Sections for this year haven't been set up yet — no problem, you'll be assigned one once your account is approved.
+        </p>
+      </section>
 
-      <div>
-        <label class="form-label" for="specializationId">Specialization (if any)</label>
-        <select class="form-input" id="specializationId" name="specializationId" disabled>
-          <option value="">Select a program first</option>
-        </select>
-      </div>
+      <!-- Step 4: Mentor + submit -->
+      <section class="signup-step hidden" data-step="4">
+        <h1 class="text-2xl font-bold text-navy-900">Pick your mentor</h1>
+        <p class="mt-1 text-sm text-navy-500">This teacher reviews and approves your request.</p>
 
-      <div>
-        <label class="form-label" for="requestedTeacherId">Request approval from</label>
-        <select class="form-input" id="requestedTeacherId" name="requestedTeacherId" required>
-          <option value="">Select a teacher</option>
+        <input type="hidden" id="requestedTeacherId" name="requestedTeacherId" value="<%= formData.requestedTeacherId || '' %>" />
+        <div class="no-scrollbar mt-6 grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
           <% teachers.forEach(function(t) { %>
-            <option value="<%= t.id %>" <%= formData.requestedTeacherId === t.id ? 'selected' : '' %>>
-              <%= t.User.firstName %> <%= t.User.lastName %> (<%= t.employeeCode %>)
-            </option>
+            <button type="button" class="teacher-card flex items-center gap-3 rounded-lg border border-navy-100 p-3 text-left transition hover:border-amber-300 hover:bg-amber-50" data-teacher-id="<%= t.id %>">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-white">
+                <%= t.User.firstName[0] %><%= t.User.lastName[0] %>
+              </span>
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium text-navy-800"><%= t.User.firstName %> <%= t.User.lastName %></span>
+                <span class="block truncate text-xs text-navy-400"><%= t.employeeCode %></span>
+              </span>
+              <i class="fa-solid fa-circle-check ml-auto hidden text-lg text-amber-500 teacher-check"></i>
+            </button>
           <% }) %>
-        </select>
-        <p class="mt-1 text-xs text-navy-400">This teacher will see your request in their "Pending Approvals" panel.</p>
-      </div>
+        </div>
+        <p class="mt-2 text-xs text-navy-400">This teacher will see your request in their "Pending Approvals" panel.</p>
+      </section>
 
-      <button type="submit" class="btn-primary w-full">Submit request</button>
+      <!-- Nav -->
+      <div class="mt-8 flex items-center justify-between border-t border-navy-100 pt-5">
+        <button type="button" id="back-btn" class="btn-secondary invisible">Back</button>
+        <button type="button" id="next-btn" class="btn-primary">Continue</button>
+        <button type="submit" id="submit-btn" class="btn-primary hidden">Submit request</button>
+      </div>
     </form>
   </div>
 </div>
 
 <script>
   (function () {
+    var steps = Array.prototype.slice.call(document.querySelectorAll('.signup-step'));
+    var total = steps.length;
+    var current = 1;
+
+    var stepLabel = document.getElementById('step-label');
+    var stepTitle = document.getElementById('step-title');
+    var progressBar = document.getElementById('progress-bar');
+    var backBtn = document.getElementById('back-btn');
+    var nextBtn = document.getElementById('next-btn');
+    var submitBtn = document.getElementById('submit-btn');
+    var titles = ['About you', 'Your program', 'Your class', 'Your mentor'];
+
+    function showStep(n) {
+      steps.forEach(function (el) {
+        el.classList.toggle('hidden', parseInt(el.dataset.step, 10) !== n);
+      });
+      stepLabel.textContent = 'Step ' + n + ' of ' + total;
+      stepTitle.textContent = titles[n - 1];
+      progressBar.style.width = (n / total) * 100 + '%';
+      backBtn.classList.toggle('invisible', n === 1);
+      nextBtn.classList.toggle('hidden', n === total);
+      submitBtn.classList.toggle('hidden', n !== total);
+      current = n;
+    }
+
+    function currentStepEl() {
+      return steps[current - 1];
+    }
+
+    function validateStep() {
+      var inputs = currentStepEl().querySelectorAll('input, select');
+      for (var i = 0; i < inputs.length; i++) {
+        if (!inputs[i].disabled && !inputs[i].checkValidity()) {
+          inputs[i].reportValidity();
+          return false;
+        }
+      }
+      if (current === 4 && !document.getElementById('requestedTeacherId').value) {
+        alert('Please pick a mentor to continue.');
+        return false;
+      }
+      return true;
+    }
+
+    nextBtn.addEventListener('click', function () {
+      if (!validateStep()) return;
+      if (current < total) showStep(current + 1);
+    });
+    backBtn.addEventListener('click', function () {
+      if (current > 1) showStep(current - 1);
+    });
+
     var schoolSelect = document.getElementById('schoolId');
     var programSelect = document.getElementById('programId');
     var specializationSelect = document.getElementById('specializationId');
+    var admissionYearSelect = document.getElementById('admissionYear');
+    var sectionSelect = document.getElementById('sectionId');
+    var subGroupSelect = document.getElementById('subGroupId');
+    var subGroupWrapper = document.getElementById('subgroup-wrapper');
+    var noSectionsNote = document.getElementById('no-sections-note');
 
-    // Re-render state, so a validation-error re-render can restore the
-    // student's previous selections instead of resetting the cascade.
     var prefillProgramId = <%- JSON.stringify(formData.programId || '') %>;
     var prefillSpecializationId = <%- JSON.stringify(formData.specializationId || '') %>;
+    var prefillSectionId = <%- JSON.stringify(formData.sectionId || '') %>;
+    var prefillSubGroupId = <%- JSON.stringify(formData.subGroupId || '') %>;
 
     function setOptions(select, items, placeholder, selectedId) {
       select.innerHTML = '';
@@ -122,6 +241,7 @@
           programSelect.disabled = false;
           setOptions(programSelect, programs, 'Select a program', selectedProgramId);
           if (selectedProgramId) loadSpecializations(selectedProgramId, prefillSpecializationId);
+          refreshSections();
         });
     }
 
@@ -139,17 +259,71 @@
         });
     }
 
-    schoolSelect.addEventListener('change', function () {
-      loadPrograms(this.value, null);
+    function refreshSections() {
+      var programId = programSelect.value;
+      var year = admissionYearSelect.value;
+      subGroupWrapper.classList.add('hidden');
+      noSectionsNote.classList.add('hidden');
+
+      if (!programId || !year) {
+        sectionSelect.disabled = true;
+        setOptions(sectionSelect, [], 'Select school, program & year first');
+        return;
+      }
+
+      fetch('/api/programs/' + programId + '/years/' + year + '/sections')
+        .then(function (r) { return r.json(); })
+        .then(function (sections) {
+          if (!sections.length) {
+            sectionSelect.disabled = true;
+            setOptions(sectionSelect, [], 'None set up yet — skip for now');
+            noSectionsNote.classList.remove('hidden');
+            return;
+          }
+          sectionSelect.disabled = false;
+          setOptions(sectionSelect, sections, 'Select a section (optional)', prefillSectionId);
+          sectionSelect.dataset.raw = JSON.stringify(sections);
+          maybeShowSubGroups(sections);
+        });
+    }
+
+    function maybeShowSubGroups(sections) {
+      var chosen = sections.filter(function (s) { return s.id === sectionSelect.value; })[0];
+      if (chosen && chosen.subGroups && chosen.subGroups.length) {
+        setOptions(subGroupSelect, chosen.subGroups, 'None', prefillSubGroupId);
+        subGroupWrapper.classList.remove('hidden');
+      } else {
+        subGroupWrapper.classList.add('hidden');
+      }
+    }
+
+    sectionSelect.addEventListener('change', function () {
+      var sections = JSON.parse(sectionSelect.dataset.raw || '[]');
+      maybeShowSubGroups(sections);
     });
-    programSelect.addEventListener('change', function () {
-      loadSpecializations(this.value, null);
+    admissionYearSelect.addEventListener('change', refreshSections);
+
+    schoolSelect.addEventListener('change', function () { loadPrograms(this.value, null); });
+    programSelect.addEventListener('change', function () { loadSpecializations(this.value, null); refreshSections(); });
+
+    if (schoolSelect.value) loadPrograms(schoolSelect.value, prefillProgramId);
+
+    var teacherCards = Array.prototype.slice.call(document.querySelectorAll('.teacher-card'));
+    var teacherInput = document.getElementById('requestedTeacherId');
+    function selectTeacher(card) {
+      teacherCards.forEach(function (c) {
+        c.classList.remove('border-amber-400', 'bg-amber-50');
+        c.querySelector('.teacher-check').classList.add('hidden');
+      });
+      card.classList.add('border-amber-400', 'bg-amber-50');
+      card.querySelector('.teacher-check').classList.remove('hidden');
+      teacherInput.value = card.dataset.teacherId;
+    }
+    teacherCards.forEach(function (card) {
+      card.addEventListener('click', function () { selectTeacher(card); });
+      if (teacherInput.value && card.dataset.teacherId === teacherInput.value) selectTeacher(card);
     });
 
-    // On initial load (e.g. re-render after a validation error), restore
-    // the cascade from whatever was previously selected.
-    if (schoolSelect.value) {
-      loadPrograms(schoolSelect.value, prefillProgramId);
-    }
+    showStep(1);
   })();
 </script>

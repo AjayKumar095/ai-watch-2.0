@@ -1,0 +1,58 @@
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">System Logs</h1>
+</div>
+
+<% if (!files.length) { %>
+  <div class="card text-sm text-navy-400">No log files yet — they're created as soon as the server logs anything.</div>
+<% } else { %>
+  <form method="GET" action="/admin/system-logs" class="card mb-4 flex flex-wrap items-end gap-4">
+    <div>
+      <label class="form-label">Log file</label>
+      <select class="form-input" name="file" onchange="this.form.submit()">
+        <% files.forEach(function(f) { %>
+          <option value="<%= f.name %>" <%= selectedFile === f.name ? 'selected' : '' %>><%= f.label %> — <%= f.size %></option>
+        <% }) %>
+      </select>
+    </div>
+    <input type="hidden" name="level" value="<%= level %>" />
+    <div class="flex gap-2">
+      <a href="/admin/system-logs?file=<%= selectedFile %>&level=all" class="btn-<%= level === 'all' ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">All</a>
+      <a href="/admin/system-logs?file=<%= selectedFile %>&level=info" class="btn-<%= level === 'info' ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">Info</a>
+      <a href="/admin/system-logs?file=<%= selectedFile %>&level=warn" class="btn-<%= level === 'warn' ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">Warning</a>
+      <a href="/admin/system-logs?file=<%= selectedFile %>&level=error" class="btn-<%= level === 'error' ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">Error</a>
+    </div>
+    <a href="/admin/system-logs?file=<%= selectedFile %>&level=<%= level %>" class="btn-ghost ml-auto text-xs"><i class="fa-solid fa-rotate mr-1"></i>Refresh</a>
+  </form>
+
+  <p class="mb-2 text-xs text-navy-400">
+    <%= totalMatched %> matching line(s) in this file<% if (truncated) { %> — showing the most recent 500<% } %>.
+  </p>
+
+  <div class="card !p-0 overflow-hidden">
+    <table class="min-w-full divide-y divide-navy-100 text-sm">
+      <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+        <th class="py-2 pl-4 pr-3">When</th><th class="py-2 pr-3">Level</th><th class="py-2 pr-3">Message</th><th class="py-2 pr-3">Detail</th>
+      </tr></thead>
+      <tbody class="divide-y divide-navy-50">
+        <% lines.forEach(function(l) { %>
+          <tr>
+            <td class="py-2 pl-4 pr-3 whitespace-nowrap text-navy-400"><%= l.timestamp ? new Date(l.timestamp).toLocaleString() : '—' %></td>
+            <td class="py-2 pr-3">
+              <span class="<%= l.level === 'error' ? 'badge-amber' : (l.level === 'warn' ? 'badge-amber' : 'badge-info') %>"><%= l.level %></span>
+            </td>
+            <td class="py-2 pr-3 text-navy-700"><%= l.message %></td>
+            <td class="py-2 pr-3">
+              <% var meta = Object.assign({}, l); delete meta.level; delete meta.message; delete meta.timestamp; delete meta._unparsed; %>
+              <% if (Object.keys(meta).length) { %>
+                <details><summary class="cursor-pointer text-xs text-info-600 hover:underline">view</summary>
+                  <pre class="mt-1 max-w-md overflow-x-auto rounded bg-navy-50 p-2 text-xs text-navy-500"><%= JSON.stringify(meta, null, 2) %></pre>
+                </details>
+              <% } else { %>—<% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (!lines.length) { %><tr><td colspan="4" class="py-4 pl-4 text-navy-400">No log lines match this filter.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>

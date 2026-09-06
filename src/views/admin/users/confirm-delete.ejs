@@ -1,0 +1,34 @@
+<div class="mx-auto mt-4 max-w-lg">
+  <div class="card">
+    <h1 class="text-xl font-bold text-navy-900">Delete <%= user.fullName() %>?</h1>
+    <p class="mt-1 text-sm text-navy-500"><%= user.email %> · <%= user.role %></p>
+
+    <% if (hardBlocked) { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <strong>Can't be deleted, even by force:</strong> <%= hardBlocked %>
+      </div>
+      <a href="/admin/users" class="btn-secondary mt-6 inline-flex">Back to Users</a>
+    <% } else { %>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+        <p class="font-medium">This account has data attached:</p>
+        <ul class="mt-2 list-disc pl-5">
+          <% items.forEach(function(item) { %><li><%= item.count %> <%= item.label %></li><% }) %>
+        </ul>
+        <p class="mt-2">Deleting the account will permanently erase all of it. This can't be undone.</p>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <a href="/admin/users" class="btn-secondary flex-1 text-center">Cancel</a>
+        <form action="/admin/users/<%= user.id %>/delete" method="POST" class="flex-1"
+              onsubmit="return confirm('Really delete <%= user.fullName() %> and everything listed above? This cannot be undone.');">
+          <input type="hidden" name="force" value="on" />
+          <button type="submit" class="btn-secondary w-full !border-amber-300 !text-amber-700 hover:!bg-amber-50">Delete everything anyway</button>
+        </form>
+      </div>
+
+      <p class="mt-4 text-xs text-navy-400">
+        Prefer to keep the history? <a href="/admin/users/<%= user.id %>/edit" class="text-info-600 hover:underline">Deactivate the account instead</a> — it blocks login without deleting anything.
+      </p>
+    <% } %>
+  </div>
+</div>

@@ -1,43 +1,44 @@
-const { SubjectOffering, SubjectPool, Program, Specialization, AcademicSession, AuditLog } = require("../models");
+const { SubjectOffering, SubjectPool, Program, Specialization, AuditLog } = require("../models");
 const { safeDestroy, tryDestroy } = require("../utils/deleteHelpers");
+const { distinctAdmissionYears } = require("../services/admissionYearService");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const OFFERINGS = { label: "Subject Offerings", url: "/admin/subject-offerings" };
 
 exports.list = async (req, res) => {
   const offerings = await SubjectOffering.findAll({
-    include: [SubjectPool, Program, Specialization, AcademicSession],
-    order: [["semesterNumber", "ASC"]],
+    include: [SubjectPool, Program, Specialization],
+    order: [["admission_year", "DESC"], ["semesterNumber", "ASC"]],
   });
   res.render("admin/subject-offerings/index", { title: "Subject Offerings", offerings, bulkMessage: null, breadcrumbs: [ROOT, { label: "Subject Offerings" }] });
 };
 
 exports.showCreate = async (req, res) => {
-  const [subjects, programs, sessions, specializations] = await Promise.all([
+  const [subjects, programs, years, specializations] = await Promise.all([
     SubjectPool.findAll({ where: { isActive: true } }),
     Program.findAll({ where: { isActive: true } }),
-    AcademicSession.findAll({ where: { isActive: true } }),
+    distinctAdmissionYears(),
     Specialization.findAll({ include: [Program] }),
   ]);
-  res.render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error: null, formData: {}, breadcrumbs: [ROOT, OFFERINGS, { label: "Add Offering" }] });
+  res.render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, years, specializations, error: null, formData: {}, breadcrumbs: [ROOT, OFFERINGS, { label: "Add Offering" }] });
 };
 
 exports.create = async (req, res) => {
-  const { subjectId, programId, semesterNumber, specializationId, academicSessionId } = req.body;
-  const [subjects, programs, sessions, specializations] = await Promise.all([
+  const { subjectId, programId, semesterNumber, specializationId, admissionYear } = req.body;
+  const [subjects, programs, years, specializations] = await Promise.all([
     SubjectPool.findAll({ where: { isActive: true } }),
     Program.findAll({ where: { isActive: true } }),
-    AcademicSession.findAll({ where: { isActive: true } }),
+    distinctAdmissionYears(),
     Specialization.findAll({ include: [Program] }),
   ]);
   const breadcrumbs = [ROOT, OFFERINGS, { label: "Add Offering" }];
   const rerender = (error) =>
-    res.status(400).render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, sessions, specializations, error, formData: req.body, breadcrumbs });
+    res.status(400).render("admin/subject-offerings/new", { title: "Add Subject Offering", subjects, programs, years, specializations, error, formData: req.body, breadcrumbs });
 
-  if (!subjectId || !programId || !semesterNumber || !academicSessionId) return rerender("Subject, program, semester, and session are required.");
+  if (!subjectId || !programId || !semesterNumber || !admissionYear) return rerender("Subject, program, semester, and admission year are required.");
 
   const existing = await SubjectOffering.findOne({
-    where: { subjectId, programId, semesterNumber, specializationId: specializationId || null, academicSessionId },
+    where: { subjectId, programId, semesterNumber, specializationId: specializationId || null, admissionYear },
   });
   if (existing) return rerender("This exact subject offering already exists.");
 
@@ -46,7 +47,7 @@ exports.create = async (req, res) => {
     programId,
     semesterNumber: parseInt(semesterNumber, 10),
     specializationId: specializationId || null,
-    academicSessionId,
+    admissionYear: parseInt(admissionYear, 10),
   });
   await AuditLog.create({ userId: req.currentUser.id, action: "CREATE_SUBJECT_OFFERING", entityType: "SubjectOffering", entityId: offering.id, metadata: {} });
   res.redirect("/admin/subject-offerings");
@@ -56,29 +57,29 @@ exports.create = async (req, res) => {
 // once (this is what makes offering "AI for All" across BAC/BA/BBA/LLB one
 // action instead of four). See architecture report §7.2.
 exports.showBulkAttach = async (req, res) => {
-  const [subjects, programs, sessions] = await Promise.all([
+  const [subjects, programs, years] = await Promise.all([
     SubjectPool.findAll({ where: { isActive: true } }),
     Program.findAll({ where: { isActive: true } }),
-    AcademicSession.findAll({ where: { isActive: true } }),
+    distinctAdmissionYears(),
   ]);
-  res.render("admin/subject-offerings/bulk-attach", { title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null, error: null, breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }] });
+  res.render("admin/subject-offerings/bulk-attach", { title: "Bulk Attach Subject to Programs", subjects, programs, years, result: null, error: null, breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }] });
 };
 
 exports.bulkAttach = async (req, res) => {
-  const { subjectId, academicSessionId } = req.body;
+  const { subjectId, admissionYear } = req.body;
   let programIds = req.body.programIds || [];
   if (!Array.isArray(programIds)) programIds = [programIds];
 
-  const [subjects, programs, sessions] = await Promise.all([
+  const [subjects, programs, years] = await Promise.all([
     SubjectPool.findAll({ where: { isActive: true } }),
     Program.findAll({ where: { isActive: true } }),
-    AcademicSession.findAll({ where: { isActive: true } }),
+    distinctAdmissionYears(),
   ]);
 
-  if (!subjectId || !academicSessionId || !programIds.length) {
+  if (!subjectId || !admissionYear || !programIds.length) {
     return res.status(400).render("admin/subject-offerings/bulk-attach", {
-      title: "Bulk Attach Subject to Programs", subjects, programs, sessions, result: null,
-      error: "Subject, session, and at least one program are required.",
+      title: "Bulk Attach Subject to Programs", subjects, programs, years, result: null,
+      error: "Subject, admission year, and at least one program are required.",
       breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
     });
   }
@@ -99,7 +100,7 @@ exports.bulkAttach = async (req, res) => {
       continue;
     }
     const [offering, wasCreated] = await SubjectOffering.findOrCreate({
-      where: { subjectId, programId, semesterNumber, specializationId: null, academicSessionId },
+      where: { subjectId, programId, semesterNumber, specializationId: null, admissionYear: parseInt(admissionYear, 10) },
       defaults: {},
     });
     if (wasCreated) created.push(offering);
@@ -115,7 +116,7 @@ exports.bulkAttach = async (req, res) => {
   });
 
   res.render("admin/subject-offerings/bulk-attach", {
-    title: "Bulk Attach Subject to Programs", subjects, programs, sessions,
+    title: "Bulk Attach Subject to Programs", subjects, programs, years,
     result: { createdCount: created.length, skippedCount: skipped.length, invalid, totalRequested: programIds.length },
     error: null,
     breadcrumbs: [ROOT, OFFERINGS, { label: "Bulk Attach" }],
@@ -124,11 +125,12 @@ exports.bulkAttach = async (req, res) => {
 
 // --- Edit / Delete / Deactivate / Bulk-delete ---
 // Only specialization and active-state are editable — the identity fields
-// (subject/program/semester/session) are covered by the unique index, so
-// "changing" one of those is really "delete and recreate," not an edit.
+// (subject/program/semester/admission year) are covered by the unique
+// index, so "changing" one of those is really "delete and recreate," not
+// an edit.
 
 exports.showEdit = async (req, res) => {
-  const offering = await SubjectOffering.findByPk(req.params.id, { include: [SubjectPool, Program, AcademicSession] });
+  const offering = await SubjectOffering.findByPk(req.params.id, { include: [SubjectPool, Program] });
   if (!offering) return res.redirect("/admin/subject-offerings");
   const specializations = await Specialization.findAll({ where: { programId: offering.programId } });
   res.render("admin/subject-offerings/edit", {
@@ -198,7 +200,7 @@ exports.bulkDelete = async (req, res) => {
     }
   }
 
-  const offeringsAfter = await SubjectOffering.findAll({ include: [SubjectPool, Program, Specialization, AcademicSession], order: [["semesterNumber", "ASC"]] });
+  const offeringsAfter = await SubjectOffering.findAll({ include: [SubjectPool, Program, Specialization], order: [["admission_year", "DESC"], ["semesterNumber", "ASC"]] });
   let message = null;
   if (blocked.length) {
     message = `${deletedCount} deleted. ${blocked.length} skipped because still in use (has assessments or enrolled students): ${blocked.join(", ")}. Deactivate those instead.`;

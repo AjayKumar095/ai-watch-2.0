@@ -10,7 +10,6 @@
         { href: '/admin/programs', icon: 'fa-graduation-cap', label: 'Programs' },
         { href: '/admin/subjects', icon: 'fa-book', label: 'Subject Pool' },
         { href: '/admin/subject-offerings', icon: 'fa-layer-group', label: 'Subject Offerings' },
-        { href: '/admin/sessions', icon: 'fa-calendar-days', label: 'Academic Sessions' },
       ]},
       { section: 'People', items: [
         { href: '/admin/teachers', icon: 'fa-chalkboard-user', label: 'Teachers' },
@@ -20,10 +19,11 @@
         { href: '/admin/enroll', icon: 'fa-user-plus', label: 'Enroll Students' },
       ]},
       { section: 'Term Rollover', items: [
-        { href: '/admin/session-clone', icon: 'fa-clone', label: 'Clone Session' },
+        { href: '/admin/session-clone', icon: 'fa-clone', label: 'Clone to New Year' },
         { href: '/admin/promotions', icon: 'fa-arrow-trend-up', label: 'Promotions' },
         { href: '/admin/certificates', icon: 'fa-certificate', label: 'Certificates' },
         { href: '/admin/audit-log', icon: 'fa-clipboard-list', label: 'Audit Log' },
+        { href: '/admin/system-logs', icon: 'fa-file-lines', label: 'System Logs' },
       ]},
     ];
   } else if (currentUser.role === 'TEACHER') {

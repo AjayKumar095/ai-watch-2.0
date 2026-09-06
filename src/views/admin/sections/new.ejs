@@ -11,7 +11,7 @@
         <label class="form-label">Program Offering</label>
         <select class="form-input" name="programOfferingId" required>
           <option value="">Select a program offering</option>
-          <% offerings.forEach(function(o) { %><option value="<%= o.id %>"><%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.AcademicSession.label %>)</option><% }) %>
+          <% offerings.forEach(function(o) { %><option value="<%= o.id %>"><%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.admissionYear %>)</option><% }) %>
         </select>
       </div>
       <div>

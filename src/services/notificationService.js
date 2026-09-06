@@ -3,6 +3,7 @@
 // mail failure must never break the request that triggered it) lives in
 // one place instead of being copy-pasted per controller.
 const { sendTemplateMail } = require("../plugins/mailer");
+const logger = require("../utils/logger");
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
@@ -10,7 +11,7 @@ async function safeSend(args) {
   try {
     return await sendTemplateMail(args);
   } catch (err) {
-    console.error(`[mailer] Failed to send "${args.template}" to ${args.to}:`, err.message);
+    logger.warn(`Mail send failed: "${args.template}" to ${args.to}`, { template: args.template, to: args.to, error: err.message });
     return { skipped: true, error: err.message };
   }
 }

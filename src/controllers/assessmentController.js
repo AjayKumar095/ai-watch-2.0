@@ -44,9 +44,9 @@ async function buildTargetOptions(teacherProfile) {
     if (m.sectionId) {
       options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: m.Section });
     } else {
-      // Scoped by academicSessionId, not just programId+semesterNumber:
-      // a program+semester pair is no longer unique to one cohort once
-      // academicSessionId represents "admission cohort" rather than "the
+      // Scoped by admissionYear, not just programId+semesterNumber: a
+      // program+semester pair is no longer unique to one cohort once
+      // admissionYear represents "admission cohort" rather than "the
       // current year" — e.g. a fresh Sem-1 admit this year and a held-back
       // Sem-1 repeater from an earlier cohort can both exist at once. This
       // keeps "all sections" mappings pointed at the SAME cohort as the
@@ -55,7 +55,7 @@ async function buildTargetOptions(teacherProfile) {
         where: {
           programId: m.SubjectOffering.programId,
           semesterNumber: m.SubjectOffering.semesterNumber,
-          academicSessionId: m.SubjectOffering.academicSessionId,
+          admissionYear: m.SubjectOffering.admissionYear,
         },
       });
       for (const po of offerings) {

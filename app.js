@@ -11,6 +11,7 @@ const session = require("express-session");
 const flash = require("connect-flash");
 
 const { attachUser } = require("./src/middleware/auth");
+const logger = require("./src/utils/logger");
 const authRoutes = require("./src/routes/auth");
 const accountRoutes = require("./src/routes/account");
 const teacherRoutes = require("./src/routes/teacher");
@@ -31,6 +32,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
+
+// File-logged request line, separate from morgan (which only goes to the
+// console). Logged on 'finish' so the real status code is included.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    // Static assets would drown out everything else in the log file for
+    // very little value — skip them.
+    if (req.path.startsWith("/css") || req.path.startsWith("/images") || req.path.startsWith("/js")) return;
+    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode}`, {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - start,
+      userId: req.currentUser ? req.currentUser.id : null,
+    });
+  });
+  next();
+});
 
 app.use(
   session({
@@ -70,6 +90,7 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
+  logger.error(err.message || "Unhandled error", { stack: err.stack, method: req.method, path: req.originalUrl });
   // XHR-style upload endpoints (CSV import, editor image upload) expect a
   // JSON error body, not an HTML error page — the client-side JS checks
   // `data.success`/`data.error`, so an HTML response would break silently.

@@ -15,20 +15,12 @@
       </div>
       <div><label class="form-label">From semester number</label><input class="form-input" type="number" name="fromSemesterNumber" min="1" value="<%= preview ? preview.fromSemesterNumber : '' %>" required /></div>
       <div>
-        <label class="form-label">From session (student's cohort)</label>
-        <select class="form-input" name="fromSessionId" required>
-          <option value="">Select session</option>
-          <% sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= preview && preview.fromSessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
+        <label class="form-label">Admission year (student's cohort)</label>
+        <select class="form-input" name="admissionYear" required>
+          <option value="">Select year</option>
+          <% years.forEach(function(y) { %><option value="<%= y %>" <%= preview && preview.admissionYear === y ? 'selected' : '' %>><%= y %></option><% }) %>
         </select>
-        <p class="mt-1 text-xs text-navy-400">The session these students were admitted under. It won't change — it's how the portal tells a new AI-code curriculum cohort apart from an older VA-code one, even once both are running in the same real year.</p>
-      </div>
-      <div>
-        <label class="form-label">Promotion running in (this year)</label>
-        <select class="form-input" name="toSessionId" required>
-          <option value="">Select session</option>
-          <% sessions.forEach(function(s) { %><option value="<%= s.id %>" <%= preview && preview.toSessionId === s.id ? 'selected' : '' %>><%= s.label %></option><% }) %>
-        </select>
-        <p class="mt-1 text-xs text-navy-400">Recorded for history only — just which real-world session this promotion event happened in. Students keep their original cohort session above.</p>
+        <p class="mt-1 text-xs text-navy-400">The year these students were admitted. It won't change — it's how the portal tells a new AI-code curriculum cohort apart from an older VA-code one, even once both are running in the same real year.</p>
       </div>
       <button type="submit" class="btn-secondary w-full">Preview</button>
     </form>
@@ -37,7 +29,7 @@
       <div class="mt-6 border-t border-navy-100 pt-6">
         <h2 class="text-sm font-semibold text-navy-800">
           <%= preview.students.length %> active student(s) in <%= preview.program.name %> Semester <%= preview.fromSemesterNumber %>
-          — will <%= preview.willGraduate ? 'GRADUATE' : 'move to Semester ' + preview.toSemesterNumber %> (cohort session stays the same)
+          — will <%= preview.willGraduate ? 'GRADUATE' : 'move to Semester ' + preview.toSemesterNumber %> (admission year stays the same)
         </h2>
 
         <% if (!preview.students.length) { %>
@@ -46,8 +38,7 @@
           <form action="/admin/promotions/commit" method="POST" class="mt-3">
             <input type="hidden" name="programId" value="<%= preview.programId %>" />
             <input type="hidden" name="fromSemesterNumber" value="<%= preview.fromSemesterNumber %>" />
-            <input type="hidden" name="fromSessionId" value="<%= preview.fromSessionId %>" />
-            <input type="hidden" name="toSessionId" value="<%= preview.toSessionId %>" />
+            <input type="hidden" name="admissionYear" value="<%= preview.admissionYear %>" />
 
             <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
               <% preview.students.forEach(function(s) { %>

@@ -5,7 +5,7 @@
 <div class="space-y-4">
   <% offerings.forEach(function(o) { %>
     <div class="card">
-      <h2 class="font-semibold text-navy-900"><%= o.Program.name %> — Semester <%= o.semesterNumber %> <span class="text-xs font-normal text-navy-400">(<%= o.AcademicSession.label %>)</span></h2>
+      <h2 class="font-semibold text-navy-900"><%= o.Program.name %> — Semester <%= o.semesterNumber %> <span class="text-xs font-normal text-navy-400">(<%= o.admissionYear %>)</span></h2>
       <% if (o.Sections && o.Sections.length) { %>
         <div class="mt-3 space-y-2">
           <% o.Sections.forEach(function(sec) { %>

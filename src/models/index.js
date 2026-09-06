@@ -7,7 +7,6 @@ const RefreshToken = require("./RefreshToken")(sequelize, DataTypes);
 const School = require("./School")(sequelize, DataTypes);
 const Program = require("./Program")(sequelize, DataTypes);
 const Specialization = require("./Specialization")(sequelize, DataTypes);
-const AcademicSession = require("./AcademicSession")(sequelize, DataTypes);
 const ProgramOffering = require("./ProgramOffering")(sequelize, DataTypes);
 const Section = require("./Section")(sequelize, DataTypes);
 const SubjectPool = require("./SubjectPool")(sequelize, DataTypes);
@@ -54,9 +53,6 @@ Specialization.belongsTo(Program, { foreignKey: "programId" });
 Program.hasMany(ProgramOffering, { foreignKey: "programId", onDelete: "CASCADE" });
 ProgramOffering.belongsTo(Program, { foreignKey: "programId" });
 
-AcademicSession.hasMany(ProgramOffering, { foreignKey: "academicSessionId", onDelete: "RESTRICT" });
-ProgramOffering.belongsTo(AcademicSession, { foreignKey: "academicSessionId" });
-
 ProgramOffering.hasMany(Section, { foreignKey: "programOfferingId", onDelete: "CASCADE" });
 Section.belongsTo(ProgramOffering, { foreignKey: "programOfferingId" });
 
@@ -81,9 +77,6 @@ SubjectOffering.belongsTo(Program, { foreignKey: "programId" });
 
 Specialization.hasMany(SubjectOffering, { foreignKey: "specializationId", onDelete: "SET NULL" });
 SubjectOffering.belongsTo(Specialization, { foreignKey: "specializationId" });
-
-AcademicSession.hasMany(SubjectOffering, { foreignKey: "academicSessionId", onDelete: "RESTRICT" });
-SubjectOffering.belongsTo(AcademicSession, { foreignKey: "academicSessionId" });
 
 TeacherProfile.hasMany(TeacherSubjectMapping, { foreignKey: "teacherId", onDelete: "CASCADE" });
 TeacherSubjectMapping.belongsTo(TeacherProfile, { foreignKey: "teacherId" });
@@ -114,9 +107,6 @@ StudentProfile.belongsTo(Specialization, { foreignKey: "specializationId" });
 
 Section.hasMany(StudentProfile, { as: "studentsCurrentSection", foreignKey: "currentSectionId", onDelete: "SET NULL" });
 StudentProfile.belongsTo(Section, { as: "currentSection", foreignKey: "currentSectionId" });
-
-AcademicSession.hasMany(StudentProfile, { foreignKey: "academicSessionId", onDelete: "RESTRICT" });
-StudentProfile.belongsTo(AcademicSession, { foreignKey: "academicSessionId" });
 
 // Approval requests (replaces class in-charge)
 StudentProfile.hasOne(ApprovalRequest, { foreignKey: "studentId", onDelete: "CASCADE" });
@@ -168,16 +158,10 @@ StudentProfile.hasMany(SemesterCertificate, { foreignKey: "studentId", onDelete:
 SemesterCertificate.belongsTo(StudentProfile, { foreignKey: "studentId" });
 Program.hasMany(SemesterCertificate, { foreignKey: "programId", onDelete: "CASCADE" });
 SemesterCertificate.belongsTo(Program, { foreignKey: "programId" });
-AcademicSession.hasMany(SemesterCertificate, { foreignKey: "academicSessionId", onDelete: "RESTRICT" });
-SemesterCertificate.belongsTo(AcademicSession, { foreignKey: "academicSessionId" });
 
 // Promotion
 Program.hasMany(PromotionBatch, { foreignKey: "programId", onDelete: "CASCADE" });
 PromotionBatch.belongsTo(Program, { foreignKey: "programId" });
-AcademicSession.hasMany(PromotionBatch, { as: "promotionsFrom", foreignKey: "fromSessionId", onDelete: "RESTRICT" });
-PromotionBatch.belongsTo(AcademicSession, { as: "fromSession", foreignKey: "fromSessionId" });
-AcademicSession.hasMany(PromotionBatch, { as: "promotionsTo", foreignKey: "toSessionId", onDelete: "RESTRICT" });
-PromotionBatch.belongsTo(AcademicSession, { as: "toSession", foreignKey: "toSessionId" });
 User.hasMany(PromotionBatch, { as: "executedPromotions", foreignKey: "executedById", onDelete: "RESTRICT" });
 PromotionBatch.belongsTo(User, { as: "executedBy", foreignKey: "executedById" });
 
@@ -197,7 +181,6 @@ module.exports = {
   School,
   Program,
   Specialization,
-  AcademicSession,
   ProgramOffering,
   Section,
   SubjectPool,

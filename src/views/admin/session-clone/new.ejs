@@ -1,14 +1,14 @@
 <div class="mx-auto mt-4 max-w-lg">
   <div class="card">
-    <h1 class="text-xl font-bold text-navy-900">Clone Academic Session Forward</h1>
+    <h1 class="text-xl font-bold text-navy-900">Clone to New Admission Year</h1>
     <p class="mt-1 text-sm text-navy-500">
       Clones this program's offerings, sections, sub-groups, subject offerings, and teacher mappings from one
-      session into a new one. Review and adjust individual teacher assignments afterwards.
+      admission year into a new one. Review and adjust individual teacher assignments afterwards.
     </p>
     <p class="mt-2 text-xs text-navy-400">
       For moving continuing students to their next semester, use <a href="/admin/promotions" class="text-info-600 hover:underline">Promotions</a> instead —
-      that keeps each student's original cohort session intact. Use this page for setting up a
-      <strong>new</strong> session's structure (e.g. this year's fresh Semester 1 intake), not for advancing existing cohorts.
+      that keeps each student's own admission year intact. Use this page for setting up a
+      <strong>new</strong> admission year's structure (e.g. this year's fresh Semester 1 intake), not for advancing existing cohorts.
     </p>
 
     <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
@@ -31,17 +31,17 @@
         </select>
       </div>
       <div>
-        <label class="form-label">From session</label>
-        <select class="form-input" name="fromSessionId" required>
-          <option value="">Select source session</option>
-          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        <label class="form-label">From admission year</label>
+        <select class="form-input" name="fromYear" required>
+          <option value="">Select source year</option>
+          <% years.forEach(function(y) { %><option value="<%= y %>"><%= y %></option><% }) %>
         </select>
       </div>
       <div>
-        <label class="form-label">To session</label>
-        <select class="form-input" name="toSessionId" required>
-          <option value="">Select target session</option>
-          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        <label class="form-label">To admission year</label>
+        <select class="form-input" name="toYear" required>
+          <option value="">Select target year</option>
+          <% years.forEach(function(y) { %><option value="<%= y %>"><%= y %></option><% }) %>
         </select>
       </div>
       <button type="submit" class="btn-primary w-full">Clone forward</button>

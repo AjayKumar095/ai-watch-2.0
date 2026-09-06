@@ -5,7 +5,6 @@ const schoolController = require("../controllers/schoolController");
 const programController = require("../controllers/programController");
 const programWorkspaceController = require("../controllers/programWorkspaceController");
 const subjectPoolController = require("../controllers/subjectPoolController");
-const academicSessionController = require("../controllers/academicSessionController");
 const programOfferingController = require("../controllers/programOfferingController");
 const sectionController = require("../controllers/sectionController");
 const subjectOfferingController = require("../controllers/subjectOfferingController");
@@ -16,6 +15,7 @@ const sessionCloneController = require("../controllers/sessionCloneController");
 const promotionController = require("../controllers/promotionController");
 const certificateController = require("../controllers/certificateController");
 const auditLogController = require("../controllers/auditLogController");
+const systemLogController = require("../controllers/systemLogController");
 const upload = require("../middleware/upload");
 
 router.use(requireAuth, requireRole("SUPERADMIN"));
@@ -32,6 +32,7 @@ router.get("/students", studentAdminController.list);
 router.get("/users", userAdminController.list);
 router.get("/users/:id/edit", userAdminController.showEdit);
 router.post("/users/:id/edit", userAdminController.edit);
+router.get("/users/:id/delete-confirm", userAdminController.showConfirmDelete);
 router.post("/users/:id/delete", userAdminController.delete);
 
 router.get("/mappings", adminController.listMappings);
@@ -86,15 +87,6 @@ router.post("/subjects/:id/delete", subjectPoolController.delete);
 router.post("/subjects/:id/toggle", subjectPoolController.toggleActive);
 router.post("/subjects/bulk-delete", subjectPoolController.bulkDelete);
 
-// Academic Sessions
-router.get("/sessions", academicSessionController.list);
-router.get("/sessions/new", academicSessionController.showCreate);
-router.post("/sessions/new", academicSessionController.create);
-router.get("/sessions/:id/edit", academicSessionController.showEdit);
-router.post("/sessions/:id/edit", academicSessionController.edit);
-router.post("/sessions/:id/toggle", academicSessionController.toggleActive);
-router.post("/sessions/:id/delete", academicSessionController.delete);
-
 // Program Offerings
 router.get("/offerings", programOfferingController.list);
 router.get("/offerings/new", programOfferingController.showCreate);
@@ -135,5 +127,6 @@ router.post("/certificates/generate", certificateController.generate);
 
 // Audit Log
 router.get("/audit-log", auditLogController.list);
+router.get("/system-logs", systemLogController.list);
 
 module.exports = router;

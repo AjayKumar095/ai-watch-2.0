@@ -21,7 +21,7 @@
         <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
           <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.offering-check').forEach(c=>c.checked=this.checked)" /></th>
           <th class="py-2 pr-3">Subject</th><th class="py-2 pr-3">Program</th><th class="py-2 pr-3">Semester</th>
-          <th class="py-2 pr-3">Specialization</th><th class="py-2 pr-3">Session</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"></th>
+          <th class="py-2 pr-3">Specialization</th><th class="py-2 pr-3">Admission Year</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"></th>
         </tr></thead>
         <tbody class="divide-y divide-navy-50">
           <% offerings.forEach(function(o) { %>
@@ -31,7 +31,7 @@
               <td class="py-2 pr-3 text-navy-500"><%= o.Program.name %></td>
               <td class="py-2 pr-3 text-navy-500"><%= o.semesterNumber %></td>
               <td class="py-2 pr-3 text-navy-500"><%= o.Specialization ? o.Specialization.name : '—' %></td>
-              <td class="py-2 pr-3 text-navy-500"><%= o.AcademicSession.label %></td>
+              <td class="py-2 pr-3 text-navy-500"><%= o.admissionYear %></td>
               <td class="py-2 pr-3"><span class="<%= o.isActive ? 'badge-info' : 'badge-amber' %>"><%= o.isActive ? 'Active' : 'Inactive' %></span></td>
               <td class="py-2 pr-3">
                 <div class="flex gap-2">

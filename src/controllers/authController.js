@@ -5,9 +5,12 @@ const {
   School,
   Program,
   Specialization,
+  ProgramOffering,
+  Section,
   ApprovalRequest,
   RefreshToken,
 } = require("../models");
+const { distinctAdmissionYears } = require("../services/admissionYearService");
 const { hashPassword, verifyPassword, generateTempPassword } = require("../utils/password");
 const {
   notifySignupReceived,
@@ -20,6 +23,7 @@ const {
   hashToken,
   COOKIE_OPTS,
 } = require("../utils/jwt");
+const logger = require("../utils/logger");
 
 const DASHBOARD_BY_ROLE = {
   SUPERADMIN: "/admin/dashboard",
@@ -36,6 +40,7 @@ exports.login = async (req, res) => {
   const user = await User.findOne({ where: { email } });
 
   if (!user) {
+    logger.warn("Login failed: unknown email", { email });
     return res.status(401).render("auth/login", {
       title: "Login",
       error: "Invalid email or password.",
@@ -58,6 +63,7 @@ exports.login = async (req, res) => {
   }
 
   if (!(await verifyPassword(password, user.passwordHash))) {
+    logger.warn("Login failed: wrong password", { email, userId: user.id });
     return res.status(401).render("auth/login", {
       title: "Login",
       error: "Invalid email or password.",
@@ -120,9 +126,12 @@ exports.logout = async (req, res) => {
 // --- Student onboarding -----------------------------------------------------
 
 exports.showStudentSignup = async (req, res) => {
-  const schools = await School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
-  const teachers = await TeacherProfile.findAll({ include: [User] });
-  res.render("auth/signup", { title: "Student Onboarding", schools, teachers, error: null, formData: {} });
+  const [schools, teachers, years] = await Promise.all([
+    School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] }),
+    TeacherProfile.findAll({ include: [User] }),
+    distinctAdmissionYears(),
+  ]);
+  res.render("auth/signup", { title: "Student Onboarding", schools, teachers, years, error: null, formData: {} });
 };
 
 // Public JSON endpoints powering the School -> Program -> Specialization
@@ -146,15 +155,41 @@ exports.specializationsForProgram = async (req, res) => {
   res.json(specializations);
 };
 
+// New admits always start at semester 1, so this looks up that specific
+// ProgramOffering for the chosen program+admissionYear and returns its
+// top-level sections with sub-groups nested — an empty array is a normal,
+// expected result if admin hasn't set up sections for that year yet (the
+// form treats that as "pick one later," not an error).
+exports.sectionsForProgram = async (req, res) => {
+  const { programId, admissionYear } = req.params;
+  const offering = await ProgramOffering.findOne({
+    where: { programId, admissionYear: parseInt(admissionYear, 10), semesterNumber: 1 },
+  });
+  if (!offering) return res.json([]);
+
+  const topSections = await Section.findAll({
+    where: { programOfferingId: offering.id, parentSectionId: null },
+    include: [{ model: Section, as: "subGroups" }],
+    order: [["name", "ASC"]],
+  });
+  res.json(topSections);
+};
+
 exports.studentSignup = async (req, res) => {
-  const { email, firstName, lastName, rollNo, schoolId, programId, specializationId, requestedTeacherId } = req.body;
+  const {
+    email, firstName, lastName, rollNo, schoolId, programId, specializationId,
+    admissionYear, sectionId, subGroupId, requestedTeacherId,
+  } = req.body;
 
-  const schools = await School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
-  const teachers = await TeacherProfile.findAll({ include: [User] });
+  const [schools, teachers, years] = await Promise.all([
+    School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] }),
+    TeacherProfile.findAll({ include: [User] }),
+    distinctAdmissionYears(),
+  ]);
   const rerender = (error) =>
-    res.status(400).render("auth/signup", { title: "Student Onboarding", schools, teachers, error, formData: req.body });
+    res.status(400).render("auth/signup", { title: "Student Onboarding", schools, teachers, years, error, formData: req.body });
 
-  if (!email || !firstName || !lastName || !rollNo || !schoolId || !programId || !requestedTeacherId) {
+  if (!email || !firstName || !lastName || !rollNo || !schoolId || !programId || !admissionYear || !requestedTeacherId) {
     return rerender("Please fill in all required fields.");
   }
 
@@ -188,6 +223,11 @@ exports.studentSignup = async (req, res) => {
     rollNo,
     programId,
     specializationId: specializationId || null,
+    admissionYear: parseInt(admissionYear, 10),
+    // Sub-group takes priority when chosen (it's the more specific home);
+    // both fields are optional since sections may not be set up yet for a
+    // brand-new admission year — the student can be assigned one later.
+    currentSectionId: subGroupId || sectionId || null,
     currentSemesterNumber: 1,
     isVerified: false,
   });

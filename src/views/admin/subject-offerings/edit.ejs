@@ -3,9 +3,9 @@
     <h1 class="text-xl font-bold text-navy-900">Edit Subject Offering</h1>
     <p class="mt-1 text-sm text-navy-500">
       <%= offering.SubjectPool.name %> — <%= offering.Program.name %> Semester <%= offering.semesterNumber %>
-      (<%= offering.AcademicSession.label %>)
+      (<%= offering.admissionYear %>)
     </p>
-    <p class="mt-1 text-xs text-navy-400">Subject, program, semester, and session can't be changed here — delete and recreate the offering instead if those need to change.</p>
+    <p class="mt-1 text-xs text-navy-400">Subject, program, semester, and admission year can't be changed here — delete and recreate the offering instead if those need to change.</p>
 
     <% if (error) { %><div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
 

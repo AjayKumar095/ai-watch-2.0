@@ -1,7 +1,13 @@
 // Clones a program's academic structure (ProgramOffering -> Sections ->
-// SubjectOfferings -> TeacherSubjectMappings) forward from one session to
-// another. Most departments only need to tweak a handful of teacher
-// reassignments after this runs — see architecture report §7.3.
+// SubjectOfferings -> TeacherSubjectMappings) forward from one admission
+// year to another. Most departments only need to tweak a handful of
+// teacher reassignments after this runs — see architecture report §7.3.
+//
+// Typical use since admissionYear replaced AcademicSession: standing up a
+// brand NEW admission year's structure by copying a recent year's as a
+// starting template — not for advancing existing cohorts (that's what
+// Promotions does, and it deliberately keeps each cohort's admissionYear
+// fixed rather than moving it here).
 const {
   sequelize,
   ProgramOffering,
@@ -10,12 +16,12 @@ const {
   TeacherSubjectMapping,
 } = require("../models");
 
-async function cloneSessionForward({ programId, fromSessionId, toSessionId }) {
+async function cloneYearForward({ programId, fromYear, toYear }) {
   return sequelize.transaction(async (t) => {
     const summary = { offerings: 0, sections: 0, subjectOfferings: 0, mappings: 0, skipped: [] };
 
     const sourceOfferings = await ProgramOffering.findAll({
-      where: { programId, academicSessionId: fromSessionId },
+      where: { programId, admissionYear: fromYear },
       include: [Section],
       transaction: t,
     });
@@ -27,7 +33,7 @@ async function cloneSessionForward({ programId, fromSessionId, toSessionId }) {
 
     for (const srcOffering of sourceOfferings) {
       const [newOffering, offeringCreated] = await ProgramOffering.findOrCreate({
-        where: { programId, semesterNumber: srcOffering.semesterNumber, academicSessionId: toSessionId },
+        where: { programId, semesterNumber: srcOffering.semesterNumber, admissionYear: toYear },
         defaults: {},
         transaction: t,
       });
@@ -63,7 +69,7 @@ async function cloneSessionForward({ programId, fromSessionId, toSessionId }) {
     // Clone SubjectOfferings for this program + these semesters, then their mappings.
     const semesterNumbers = sourceOfferings.map((o) => o.semesterNumber);
     const sourceSubjectOfferings = await SubjectOffering.findAll({
-      where: { programId, academicSessionId: fromSessionId, semesterNumber: semesterNumbers },
+      where: { programId, admissionYear: fromYear, semesterNumber: semesterNumbers },
       include: [{ model: TeacherSubjectMapping }],
       transaction: t,
     });
@@ -75,7 +81,7 @@ async function cloneSessionForward({ programId, fromSessionId, toSessionId }) {
           programId,
           semesterNumber: srcSO.semesterNumber,
           specializationId: srcSO.specializationId,
-          academicSessionId: toSessionId,
+          admissionYear: toYear,
         },
         defaults: {},
         transaction: t,
@@ -101,4 +107,4 @@ async function cloneSessionForward({ programId, fromSessionId, toSessionId }) {
   });
 }
 
-module.exports = { cloneSessionForward };
+module.exports = { cloneYearForward };

@@ -10,7 +10,6 @@ const {
   School,
   Specialization,
   Section,
-  AcademicSession,
 } = require("../models");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
@@ -43,7 +42,7 @@ exports.list = async (req, res) => {
 
   const students = await StudentProfile.findAll({
     where,
-    include: [User, Program, Specialization, { model: Section, as: "currentSection" }, AcademicSession],
+    include: [User, Program, Specialization, { model: Section, as: "currentSection" }],
     order: [["rollNo", "ASC"]],
     limit: 300,
   });

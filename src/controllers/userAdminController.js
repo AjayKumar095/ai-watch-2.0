@@ -3,15 +3,20 @@
 // data (employee code, roll number, etc). This page is for the account
 // itself: name, email, role, active status, and account-level deletion.
 //
-// Deletion is deliberately careful. Several FKs on StudentProfile/
-// TeacherProfile cascade (see migrations/…-baseline-schema.js), meaning a
-// raw destroy() would silently wipe a student's entire academic history
-// (enrollments, submissions, certificates, promotion records) with no
-// error to catch — unlike a FK RESTRICT, cascade never throws. So role-
-// specific dependents are counted and blocked proactively before we ever
-// call destroy(); a thrown SequelizeForeignKeyConstraintError (from a
-// RESTRICT elsewhere, e.g. assessments this user created) is still caught
-// as a fallback.
+// Deletion has two steps, not a hard wall. The first attempt shows exactly
+// what's attached (most StudentProfile/TeacherProfile FKs cascade at the DB
+// level — see migrations/…-baseline-schema.js — so a raw destroy() would
+// silently wipe a student's whole academic history with no error to catch,
+// unlike a FK RESTRICT). Rather than only ever refusing, that same page
+// offers "delete everything anyway" for when that's genuinely what's
+// wanted — it re-submits with `force=1`, which skips the soft checks and
+// destroys directly, relying on DB cascade for students (confirmed CASCADE
+// on every student_id FK) and a small manual pre-clean for teachers (see
+// below). A few things stay hard blocks even under force: your own
+// account, the last active superadmin, and real academic content a
+// TEACHER/SUPERADMIN created themselves (assessments, executed promotion
+// batches) — those use FK RESTRICT on purpose and force-deleting through
+// them would silently orphan grades or promotion history.
 const { Op } = require("sequelize");
 const {
   User,
@@ -25,9 +30,13 @@ const {
   Submission,
   SemesterCertificate,
   PromotionRecord,
+  Assessment,
+  PromotionBatch,
   AuditLog,
+  sequelize,
 } = require("../models");
 const { safeDestroy } = require("../utils/deleteHelpers");
+const logger = require("../utils/logger");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const USERS = { label: "Users", url: "/admin/users" };
@@ -102,17 +111,84 @@ exports.edit = async (req, res) => {
   res.redirect("/admin/users");
 };
 
+// Gathers exactly what's attached to a user, without deleting anything.
+// Shared by the confirm-delete screen and the delete handler so the counts
+// shown to the admin are always the same ones the delete decision uses.
+async function countDependents(user) {
+  if (user.role === "TEACHER") {
+    const teacherProfile = await TeacherProfile.findOne({ where: { userId: user.id } });
+    if (!teacherProfile) return { items: [], hardBlocked: null };
+    const [mappingCount, approvalCount, assessmentCount] = await Promise.all([
+      TeacherSubjectMapping.count({ where: { teacherId: teacherProfile.id } }),
+      ApprovalRequest.count({ where: { requestedTeacherId: teacherProfile.id } }),
+      Assessment.count({ where: { createdById: user.id } }),
+    ]);
+    const items = [];
+    if (mappingCount > 0) items.push({ label: "subject mapping(s)", count: mappingCount, forceable: true });
+    if (approvalCount > 0) items.push({ label: "approval request(s) awaiting their review", count: approvalCount, forceable: true });
+    if (assessmentCount > 0) items.push({ label: "assessment(s) they created (with any submissions/grades)", count: assessmentCount, forceable: false });
+    return {
+      items,
+      hardBlocked: assessmentCount > 0
+        ? `They created ${assessmentCount} assessment(s). Reassign or delete those first (via Assessments) — deleting the account can't safely take submitted work and grades with it.`
+        : null,
+    };
+  }
+
+  if (user.role === "STUDENT") {
+    const studentProfile = await StudentProfile.findOne({ where: { userId: user.id } });
+    if (!studentProfile) return { items: [], hardBlocked: null };
+    const [enrollmentCount, submissionCount, certificateCount, promotionCount, approvalCount] = await Promise.all([
+      SubjectEnrollment.count({ where: { studentId: studentProfile.id } }),
+      Submission.count({ where: { studentId: studentProfile.id } }),
+      SemesterCertificate.count({ where: { studentId: studentProfile.id } }),
+      PromotionRecord.count({ where: { studentId: studentProfile.id } }),
+      ApprovalRequest.count({ where: { studentId: studentProfile.id } }),
+    ]);
+    const items = [];
+    if (enrollmentCount > 0) items.push({ label: "subject enrollment(s)", count: enrollmentCount, forceable: true });
+    if (submissionCount > 0) items.push({ label: "submission(s)", count: submissionCount, forceable: true });
+    if (certificateCount > 0) items.push({ label: "certificate(s)", count: certificateCount, forceable: true });
+    if (promotionCount > 0) items.push({ label: "promotion record(s)", count: promotionCount, forceable: true });
+    if (approvalCount > 0) items.push({ label: "approval request(s)", count: approvalCount, forceable: true });
+    return { items, hardBlocked: null };
+  }
+
+  if (user.role === "SUPERADMIN") {
+    const executedCount = await PromotionBatch.count({ where: { executedById: user.id } });
+    return {
+      items: executedCount > 0 ? [{ label: "promotion batch(es) they executed", count: executedCount, forceable: false }] : [],
+      hardBlocked: executedCount > 0
+        ? `They executed ${executedCount} promotion batch(es). That history is kept for audit purposes and can't be deleted through this account.`
+        : null,
+    };
+  }
+
+  return { items: [], hardBlocked: null };
+}
+
+exports.showConfirmDelete = async (req, res) => {
+  const user = await User.findByPk(req.params.id);
+  if (!user) return res.redirect("/admin/users");
+  const { items, hardBlocked } = await countDependents(user);
+  res.render("admin/users/confirm-delete", {
+    title: "Delete User", user, items, hardBlocked,
+    breadcrumbs: [ROOT, USERS, { label: user.fullName() }],
+  });
+};
+
 exports.delete = async (req, res) => {
   const user = await User.findByPk(req.params.id);
   if (!user) return res.redirect("/admin/users");
+  const force = req.body && (req.body.force === "on" || req.body.force === "1");
 
-  const cantDelete = (message) =>
-    res.status(409).render("error", { title: "Can't delete", message });
+  const cantDelete = (message) => res.status(409).render("error", { title: "Can't delete", message });
 
+  // These two never yield to force — bypassing either can brick admin
+  // access to the portal.
   if (user.id === req.currentUser.id) {
     return cantDelete("You can't delete your own account while logged in as it.");
   }
-
   if (user.role === "SUPERADMIN") {
     const activeSuperadmins = await User.count({ where: { role: "SUPERADMIN", isActive: true } });
     if (activeSuperadmins <= 1 && user.isActive) {
@@ -120,43 +196,48 @@ exports.delete = async (req, res) => {
     }
   }
 
-  if (user.role === "TEACHER") {
-    const teacherProfile = await TeacherProfile.findOne({ where: { userId: user.id } });
-    if (teacherProfile) {
-      const mappingCount = await TeacherSubjectMapping.count({ where: { teacherId: teacherProfile.id } });
-      const approvalCount = await ApprovalRequest.count({ where: { requestedTeacherId: teacherProfile.id } });
-      if (mappingCount > 0 || approvalCount > 0) {
-        return cantDelete(
-          `This teacher still has ${mappingCount} subject mapping(s) and ${approvalCount} approval request(s). Remove/reassign those first, or deactivate the account instead of deleting it.`
-        );
-      }
-    }
+  const { items, hardBlocked } = await countDependents(user);
+
+  if (hardBlocked) {
+    return cantDelete(hardBlocked);
   }
 
-  if (user.role === "STUDENT") {
-    const studentProfile = await StudentProfile.findOne({ where: { userId: user.id } });
-    if (studentProfile) {
-      const [enrollmentCount, submissionCount, certificateCount, promotionCount, approvalCount] = await Promise.all([
-        SubjectEnrollment.count({ where: { studentId: studentProfile.id } }),
-        Submission.count({ where: { studentId: studentProfile.id } }),
-        SemesterCertificate.count({ where: { studentId: studentProfile.id } }),
-        PromotionRecord.count({ where: { studentId: studentProfile.id } }),
-        ApprovalRequest.count({ where: { studentId: studentProfile.id } }),
-      ]);
-      const total = enrollmentCount + submissionCount + certificateCount + promotionCount + approvalCount;
-      if (total > 0) {
-        return cantDelete(
-          `This student has academic history attached (${enrollmentCount} enrollment(s), ${submissionCount} submission(s), ${certificateCount} certificate(s), ${promotionCount} promotion record(s), ${approvalCount} approval request(s)). Deleting would erase all of it. Deactivate the account instead, or remove those records first if you're certain.`
-        );
-      }
-    }
+  if (items.length && !force) {
+    // Redirect to the confirm screen instead of dead-ending on an error —
+    // it shows the same counts plus a "delete everything anyway" button.
+    return res.redirect(`/admin/users/${user.id}/delete-confirm`);
   }
 
-  // Fallback net: a RESTRICT elsewhere (e.g. assessments this user created,
-  // or a promotion batch they executed) throws rather than cascading —
-  // safeDestroy turns that into the same friendly message instead of a 500.
-  if (await safeDestroy(user, res, "/admin/users", "user")) {
-    await AuditLog.create({ userId: req.currentUser.id, action: "DELETE_USER", entityType: "User", entityId: req.params.id, metadata: { role: user.role, email: user.email } });
-    res.redirect("/admin/users");
+  // Force path: student dependents are all DB-level CASCADE, so destroying
+  // the user is enough. Teacher dependents include one RESTRICT
+  // (approval_requests.requested_teacher_id) that cascade can't clear on
+  // its own, so it's removed explicitly first, inside the same transaction
+  // as the destroy — if anything fails, nothing is left half-deleted.
+  try {
+    await sequelize.transaction(async (t) => {
+      if (user.role === "TEACHER" && force) {
+        const teacherProfile = await TeacherProfile.findOne({ where: { userId: user.id }, transaction: t });
+        if (teacherProfile) {
+          await ApprovalRequest.destroy({ where: { requestedTeacherId: teacherProfile.id }, transaction: t });
+        }
+      }
+      await user.destroy({ transaction: t });
+    });
+  } catch (err) {
+    if (err.name === "SequelizeForeignKeyConstraintError") {
+      logger.warn("Blocked force-delete of user due to unexpected FK constraint", { userId: user.id, role: user.role, error: err.message });
+      return cantDelete("This account still has other records depending on it that couldn't be safely removed automatically. Check assessments, submissions, or promotion history tied to it.");
+    }
+    throw err;
   }
+
+  await AuditLog.create({
+    userId: req.currentUser.id,
+    action: force ? "FORCE_DELETE_USER" : "DELETE_USER",
+    entityType: "User",
+    entityId: req.params.id,
+    metadata: { role: user.role, email: user.email, removedDependents: items },
+  });
+  logger.info(`User ${force ? "force-" : ""}deleted`, { deletedUserId: req.params.id, role: user.role, email: user.email, by: req.currentUser.email });
+  res.redirect("/admin/users");
 };

@@ -27,10 +27,10 @@
         </select>
       </div>
       <div>
-        <label class="form-label">Academic Session</label>
-        <select class="form-input" name="academicSessionId" required>
-          <option value="">Select a session</option>
-          <% sessions.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }) %>
+        <label class="form-label">Admission Year</label>
+        <select class="form-input" name="admissionYear" required>
+          <option value="">Select a year</option>
+          <% years.forEach(function(y) { %><option value="<%= y %>"><%= y %></option><% }) %>
         </select>
       </div>
       <div>
