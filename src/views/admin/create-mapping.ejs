@@ -10,7 +10,7 @@
     <form action="/admin/mappings/new" method="POST" class="mt-6 space-y-4">
       <div>
         <label class="form-label">Teacher</label>
-        <select class="form-input" name="teacherId" required>
+        <select class="form-input searchable-select" name="teacherId" data-placeholder="Search teacher by name or code..." required>
           <option value="">Select a teacher</option>
           <% teachers.forEach(function(t) { %>
             <option value="<%= t.id %>" <%= formData.teacherId === t.id ? 'selected' : '' %>><%= t.User.firstName %> <%= t.User.lastName %> (<%= t.employeeCode %>)</option>
@@ -19,10 +19,10 @@
       </div>
       <div>
         <label class="form-label">Subject Offering</label>
-        <select class="form-input" name="subjectOfferingId" required>
+        <select class="form-input searchable-select" name="subjectOfferingId" data-placeholder="Search subject or program..." required>
           <option value="">Select a subject offering</option>
           <% offerings.forEach(function(o) { %>
-            <option value="<%= o.id %>" <%= formData.subjectOfferingId === o.id ? 'selected' : '' %>><%= o.SubjectPool.name %> — <%= o.Program.name %> Sem <%= o.semesterNumber %></option>
+            <option value="<%= o.id %>" <%= formData.subjectOfferingId === o.id ? 'selected' : '' %>><%= o.SubjectPool.name %> — <%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.admissionYear %>)</option>
           <% }) %>
         </select>
       </div>

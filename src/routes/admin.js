@@ -16,6 +16,8 @@ const promotionController = require("../controllers/promotionController");
 const certificateController = require("../controllers/certificateController");
 const auditLogController = require("../controllers/auditLogController");
 const systemLogController = require("../controllers/systemLogController");
+const enrollStudentController = require("../controllers/enrollStudentController");
+const academicYearAdminController = require("../controllers/academicYearAdminController");
 const upload = require("../middleware/upload");
 
 router.use(requireAuth, requireRole("SUPERADMIN"));
@@ -40,7 +42,10 @@ router.get("/mappings/new", adminController.showCreateMapping);
 router.post("/mappings/new", adminController.createMapping);
 router.post("/mappings/:id/delete", adminController.deleteMapping);
 
-router.get("/enroll", adminController.showEnroll);
+// Enrollments
+router.get("/enroll", enrollStudentController.showEnrollPage);
+router.post("/enroll/single", enrollStudentController.singleEnroll);
+router.post("/enroll/bulk", upload.single("csvFile"), enrollStudentController.bulkEnroll);
 router.post("/enroll/auto", adminController.autoEnroll);
 
 // Schools
@@ -128,5 +133,11 @@ router.post("/certificates/generate", certificateController.generate);
 // Audit Log
 router.get("/audit-log", auditLogController.list);
 router.get("/system-logs", systemLogController.list);
+
+// Academic Years
+router.get("/academic-years", academicYearAdminController.list);
+router.post("/academic-years", academicYearAdminController.create);
+router.post("/academic-years/:id/toggle", academicYearAdminController.toggleStatus);
+router.post("/academic-years/:id/make-current", academicYearAdminController.makeCurrent);
 
 module.exports = router;

@@ -54,13 +54,27 @@
 
     <!-- Target sections -->
     <div class="card">
-      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
-        <i class="fa-solid fa-bullseye text-info-500"></i> Target Sections
-      </h2>
+      <div class="mb-3 flex items-center justify-between gap-4">
+        <h2 class="flex items-center gap-2 text-sm font-semibold text-navy-900">
+          <i class="fa-solid fa-bullseye text-info-500"></i> Target Sections
+        </h2>
+        <% if (targetOptions.length > 3) { %>
+          <div class="relative w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-navy-400"></i>
+            <input
+              type="text"
+              id="filter-targets"
+              placeholder="Search sections or subjects..."
+              class="form-input !py-1 !pl-8 text-xs w-full"
+              oninput="filterTargetSections(this.value)"
+            />
+          </div>
+        <% } %>
+      </div>
       <% if (!targetOptions.length) { %>
         <p class="text-sm text-navy-400">You have no subject mappings yet — ask the admin to map you to a subject.</p>
       <% } %>
-      <div class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-navy-100 p-3 sm:grid-cols-2">
+      <div id="target-options-list" class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-navy-100 p-3 sm:grid-cols-2">
         <% targetOptions.forEach(function(opt) { %>
           <label class="flex items-start gap-2 rounded-lg border border-transparent px-3 py-2 text-sm hover:border-navy-100 hover:bg-navy-50">
             <input type="checkbox" class="mt-0.5" name="targets" value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>" />
@@ -95,4 +109,17 @@
       document.getElementById("descriptionBlocks").value = JSON.stringify(editorHandle.getContent());
     });
   })();
+
+  function filterTargetSections(query) {
+    var q = (query || '').toLowerCase().trim();
+    var labels = document.querySelectorAll('#target-options-list label');
+    labels.forEach(function(l) {
+      var text = l.textContent.toLowerCase();
+      if (!q || text.includes(q)) {
+        l.classList.remove('hidden');
+      } else {
+        l.classList.add('hidden');
+      }
+    });
+  }
 </script>

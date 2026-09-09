@@ -5,14 +5,14 @@
     <form action="/admin/subject-offerings/new" method="POST" class="mt-6 space-y-4">
       <div>
         <label class="form-label">Subject</label>
-        <select class="form-input" name="subjectId" required>
+        <select class="form-input searchable-select" name="subjectId" data-placeholder="Search subject by name or code..." required>
           <option value="">Select a subject</option>
           <% subjects.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %> (<%= s.code %>)</option><% }) %>
         </select>
       </div>
       <div>
         <label class="form-label">Program</label>
-        <select class="form-input" name="programId" required>
+        <select class="form-input searchable-select" name="programId" data-placeholder="Search program..." required>
           <option value="">Select a program</option>
           <% programs.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
         </select>

@@ -3,12 +3,17 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const teacherController = require("../controllers/teacherController");
 const assessmentController = require("../controllers/assessmentController");
 const evaluationController = require("../controllers/evaluationController");
+const enrollStudentController = require("../controllers/enrollStudentController");
 const uploadImage = require("../middleware/uploadImage");
+const upload = require("../middleware/upload");
 
 router.use(requireAuth, requireRole("TEACHER"));
 
 router.get("/dashboard", teacherController.dashboard);
 router.get("/roster", teacherController.roster);
+router.get("/enroll", enrollStudentController.showEnrollPage);
+router.post("/enroll/single", enrollStudentController.singleEnroll);
+router.post("/enroll/bulk", upload.single("csvFile"), enrollStudentController.bulkEnroll);
 router.post("/approvals/:id/approve", teacherController.approveRequest);
 router.post("/approvals/:id/reject", teacherController.rejectRequest);
 router.post("/approvals/bulk-approve", teacherController.bulkApprove);

@@ -78,18 +78,37 @@
         <h1 class="text-2xl font-bold text-navy-900">What's your class?</h1>
         <p class="mt-1 text-sm text-navy-500">Your admission year stays fixed for your whole program — it's how we track which curriculum applies to you.</p>
 
-        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <label class="form-label" for="rollNo">Roll number</label>
-            <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" required />
+            <label class="form-label" for="rollNo">Roll number <span class="text-rose-500">*</span></label>
+            <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" placeholder="e.g. 24BBA001" required />
           </div>
           <div>
-            <label class="form-label" for="admissionYear">Admission year</label>
+            <label class="form-label" for="admissionYear">Admission year <span class="text-rose-500">*</span></label>
             <select class="form-input" id="admissionYear" name="admissionYear" required>
-              <option value="">Select a year</option>
-              <% years.forEach(function(y) { %>
-                <option value="<%= y %>" <%= String(formData.admissionYear) === String(y) ? 'selected' : '' %>><%= y %></option>
-              <% }) %>
+              <option value="">Select year</option>
+              <% if (typeof academicYears !== 'undefined' && academicYears && academicYears.length) { %>
+                <% academicYears.forEach(function(y) { %>
+                  <option value="<%= y.admissionYear %>" <%= String(formData.admissionYear || defaultYear) === String(y.admissionYear) ? 'selected' : '' %>><%= y.label %></option>
+                <% }) %>
+              <% } else { %>
+                <% years.forEach(function(y) { %>
+                  <option value="<%= y %>" <%= String(formData.admissionYear) === String(y) ? 'selected' : '' %>><%= y %></option>
+                <% }) %>
+              <% } %>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="semesterNumber">Semester <span class="text-rose-500">*</span></label>
+            <select class="form-input" id="semesterNumber" name="semesterNumber" required>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
             </select>
           </div>
         </div>
@@ -143,6 +162,16 @@
     </form>
   </div>
 </div>
+
+<script id="signup-prefill-data" type="application/json">
+  <%- JSON.stringify({
+    programId: formData.programId || '',
+    specializationId: formData.specializationId || '',
+    semesterNumber: formData.semesterNumber || '1',
+    sectionId: formData.sectionId || '',
+    subGroupId: formData.subGroupId || ''
+  }) %>
+</script>
 
 <script>
   (function () {
@@ -202,15 +231,18 @@
     var programSelect = document.getElementById('programId');
     var specializationSelect = document.getElementById('specializationId');
     var admissionYearSelect = document.getElementById('admissionYear');
+    var semesterSelect = document.getElementById('semesterNumber');
     var sectionSelect = document.getElementById('sectionId');
     var subGroupSelect = document.getElementById('subGroupId');
     var subGroupWrapper = document.getElementById('subgroup-wrapper');
     var noSectionsNote = document.getElementById('no-sections-note');
 
-    var prefillProgramId = <%- JSON.stringify(formData.programId || '') %>;
-    var prefillSpecializationId = <%- JSON.stringify(formData.specializationId || '') %>;
-    var prefillSectionId = <%- JSON.stringify(formData.sectionId || '') %>;
-    var prefillSubGroupId = <%- JSON.stringify(formData.subGroupId || '') %>;
+    var prefillData = JSON.parse(document.getElementById('signup-prefill-data').textContent || '{}');
+    var prefillProgramId = prefillData.programId || '';
+    var prefillSpecializationId = prefillData.specializationId || '';
+    var prefillSemesterNumber = prefillData.semesterNumber || '1';
+    var prefillSectionId = prefillData.sectionId || '';
+    var prefillSubGroupId = prefillData.subGroupId || '';
 
     function setOptions(select, items, placeholder, selectedId) {
       select.innerHTML = '';
@@ -238,9 +270,13 @@
       fetch('/api/schools/' + schoolId + '/programs')
         .then(function (r) { return r.json(); })
         .then(function (programs) {
+          programSelect.__programsData = programs;
           programSelect.disabled = false;
           setOptions(programSelect, programs, 'Select a program', selectedProgramId);
-          if (selectedProgramId) loadSpecializations(selectedProgramId, prefillSpecializationId);
+          if (selectedProgramId) {
+            updateSemestersForProgram(selectedProgramId);
+            loadSpecializations(selectedProgramId, prefillSpecializationId);
+          }
           refreshSections();
         });
     }
@@ -259,9 +295,25 @@
         });
     }
 
+    function updateSemestersForProgram(programId) {
+      if (!programId) return;
+      var selected = (programSelect.__programsData || []).find(function (p) { return p.id === programId; });
+      var total = selected && selected.totalSemesters ? selected.totalSemesters : 8;
+      var curVal = semesterSelect.value || prefillSemesterNumber || '1';
+      semesterSelect.innerHTML = '';
+      for (var i = 1; i <= total; i++) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = 'Semester ' + i;
+        if (String(i) === String(curVal)) opt.selected = true;
+        semesterSelect.appendChild(opt);
+      }
+    }
+
     function refreshSections() {
       var programId = programSelect.value;
       var year = admissionYearSelect.value;
+      var sem = semesterSelect.value || 1;
       subGroupWrapper.classList.add('hidden');
       noSectionsNote.classList.add('hidden');
 
@@ -271,7 +323,7 @@
         return;
       }
 
-      fetch('/api/programs/' + programId + '/years/' + year + '/sections')
+      fetch('/api/programs/' + programId + '/years/' + year + '/sections?semesterNumber=' + sem)
         .then(function (r) { return r.json(); })
         .then(function (sections) {
           if (!sections.length) {
@@ -302,11 +354,18 @@
       maybeShowSubGroups(sections);
     });
     admissionYearSelect.addEventListener('change', refreshSections);
+    semesterSelect.addEventListener('change', refreshSections);
 
     schoolSelect.addEventListener('change', function () { loadPrograms(this.value, null); });
-    programSelect.addEventListener('change', function () { loadSpecializations(this.value, null); refreshSections(); });
+    programSelect.addEventListener('change', function () {
+      updateSemestersForProgram(this.value);
+      loadSpecializations(this.value, null);
+      refreshSections();
+    });
 
-    if (schoolSelect.value) loadPrograms(schoolSelect.value, prefillProgramId);
+    if (schoolSelect.value) {
+      loadPrograms(schoolSelect.value, prefillProgramId);
+    }
 
     var teacherCards = Array.prototype.slice.call(document.querySelectorAll('.teacher-card'));
     var teacherInput = document.getElementById('requestedTeacherId');

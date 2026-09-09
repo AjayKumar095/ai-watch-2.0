@@ -8,7 +8,7 @@ const {
   ApprovalRequest,
   RefreshToken,
 } = require("../models");
-const { distinctAdmissionYears } = require("../services/admissionYearService");
+const { distinctAdmissionYears, getActiveAcademicYears, getDefaultAcademicYear } = require("../services/admissionYearService");
 const { sectionsFor } = require("../services/sectionLookupService");
 const { hashPassword, verifyPassword, generateTempPassword } = require("../utils/password");
 const {
@@ -125,12 +125,23 @@ exports.logout = async (req, res) => {
 // --- Student onboarding -----------------------------------------------------
 
 exports.showStudentSignup = async (req, res) => {
-  const [schools, teachers, years] = await Promise.all([
+  const [schools, teachers, years, academicYears, defaultYear] = await Promise.all([
     School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] }),
     TeacherProfile.findAll({ include: [User] }),
     distinctAdmissionYears(),
+    getActiveAcademicYears(),
+    getDefaultAcademicYear(),
   ]);
-  res.render("auth/signup", { title: "Student Onboarding", schools, teachers, years, error: null, formData: {} });
+  res.render("auth/signup", {
+    title: "Student Onboarding",
+    schools,
+    teachers,
+    years,
+    academicYears,
+    defaultYear: defaultYear ? defaultYear.admissionYear : null,
+    error: null,
+    formData: {},
+  });
 };
 
 // Public JSON endpoints powering the School -> Program -> Specialization
@@ -140,7 +151,7 @@ exports.programsForSchool = async (req, res) => {
   const programs = await Program.findAll({
     where: { schoolId: req.params.schoolId, isActive: true },
     order: [["name", "ASC"]],
-    attributes: ["id", "name"],
+    attributes: ["id", "name", "totalSemesters"],
   });
   res.json(programs);
 };
@@ -160,27 +171,40 @@ exports.specializationsForProgram = async (req, res) => {
 // expected result if admin hasn't set up sections for that year yet (the
 // form treats that as "pick one later," not an error).
 exports.sectionsForProgram = async (req, res) => {
-  const { programId, admissionYear } = req.params;
-  // New admits always start at semester 1 — a returning student picking a
-  // section later (from their profile) goes through a different endpoint
-  // scoped to their actual current semester; see studentController.
-  const sections = await sectionsFor({ programId, admissionYear: parseInt(admissionYear, 10), semesterNumber: 1 });
+  const { programId, admissionYear, semesterNumber: paramSem } = req.params;
+  const semesterNumber = parseInt(paramSem || req.query.semesterNumber || 1, 10);
+  const sections = await sectionsFor({
+    programId,
+    admissionYear: parseInt(admissionYear, 10),
+    semesterNumber,
+  });
   res.json(sections);
 };
 
 exports.studentSignup = async (req, res) => {
   const {
     email, firstName, lastName, rollNo, schoolId, programId, specializationId,
-    admissionYear, sectionId, subGroupId, requestedTeacherId,
+    admissionYear, semesterNumber, sectionId, subGroupId, requestedTeacherId,
   } = req.body;
 
-  const [schools, teachers, years] = await Promise.all([
+  const [schools, teachers, years, academicYears, defaultYear] = await Promise.all([
     School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] }),
     TeacherProfile.findAll({ include: [User] }),
     distinctAdmissionYears(),
+    getActiveAcademicYears(),
+    getDefaultAcademicYear(),
   ]);
   const rerender = (error) =>
-    res.status(400).render("auth/signup", { title: "Student Onboarding", schools, teachers, years, error, formData: req.body });
+    res.status(400).render("auth/signup", {
+      title: "Student Onboarding",
+      schools,
+      teachers,
+      years,
+      academicYears,
+      defaultYear: defaultYear ? defaultYear.admissionYear : null,
+      error,
+      formData: req.body,
+    });
 
   if (!email || !firstName || !lastName || !rollNo || !schoolId || !programId || !admissionYear || !requestedTeacherId) {
     return rerender("Please fill in all required fields.");
@@ -217,11 +241,8 @@ exports.studentSignup = async (req, res) => {
     programId,
     specializationId: specializationId || null,
     admissionYear: parseInt(admissionYear, 10),
-    // Sub-group takes priority when chosen (it's the more specific home);
-    // both fields are optional since sections may not be set up yet for a
-    // brand-new admission year — the student can be assigned one later.
     currentSectionId: subGroupId || sectionId || null,
-    currentSemesterNumber: 1,
+    currentSemesterNumber: parseInt(semesterNumber, 10) || 1,
     isVerified: false,
   });
 

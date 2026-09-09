@@ -13,6 +13,7 @@ const {
 } = require("../models");
 const { visibleSectionIdsForStudent } = require("../services/sectionScope");
 const { sectionsFor } = require("../services/sectionLookupService");
+const { enrollStudentInOfferings } = require("../services/enrollmentService");
 const renderBlocks = require("../utils/renderBlocks");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
@@ -206,6 +207,15 @@ exports.chooseSection = async (req, res) => {
 
   studentProfile.currentSectionId = subGroupId || sectionId;
   await studentProfile.save();
+
+  // If the student is already verified, auto-enroll them in active offerings now that section is set
+  if (studentProfile.isVerified) {
+    try {
+      await enrollStudentInOfferings(studentProfile);
+    } catch (err) {
+      // Log and continue
+    }
+  }
 
   res.redirect("/student/profile");
 };

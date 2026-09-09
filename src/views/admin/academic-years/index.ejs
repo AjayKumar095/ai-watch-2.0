@@ -1,0 +1,161 @@
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Academic Years</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      Manage admission cycles (e.g. 2025-2026), set active statuses, and configure the default active admission year for student onboarding and enrollments.
+    </p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- Create New Academic Year Form -->
+  <div class="card h-fit">
+    <h2 class="text-lg font-bold text-navy-900 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-calendar-plus text-amber-500"></i> Add Academic Year
+    </h2>
+    <form action="/admin/academic-years" method="POST" class="space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" for="yearStart">Start Year</label>
+          <input
+            type="number"
+            id="yearStart"
+            name="yearStart"
+            class="form-input"
+            placeholder="2025"
+            min="2000"
+            max="2100"
+            required
+            oninput="document.getElementById('yearEnd').value = parseInt(this.value) + 1; updateLabelPreview();"
+          />
+        </div>
+        <div>
+          <label class="form-label" for="yearEnd">End Year</label>
+          <input
+            type="number"
+            id="yearEnd"
+            name="yearEnd"
+            class="form-input"
+            placeholder="2026"
+            min="2001"
+            max="2101"
+            required
+            oninput="updateLabelPreview();"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="label">Display Label (optional)</label>
+        <input
+          type="text"
+          id="label"
+          name="label"
+          class="form-input"
+          placeholder="e.g. 2025-2026"
+        />
+        <p class="mt-1 text-xs text-navy-400">Defaults to "StartYear-EndYear" if left blank.</p>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <label class="flex items-center gap-2 text-sm text-navy-700 cursor-pointer">
+          <input type="checkbox" name="isActive" value="true" checked class="rounded text-amber-500 focus:ring-amber-400" />
+          <span>Active (available for selection)</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm text-navy-700 cursor-pointer">
+          <input type="checkbox" name="isCurrent" value="true" class="rounded text-amber-500 focus:ring-amber-400" />
+          <span>Set as default active year</span>
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary w-full mt-2">
+        <i class="fa-solid fa-plus mr-1.5"></i> Save Academic Year
+      </button>
+    </form>
+  </div>
+
+  <!-- Academic Years List -->
+  <div class="card lg:col-span-2">
+    <h2 class="text-lg font-bold text-navy-900 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-calendar-days text-navy-700"></i> Existing Academic Years
+    </h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-navy-100 text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+            <th class="py-2.5 pr-3">Academic Session</th>
+            <th class="py-2.5 pr-3">Admission Year</th>
+            <th class="py-2.5 pr-3">Enrolled Students</th>
+            <th class="py-2.5 pr-3">Status</th>
+            <th class="py-2.5 pr-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-navy-50">
+          <% years.forEach(function(y) { %>
+            <tr class="hover:bg-navy-50/50 transition-colors">
+              <td class="py-3 pr-3 font-semibold text-navy-800">
+                <div class="flex items-center gap-2">
+                  <span><%= y.label %></span>
+                  <% if (y.isCurrent) { %>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      <i class="fa-solid fa-star text-[10px]"></i> Current Default
+                    </span>
+                  <% } %>
+                </div>
+              </td>
+              <td class="py-3 pr-3 font-mono text-navy-600"><%= y.admissionYear %></td>
+              <td class="py-3 pr-3">
+                <span class="inline-flex items-center gap-1 text-navy-700">
+                  <i class="fa-solid fa-user-graduate text-xs text-navy-400"></i>
+                  <%= y.studentCount %>
+                </span>
+              </td>
+              <td class="py-3 pr-3">
+                <span class="<%= y.isActive ? 'badge-info' : 'badge-amber' %>">
+                  <%= y.isActive ? 'Active' : 'Inactive' %>
+                </span>
+              </td>
+              <td class="py-3 pr-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <% if (!y.isCurrent && y.isActive) { %>
+                    <form action="/admin/academic-years/<%= y.id %>/make-current" method="POST" class="inline">
+                      <button type="submit" class="btn-ghost text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50" title="Set as default year for new forms">
+                        Set Default
+                      </button>
+                    </form>
+                  <% } %>
+                  <form action="/admin/academic-years/<%= y.id %>/toggle" method="POST" class="inline">
+                    <button type="submit" class="btn-ghost text-xs <%= y.isActive ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50' %>">
+                      <%= y.isActive ? 'Deactivate' : 'Activate' %>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!years.length) { %>
+            <tr>
+              <td colspan="5" class="py-6 text-center text-navy-400">
+                No academic years registered yet. Add one above.
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function updateLabelPreview() {
+    var start = document.getElementById('yearStart').value;
+    var end = document.getElementById('yearEnd').value;
+    var labelInput = document.getElementById('label');
+    if (start && end && (!labelInput.dataset.userEdited || !labelInput.value)) {
+      labelInput.placeholder = start + '-' + end;
+    }
+  }
+  document.getElementById('label').addEventListener('input', function() {
+    this.dataset.userEdited = !!this.value;
+  });
+</script>

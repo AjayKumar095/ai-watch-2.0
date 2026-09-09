@@ -10,7 +10,7 @@
   <div class="card"><p class="text-xs uppercase text-navy-400">Schools</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.schoolCount %></p></div>
   <div class="card"><p class="text-xs uppercase text-navy-400">Programs</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.programCount %></p></div>
   <div class="card"><p class="text-xs uppercase text-navy-400">Subjects</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.subjectCount %></p></div>
-  <div class="card"><p class="text-xs uppercase text-navy-400">Admission Years</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.sessionCount %></p></div>
+  <a href="/admin/academic-years" class="card hover:border-amber-400 transition-colors block"><p class="text-xs uppercase text-navy-400">Academic Years</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.sessionCount %></p></a>
   <div class="card"><p class="text-xs uppercase text-navy-400">Teachers</p><p class="mt-2 text-2xl font-bold text-info-600"><%= stats.teacherCount %></p></div>
   <div class="card"><p class="text-xs uppercase text-navy-400">Students</p><p class="mt-2 text-2xl font-bold text-amber-600"><%= stats.studentCount %></p></div>
 </div>
@@ -55,36 +55,54 @@
   <% } %>
 </div>
 
+<script id="dashboard-chart-data" type="application/json">
+  <%- JSON.stringify({
+    programLabels: programChart.labels,
+    programData: programChart.data,
+    submissionData: [submissionChart.pending, submissionChart.evaluated, submissionChart.rejected]
+  }) %>
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script>
   (function () {
+    var chartDataEl = document.getElementById('dashboard-chart-data');
+    var chartData = JSON.parse(chartDataEl ? chartDataEl.textContent : '{}');
+
     var navy = '#203A63';
     var amber = '#F79009';
     var info = '#2E90FA';
 
-    new Chart(document.getElementById('programChart'), {
-      type: 'bar',
-      data: {
-        labels: <%- JSON.stringify(programChart.labels) %>,
-        datasets: [{ label: 'Students', data: <%- JSON.stringify(programChart.data) %>, backgroundColor: info, borderRadius: 6 }],
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-      },
-    });
+    var programCanvas = document.getElementById('programChart');
+    if (programCanvas) {
+      new Chart(programCanvas, {
+        type: 'bar',
+        data: {
+          labels: chartData.programLabels || [],
+          datasets: [{ label: 'Students', data: chartData.programData || [], backgroundColor: info, borderRadius: 6 }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
+      });
+    }
 
-    new Chart(document.getElementById('submissionChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Pending', 'Evaluated', 'Rejected'],
-        datasets: [{
-          data: [<%= submissionChart.pending %>, <%= submissionChart.evaluated %>, <%= submissionChart.rejected %>],
-          backgroundColor: [amber, info, navy],
-        }],
-      },
-      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } },
-    });
+    var submissionCanvas = document.getElementById('submissionChart');
+    if (submissionCanvas) {
+      new Chart(submissionCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pending', 'Evaluated', 'Rejected'],
+          datasets: [{
+            data: chartData.submissionData || [0, 0, 0],
+            backgroundColor: [amber, info, navy],
+          }],
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } },
+      });
+    }
   })();
 </script>
+

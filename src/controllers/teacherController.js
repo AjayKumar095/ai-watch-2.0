@@ -14,6 +14,7 @@ const {
 } = require("../models");
 const { hashPassword, generateTempPassword } = require("../utils/password");
 const { notifyApprovalDecision } = require("../services/notificationService");
+const { enrollStudentInOfferings } = require("../services/enrollmentService");
 const logger = require("../utils/logger");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
@@ -79,7 +80,13 @@ exports.roster = async (req, res) => {
   for (const m of mappings) {
     grouped[m.subjectOfferingId] = {
       mapping: m,
-      students: enrollments.filter((e) => e.subjectOfferingId === m.subjectOfferingId && (!m.sectionId || e.sectionId === m.sectionId)),
+      students: enrollments.filter((e) => {
+        if (e.subjectOfferingId !== m.subjectOfferingId) return false;
+        if (!m.sectionId) return true;
+        if (e.sectionId === m.sectionId) return true;
+        if (e.Section && e.Section.parentSectionId === m.sectionId) return true;
+        return false;
+      }),
     };
   }
 
@@ -123,6 +130,16 @@ exports.approveRequest = async (req, res) => {
   studentUser.passwordHash = await hashPassword(tempPassword);
   studentUser.isActive = true;
   await studentUser.save();
+
+  // Auto-enroll the student in all active subject offerings for their program/semester/section
+  try {
+    await enrollStudentInOfferings(request.StudentProfile);
+  } catch (err) {
+    logger.error("Failed to auto-enroll approved student into offerings", {
+      studentId: request.StudentProfile.id,
+      error: err.message,
+    });
+  }
 
   logger.info("Student approved", { approvalRequestId: request.id, studentUserId: studentUser.id, teacherProfileId: teacherProfile.id });
 
@@ -212,6 +229,16 @@ exports.bulkApprove = async (req, res) => {
     request.StudentProfile.User.passwordHash = await hashPassword(tempPassword);
     request.StudentProfile.User.isActive = true;
     await request.StudentProfile.User.save();
+
+    // Auto-enroll the student in all active subject offerings for their program/semester/section
+    try {
+      await enrollStudentInOfferings(request.StudentProfile);
+    } catch (err) {
+      logger.error("Failed to auto-enroll approved student in bulkApprove", {
+        studentId: request.StudentProfile.id,
+        error: err.message,
+      });
+    }
 
     notifyApprovalDecision({
       studentUser: request.StudentProfile.User,

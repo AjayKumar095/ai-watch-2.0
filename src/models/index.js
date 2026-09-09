@@ -25,6 +25,7 @@ const SemesterCertificate = require("./SemesterCertificate")(sequelize, DataType
 const PromotionBatch = require("./PromotionBatch")(sequelize, DataTypes);
 const PromotionRecord = require("./PromotionRecord")(sequelize, DataTypes);
 const AuditLog = require("./AuditLog")(sequelize, DataTypes);
+const AcademicYear = require("./AcademicYear")(sequelize, DataTypes);
 
 // ---------------------------------------------------------------------------
 // Associations
@@ -199,4 +200,5 @@ module.exports = {
   PromotionBatch,
   PromotionRecord,
   AuditLog,
+  AcademicYear,
 };

@@ -1,29 +1,506 @@
-<div class="mx-auto mt-4 max-w-lg">
-  <div class="card">
-    <h1 class="text-xl font-bold text-navy-900">Enroll Students (default rule)</h1>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Enroll Students</h1>
     <p class="mt-1 text-sm text-navy-500">
-      Auto-enrolls all students matching this offering's program + semester + specialization.
-      Manual add/remove for mixed-specialization exceptions comes next.
+      Add a single student, bulk import a cohort via CSV, or run offering-wide auto-enrollment.
     </p>
+  </div>
+</div>
 
-    <% if (result) { %>
-      <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
-        <%= result.offeringName %>: <%= result.created %> newly enrolled, <%= result.skipped %> already enrolled
-        (<%= result.total %> matching students total).
-      </div>
+<!-- Tabs Navigation -->
+<div class="mb-6 border-b border-navy-200">
+  <nav class="-mb-px flex space-x-6">
+    <button
+      type="button"
+      onclick="switchTab('single')"
+      id="tab-btn-single"
+      class="tab-btn flex items-center gap-2 border-b-2 py-3 px-1 text-sm font-medium transition-colors border-amber-500 text-amber-600"
+    >
+      <i class="fa-solid fa-user-plus text-base"></i>
+      <span>Single Student</span>
+    </button>
+
+    <button
+      type="button"
+      onclick="switchTab('bulk')"
+      id="tab-btn-bulk"
+      class="tab-btn flex items-center gap-2 border-b-2 py-3 px-1 text-sm font-medium transition-colors border-transparent text-navy-500 hover:border-navy-300 hover:text-navy-700"
+    >
+      <i class="fa-solid fa-file-csv text-base"></i>
+      <span>Bulk CSV Upload</span>
+    </button>
+
+    <% if (!isTeacher) { %>
+      <button
+        type="button"
+        onclick="switchTab('auto')"
+        id="tab-btn-auto"
+        class="tab-btn flex items-center gap-2 border-b-2 py-3 px-1 text-sm font-medium transition-colors border-transparent text-navy-500 hover:border-navy-300 hover:text-navy-700"
+      >
+        <i class="fa-solid fa-bolt text-base"></i>
+        <span>Auto-Enroll by Offering</span>
+      </button>
     <% } %>
+  </nav>
+</div>
 
-    <form action="/admin/enroll/auto" method="POST" class="mt-6 space-y-4">
+<!-- =========================================================================
+     TAB 1: Single Student Enrollment
+     ========================================================================= -->
+<div id="tab-content-single" class="tab-pane">
+  <div class="card max-w-3xl">
+    <div class="border-b border-navy-100 pb-3 mb-5">
+      <h2 class="text-lg font-bold text-navy-900 flex items-center gap-2">
+        <i class="fa-solid fa-user-plus text-amber-500"></i> Enroll Single Student
+      </h2>
+      <p class="text-xs text-navy-500 mt-1">
+        Directly creates an active student profile, verifies them, auto-enrolls them in their semester subject offerings, and emails them their generated password.
+      </p>
+    </div>
+
+    <form action="<%= basePath %>/enroll/single" method="POST" class="space-y-6">
+      <!-- Personal Details -->
       <div>
-        <label class="form-label">Subject Offering</label>
-        <select class="form-input" name="subjectOfferingId" required>
-          <option value="">Select a subject offering</option>
-          <% offerings.forEach(function(o) { %>
-            <option value="<%= o.id %>"><%= o.SubjectPool.name %> — <%= o.Program.name %> Sem <%= o.semesterNumber %></option>
-          <% }) %>
-        </select>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-navy-400 mb-3">Personal Details</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="form-label" for="single-firstName">First Name</label>
+            <input type="text" id="single-firstName" name="firstName" class="form-input" placeholder="e.g. Rahul" />
+          </div>
+          <div>
+            <label class="form-label" for="single-lastName">Last Name</label>
+            <input type="text" id="single-lastName" name="lastName" class="form-input" placeholder="e.g. Sharma" />
+          </div>
+          <div>
+            <label class="form-label" for="single-email">Email Address <span class="text-rose-500">*</span></label>
+            <input type="email" id="single-email" name="email" class="form-input" placeholder="student@example.com" required />
+          </div>
+          <div>
+            <label class="form-label" for="single-rollNo">Roll Number <span class="text-rose-500">*</span></label>
+            <input type="text" id="single-rollNo" name="rollNo" class="form-input" placeholder="e.g. 24BBA001" required />
+          </div>
+        </div>
       </div>
-      <button type="submit" class="btn-primary w-full">Run auto-enroll</button>
+
+      <!-- Academic Placement -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-navy-400 mb-3">Academic Placement</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Program -->
+          <div class="sm:col-span-2">
+            <label class="form-label" for="single-programId">Program <span class="text-rose-500">*</span></label>
+            <select id="single-programId" name="programId" class="form-input searchable-select" data-placeholder="Search or select a program..." required>
+              <option value="">Select a Program</option>
+              <% programs.forEach(function(p) { %>
+                <option value="<%= p.id %>" data-semesters="<%= p.totalSemesters %>">
+                  <%= p.name %> (<%= p.code %>) <%= p.School ? '— ' + p.School.name : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Admission Year -->
+          <div>
+            <label class="form-label" for="single-admissionYear">Admission Year <span class="text-rose-500">*</span></label>
+            <select id="single-admissionYear" name="admissionYear" class="form-input searchable-select" data-placeholder="Search year..." required>
+              <% academicYears.forEach(function(y) { %>
+                <option value="<%= y.admissionYear %>" <%= String(y.admissionYear) === String(defaultYear) ? 'selected' : '' %>>
+                  <%= y.label %> <%= y.isCurrent ? '(Current Default)' : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Semester -->
+          <div>
+            <label class="form-label" for="single-semesterNumber">Semester <span class="text-rose-500">*</span></label>
+            <select id="single-semesterNumber" name="semesterNumber" class="form-input" required>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
+            </select>
+          </div>
+
+          <!-- Section -->
+          <div>
+            <label class="form-label" for="single-sectionId">Section</label>
+            <select id="single-sectionId" name="sectionId" class="form-input">
+              <option value="">Select program & year first</option>
+            </select>
+            <p id="single-no-sections" class="text-xs text-amber-600 mt-1 hidden">
+              <i class="fa-solid fa-circle-info mr-1"></i> No sections created yet for this semester.
+            </p>
+          </div>
+
+          <!-- Sub-Group (Dynamic) -->
+          <div id="single-subgroup-wrapper" class="hidden">
+            <label class="form-label" for="single-subGroupId">Sub-Group (Optional)</label>
+            <select id="single-subGroupId" name="subGroupId" class="form-input">
+              <option value="">None (Whole Section)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-navy-100 flex items-center justify-end gap-3">
+        <button type="submit" class="btn-primary px-6">
+          <i class="fa-solid fa-user-check mr-2"></i> Enroll Student
+        </button>
+      </div>
     </form>
   </div>
 </div>
+
+<!-- =========================================================================
+     TAB 2: Bulk CSV Upload
+     ========================================================================= -->
+<div id="tab-content-bulk" class="tab-pane hidden">
+  <div class="card max-w-3xl">
+    <div class="border-b border-navy-100 pb-3 mb-5">
+      <h2 class="text-lg font-bold text-navy-900 flex items-center gap-2">
+        <i class="fa-solid fa-file-csv text-emerald-600"></i> Bulk Enroll via CSV
+      </h2>
+      <p class="text-xs text-navy-500 mt-1">
+        Select the target class hierarchy (program, admission year, semester, section), then upload a CSV containing emails and roll numbers for that class.
+      </p>
+    </div>
+
+    <% if (bulkResult) { %>
+      <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <h3 class="font-bold text-emerald-900 flex items-center gap-2 text-sm">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i> Bulk Enrollment Complete
+        </h3>
+        <p class="text-xs text-emerald-700 mt-1">
+          Processed <%= bulkResult.total %> rows:
+          <strong><%= bulkResult.created.length %> enrolled</strong>,
+          <strong><%= bulkResult.skipped.length %> skipped</strong>.
+        </p>
+
+        <% if (bulkResult.created.length > 0) { %>
+          <div class="mt-3 max-h-48 overflow-y-auto rounded border border-emerald-200 bg-white p-2">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="border-b border-navy-100 text-navy-500">
+                  <th class="pb-1">Roll No</th>
+                  <th class="pb-1">Name</th>
+                  <th class="pb-1">Email</th>
+                  <th class="pb-1">Offerings Enrolled</th>
+                  <th class="pb-1">Temp Password</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-navy-50">
+                <% bulkResult.created.forEach(function(s) { %>
+                  <tr>
+                    <td class="py-1 font-mono font-medium text-navy-800"><%= s.rollNo %></td>
+                    <td class="py-1 text-navy-700"><%= s.name %></td>
+                    <td class="py-1 text-navy-600"><%= s.email %></td>
+                    <td class="py-1 text-center font-bold text-amber-600"><%= s.offeringsCount %></td>
+                    <td class="py-1 font-mono text-navy-500"><%= s.tempPassword %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (bulkResult.skipped.length > 0) { %>
+          <div class="mt-3 rounded border border-amber-200 bg-amber-50/70 p-2">
+            <p class="text-xs font-semibold text-amber-800 mb-1">Skipped Rows:</p>
+            <ul class="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+              <% bulkResult.skipped.forEach(function(sk) { %>
+                <li><%= sk.rollNo %> (<%= sk.email %>): <%= sk.reason %></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <form action="<%= basePath %>/enroll/bulk" method="POST" enctype="multipart/form-data" class="space-y-6">
+      <!-- Target Class Selection -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-navy-400 mb-3">1. Select Target Class</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Program -->
+          <div class="sm:col-span-2">
+            <label class="form-label" for="bulk-programId">Program <span class="text-rose-500">*</span></label>
+            <select id="bulk-programId" name="programId" class="form-input searchable-select" data-placeholder="Search or select program..." required>
+              <option value="">Select a Program</option>
+              <% programs.forEach(function(p) { %>
+                <option value="<%= p.id %>" data-semesters="<%= p.totalSemesters %>">
+                  <%= p.name %> (<%= p.code %>) <%= p.School ? '— ' + p.School.name : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Admission Year -->
+          <div>
+            <label class="form-label" for="bulk-admissionYear">Admission Year <span class="text-rose-500">*</span></label>
+            <select id="bulk-admissionYear" name="admissionYear" class="form-input searchable-select" data-placeholder="Search year..." required>
+              <% academicYears.forEach(function(y) { %>
+                <option value="<%= y.admissionYear %>" <%= String(y.admissionYear) === String(defaultYear) ? 'selected' : '' %>>
+                  <%= y.label %> <%= y.isCurrent ? '(Current Default)' : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Semester -->
+          <div>
+            <label class="form-label" for="bulk-semesterNumber">Semester <span class="text-rose-500">*</span></label>
+            <select id="bulk-semesterNumber" name="semesterNumber" class="form-input" required>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+              <option value="3">Semester 3</option>
+              <option value="4">Semester 4</option>
+              <option value="5">Semester 5</option>
+              <option value="6">Semester 6</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
+            </select>
+          </div>
+
+          <!-- Section -->
+          <div>
+            <label class="form-label" for="bulk-sectionId">Section</label>
+            <select id="bulk-sectionId" name="sectionId" class="form-input">
+              <option value="">Select program & year first</option>
+            </select>
+            <p id="bulk-no-sections" class="text-xs text-amber-600 mt-1 hidden">
+              <i class="fa-solid fa-circle-info mr-1"></i> No sections created yet for this semester.
+            </p>
+          </div>
+
+          <!-- Sub-Group (Dynamic) -->
+          <div id="bulk-subgroup-wrapper" class="hidden">
+            <label class="form-label" for="bulk-subGroupId">Sub-Group (Optional)</label>
+            <select id="bulk-subGroupId" name="subGroupId" class="form-input">
+              <option value="">None (Whole Section)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- CSV Upload -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-navy-400 mb-3">2. Upload CSV File or Paste Data</h3>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="form-label" for="csvFile">CSV File Upload</label>
+            <input
+              type="file"
+              id="csvFile"
+              name="csvFile"
+              accept=".csv,text/csv"
+              class="form-input !py-2 text-sm cursor-pointer"
+            />
+          </div>
+
+          <div class="relative flex py-1 items-center">
+            <div class="flex-grow border-t border-navy-200"></div>
+            <span class="flex-shrink mx-4 text-xs font-medium text-navy-400 uppercase">OR paste CSV text</span>
+            <div class="flex-grow border-t border-navy-200"></div>
+          </div>
+
+          <div>
+            <label class="form-label" for="csvText">Paste CSV Content</label>
+            <textarea
+              id="csvText"
+              name="csvText"
+              rows="5"
+              class="form-input font-mono text-xs"
+              placeholder="email,rollNo,firstName,lastName&#10;student1@example.com,BBA001,John,Doe&#10;student2@example.com,BBA002,Jane,Smith"
+            ></textarea>
+            <p class="text-[11px] text-navy-400 mt-1">
+              Required headers: <code>email</code> and <code>rollNo</code>. Optional: <code>firstName</code>, <code>lastName</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-navy-100 flex items-center justify-end gap-3">
+        <button type="submit" class="btn-primary px-6">
+          <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload & Enroll Students
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========================================================================
+     TAB 3: Auto-Enroll by Offering (Admin only)
+     ========================================================================= -->
+<% if (!isTeacher) { %>
+  <div id="tab-content-auto" class="tab-pane hidden">
+    <div class="card max-w-xl">
+      <div class="border-b border-navy-100 pb-3 mb-5">
+        <h2 class="text-lg font-bold text-navy-900 flex items-center gap-2">
+          <i class="fa-solid fa-bolt text-amber-500"></i> Auto-Enroll by Subject Offering
+        </h2>
+        <p class="text-xs text-navy-500 mt-1">
+          Enrolls all verified students matching this offering's program, admission year, semester, and specialization.
+        </p>
+      </div>
+
+      <% if (result) { %>
+        <div class="mb-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+          <%= result.offeringName %>: <%= result.created %> newly enrolled, <%= result.skipped %> already enrolled
+          (<%= result.total %> matching students total).
+        </div>
+      <% } %>
+
+      <form action="/admin/enroll/auto" method="POST" class="space-y-4">
+        <div>
+          <label class="form-label">Subject Offering</label>
+          <select class="form-input searchable-select" name="subjectOfferingId" data-placeholder="Type offering name or code to search..." required>
+            <option value="">Select a subject offering</option>
+            <% offerings.forEach(function(o) { %>
+              <option value="<%= o.id %>">
+                <%= o.SubjectPool.name %> (<%= o.SubjectPool.code %>) — <%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.admissionYear %>)
+              </option>
+            <% }) %>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary w-full mt-2">Run auto-enroll</button>
+      </form>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-pane').forEach(function(el) {
+      el.classList.add('hidden');
+    });
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.classList.remove('border-amber-500', 'text-amber-600');
+      btn.classList.add('border-transparent', 'text-navy-500');
+    });
+
+    var targetContent = document.getElementById('tab-content-' + tabId);
+    var targetBtn = document.getElementById('tab-btn-' + tabId);
+
+    if (targetContent) targetContent.classList.remove('hidden');
+    if (targetBtn) {
+      targetBtn.classList.remove('border-transparent', 'text-navy-500');
+      targetBtn.classList.add('border-amber-500', 'text-amber-600');
+    }
+  }
+
+  // Pre-select tab if in query string
+  var activeTab = <%- JSON.stringify(activeTab || 'single') %>;
+  switchTab(activeTab);
+
+  // Dynamic section loaders for both Single and Bulk tabs
+  function setupHierarchySync(prefix) {
+    var programSelect = document.getElementById(prefix + '-programId');
+    var yearSelect = document.getElementById(prefix + '-admissionYear');
+    var semesterSelect = document.getElementById(prefix + '-semesterNumber');
+    var sectionSelect = document.getElementById(prefix + '-sectionId');
+    var subGroupWrapper = document.getElementById(prefix + '-subgroup-wrapper');
+    var subGroupSelect = document.getElementById(prefix + '-subGroupId');
+    var noSectionsNote = document.getElementById(prefix + '-no-sections');
+
+    var currentSectionsData = [];
+
+    function updateSemesters() {
+      var selectedOpt = programSelect.options[programSelect.selectedIndex];
+      var totalSems = selectedOpt ? parseInt(selectedOpt.dataset.semesters || 8, 10) : 8;
+      var curVal = semesterSelect.value;
+      semesterSelect.innerHTML = '';
+      for (var i = 1; i <= totalSems; i++) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = 'Semester ' + i;
+        if (String(i) === String(curVal)) opt.selected = true;
+        semesterSelect.appendChild(opt);
+      }
+    }
+
+    function refreshSections() {
+      var programId = programSelect.value;
+      var year = yearSelect.value;
+      var sem = semesterSelect.value || 1;
+
+      subGroupWrapper.classList.add('hidden');
+      noSectionsNote.classList.add('hidden');
+      sectionSelect.innerHTML = '<option value="">Loading sections...</option>';
+
+      if (!programId || !year) {
+        sectionSelect.innerHTML = '<option value="">Select program & year first</option>';
+        return;
+      }
+
+      fetch('/api/programs/' + programId + '/years/' + year + '/sections?semesterNumber=' + sem)
+        .then(function(r) { return r.json(); })
+        .then(function(sections) {
+          currentSectionsData = sections;
+          sectionSelect.innerHTML = '';
+
+          if (!sections || !sections.length) {
+            sectionSelect.innerHTML = '<option value="">No sections configured</option>';
+            noSectionsNote.classList.remove('hidden');
+            return;
+          }
+
+          var defaultOpt = document.createElement('option');
+          defaultOpt.value = '';
+          defaultOpt.textContent = 'Select a section';
+          sectionSelect.appendChild(defaultOpt);
+
+          sections.forEach(function(sec) {
+            var opt = document.createElement('option');
+            opt.value = sec.id;
+            opt.textContent = 'Section ' + sec.name;
+            sectionSelect.appendChild(opt);
+          });
+        })
+        .catch(function() {
+          sectionSelect.innerHTML = '<option value="">Error loading sections</option>';
+        });
+    }
+
+    function onSectionChange() {
+      var secId = sectionSelect.value;
+      subGroupSelect.innerHTML = '<option value="">None (Whole Section)</option>';
+      subGroupWrapper.classList.add('hidden');
+
+      if (!secId) return;
+
+      var match = currentSectionsData.find(function(s) { return s.id === secId; });
+      if (match && match.subGroups && match.subGroups.length > 0) {
+        match.subGroups.forEach(function(sg) {
+          var opt = document.createElement('option');
+          opt.value = sg.id;
+          opt.textContent = sg.name;
+          subGroupSelect.appendChild(opt);
+        });
+        subGroupWrapper.classList.remove('hidden');
+      }
+    }
+
+    programSelect.addEventListener('change', function() {
+      updateSemesters();
+      refreshSections();
+    });
+    yearSelect.addEventListener('change', refreshSections);
+    semesterSelect.addEventListener('change', refreshSections);
+    sectionSelect.addEventListener('change', onSectionChange);
+
+    // Initial trigger if program is pre-selected
+    if (programSelect.value) {
+      updateSemesters();
+      refreshSections();
+    }
+  }
+
+  setupHierarchySync('single');
+  setupHierarchySync('bulk');
+</script>
