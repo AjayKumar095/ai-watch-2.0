@@ -1,5 +1,3 @@
-// App.js
-
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const validateEnv = require("./src/config/validateEnv");
@@ -70,6 +68,15 @@ app.use(attachUser);
 // currentPath drives active-link highlighting in the sidebar.
 app.use((req, res, next) => {
   res.locals.currentPath = req.path;
+  next();
+});
+
+// connect-flash messages are one-time (req.flash() clears them on read), so
+// this has to run once per request, before any view renders — not inside
+// individual controllers, which would clear/miss them inconsistently.
+app.use((req, res, next) => {
+  res.locals.flashSuccess = req.flash("success");
+  res.locals.flashError = req.flash("error");
   next();
 });
 

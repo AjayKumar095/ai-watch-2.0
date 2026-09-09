@@ -12,6 +12,7 @@ const {
   Section,
 } = require("../models");
 const { visibleSectionIdsForStudent } = require("../services/sectionScope");
+const { sectionsFor } = require("../services/sectionLookupService");
 const renderBlocks = require("../utils/renderBlocks");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
@@ -137,4 +138,74 @@ exports.submitAssessment = async (req, res) => {
   });
 
   res.redirect("/student/dashboard");
+};
+
+// --- Profile: pick a section later if it wasn't chosen (or wasn't
+// available) at signup ---
+
+exports.showProfile = async (req, res) => {
+  const studentProfile = await StudentProfile.findOne({
+    where: { userId: req.currentUser.id },
+    include: [Program, { model: Section, as: "currentSection" }],
+  });
+
+  let availableSections = [];
+  if (!studentProfile.currentSectionId) {
+    availableSections = await sectionsFor({
+      programId: studentProfile.programId,
+      admissionYear: studentProfile.admissionYear,
+      semesterNumber: studentProfile.currentSemesterNumber,
+    });
+  }
+
+  res.render("student/profile", {
+    title: "My Profile",
+    studentProfile,
+    availableSections,
+    error: null,
+    breadcrumbs: [ROOT, { label: "My Profile" }],
+  });
+};
+
+exports.chooseSection = async (req, res) => {
+  const studentProfile = await StudentProfile.findOne({
+    where: { userId: req.currentUser.id },
+    include: [Program, { model: Section, as: "currentSection" }],
+  });
+
+  // Once a section is set, changing it here would silently disconnect the
+  // student from any teacher mappings/enrollments already tied to their
+  // current one — that needs an admin's eyes, not a one-click self-service
+  // change. This route only ever fills in an EMPTY section.
+  if (studentProfile.currentSectionId) {
+    return res.redirect("/student/profile");
+  }
+
+  const { sectionId, subGroupId } = req.body;
+  const availableSections = await sectionsFor({
+    programId: studentProfile.programId,
+    admissionYear: studentProfile.admissionYear,
+    semesterNumber: studentProfile.currentSemesterNumber,
+  });
+
+  const rerender = (error) =>
+    res.status(400).render("student/profile", {
+      title: "My Profile", studentProfile, availableSections, error,
+      breadcrumbs: [ROOT, { label: "My Profile" }],
+    });
+
+  if (!sectionId) return rerender("Please select a section.");
+
+  // Validate the chosen (sub-)section actually belongs to one of the
+  // options offered — never trust the posted id blindly.
+  const chosenTop = availableSections.find((s) => s.id === sectionId);
+  if (!chosenTop) return rerender("That section isn't available for your program/semester. Please pick from the list.");
+  if (subGroupId && !(chosenTop.subGroups || []).some((g) => g.id === subGroupId)) {
+    return rerender("That sub-group doesn't belong to the selected section.");
+  }
+
+  studentProfile.currentSectionId = subGroupId || sectionId;
+  await studentProfile.save();
+
+  res.redirect("/student/profile");
 };

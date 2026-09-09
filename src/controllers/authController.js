@@ -5,12 +5,11 @@ const {
   School,
   Program,
   Specialization,
-  ProgramOffering,
-  Section,
   ApprovalRequest,
   RefreshToken,
 } = require("../models");
 const { distinctAdmissionYears } = require("../services/admissionYearService");
+const { sectionsFor } = require("../services/sectionLookupService");
 const { hashPassword, verifyPassword, generateTempPassword } = require("../utils/password");
 const {
   notifySignupReceived,
@@ -162,17 +161,11 @@ exports.specializationsForProgram = async (req, res) => {
 // form treats that as "pick one later," not an error).
 exports.sectionsForProgram = async (req, res) => {
   const { programId, admissionYear } = req.params;
-  const offering = await ProgramOffering.findOne({
-    where: { programId, admissionYear: parseInt(admissionYear, 10), semesterNumber: 1 },
-  });
-  if (!offering) return res.json([]);
-
-  const topSections = await Section.findAll({
-    where: { programOfferingId: offering.id, parentSectionId: null },
-    include: [{ model: Section, as: "subGroups" }],
-    order: [["name", "ASC"]],
-  });
-  res.json(topSections);
+  // New admits always start at semester 1 — a returning student picking a
+  // section later (from their profile) goes through a different endpoint
+  // scoped to their actual current semester; see studentController.
+  const sections = await sectionsFor({ programId, admissionYear: parseInt(admissionYear, 10), semesterNumber: 1 });
+  res.json(sections);
 };
 
 exports.studentSignup = async (req, res) => {

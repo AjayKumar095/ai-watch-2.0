@@ -194,7 +194,20 @@ Practical implications:
   /api/programs/:programId/years/:admissionYear/sections`. Both are
   optional: a program's very first cohort of a new year will often sign up
   before an admin has created any sections yet, and the form treats that as
-  normal, not an error.
+  normal, not an error. If skipped (or sections weren't set up yet), the
+  student can pick one later from `/student/profile` — once set, changing
+  it isn't self-service (it would silently disconnect them from any
+  enrollments/mappings already tied to the old section), so that page
+  shows it read-only with a note to contact a teacher/admin instead.
+
+**Approval requests now fail loudly, not silently.** `teacherController.
+approveRequest`/`rejectRequest`/`bulkApprove` used to redirect back to the
+dashboard with no feedback at all if the request didn't match the acting
+teacher (wrong account, already-decided request, a stale link) — a teacher
+could click Approve and see nothing change, with no indication why. They
+now flash a specific error (via `connect-flash`, rendered at the top of the
+authenticated layout) and log a `warn` with the mismatch details, so a
+failed approval is never mistaken for a successful one.
 
 **A real bug this replaced:** the student signup form never used to set
 `academicSessionId` at all, even though the column was `NOT NULL` at the DB

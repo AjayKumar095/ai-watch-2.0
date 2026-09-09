@@ -1,0 +1,83 @@
+<div class="mx-auto mt-2 max-w-lg">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-navy-900">My Profile</h1>
+  </div>
+
+  <div class="card">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Account</h2>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between"><dt class="text-navy-500">Name</dt><dd class="font-medium text-navy-800"><%= currentUser.firstName %> <%= currentUser.lastName %></dd></div>
+      <div class="flex justify-between"><dt class="text-navy-500">Email</dt><dd class="font-medium text-navy-800"><%= currentUser.email %></dd></div>
+      <div class="flex justify-between"><dt class="text-navy-500">Roll number</dt><dd class="font-medium text-navy-800"><%= studentProfile.rollNo %></dd></div>
+      <div class="flex justify-between"><dt class="text-navy-500">Program</dt><dd class="font-medium text-navy-800"><%= studentProfile.Program ? studentProfile.Program.name : '—' %></dd></div>
+      <div class="flex justify-between"><dt class="text-navy-500">Admission year</dt><dd class="font-medium text-navy-800"><%= studentProfile.admissionYear %></dd></div>
+      <div class="flex justify-between"><dt class="text-navy-500">Semester</dt><dd class="font-medium text-navy-800"><%= studentProfile.currentSemesterNumber %></dd></div>
+    </dl>
+    <p class="mt-3 text-xs text-navy-400">
+      <a href="/account/change-password" class="text-info-600 hover:underline">Change password</a>
+    </p>
+  </div>
+
+  <div class="card mt-4">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Section</h2>
+
+    <% if (studentProfile.currentSection) { %>
+      <p class="mt-3 text-sm text-navy-700">
+        You're in <strong><%= studentProfile.currentSection.name %></strong>.
+      </p>
+      <p class="mt-1 text-xs text-navy-400">To change sections, ask your teacher or admin — this isn't self-service once set, since it affects your enrollments and assignments.</p>
+    <% } else { %>
+      <p class="mt-1 text-sm text-navy-500">You haven't been placed in a section yet — pick one if it's set up, or check back later.</p>
+
+      <% if (error) { %><div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+
+      <% if (!availableSections.length) { %>
+        <p class="mt-3 text-sm text-navy-400">Sections for your program/semester haven't been set up yet. Check back once your teacher or admin has added them.</p>
+      <% } else { %>
+        <form action="/student/profile/section" method="POST" class="mt-4 space-y-4">
+          <div>
+            <label class="form-label" for="sectionId">Section</label>
+            <select class="form-input" id="sectionId" name="sectionId" required>
+              <option value="">Select a section</option>
+              <% availableSections.forEach(function(s) { %>
+                <option value="<%= s.id %>" data-has-subgroups="<%= s.subGroups && s.subGroups.length ? '1' : '0' %>"><%= s.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="hidden" id="subgroup-wrapper">
+            <label class="form-label" for="subGroupId">Sub-group</label>
+            <select class="form-input" id="subGroupId" name="subGroupId">
+              <option value="">None</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-primary w-full">Save section</button>
+        </form>
+
+        <script>
+          (function () {
+            var sections = <%- JSON.stringify(availableSections) %>;
+            var sectionSelect = document.getElementById('sectionId');
+            var subGroupSelect = document.getElementById('subGroupId');
+            var subGroupWrapper = document.getElementById('subgroup-wrapper');
+
+            sectionSelect.addEventListener('change', function () {
+              var chosen = sections.filter(function (s) { return s.id === sectionSelect.value; })[0];
+              if (chosen && chosen.subGroups && chosen.subGroups.length) {
+                subGroupSelect.innerHTML = '<option value="">None</option>';
+                chosen.subGroups.forEach(function (g) {
+                  var opt = document.createElement('option');
+                  opt.value = g.id;
+                  opt.textContent = g.name;
+                  subGroupSelect.appendChild(opt);
+                });
+                subGroupWrapper.classList.remove('hidden');
+              } else {
+                subGroupWrapper.classList.add('hidden');
+              }
+            });
+          })();
+        </script>
+      <% } %>
+    <% } %>
+  </div>
+</div>

@@ -14,6 +14,7 @@ const {
 } = require("../models");
 const { hashPassword, generateTempPassword } = require("../utils/password");
 const { notifyApprovalDecision } = require("../services/notificationService");
+const logger = require("../utils/logger");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 
@@ -91,7 +92,23 @@ exports.approveRequest = async (req, res) => {
     where: { id: req.params.id, requestedTeacherId: teacherProfile.id },
     include: [{ model: StudentProfile, include: [User] }],
   });
-  if (!request) return res.redirect("/teacher/dashboard");
+  if (!request) {
+    // Silently redirecting here used to look identical to success — a
+    // teacher clicking Approve got no feedback at all if the request
+    // didn't belong to them (wrong account) or had already been decided
+    // (e.g. a double-click, or two teachers/tabs racing on the same
+    // request). Now it's an explicit, loud failure instead.
+    logger.warn("Approve request failed: no matching pending request", {
+      approvalRequestId: req.params.id, teacherProfileId: teacherProfile.id, actingUserId: req.currentUser.id,
+    });
+    req.flash("error", "Couldn't approve that request — it may already have been decided, or it wasn't sent to you.");
+    return res.redirect("/teacher/dashboard");
+  }
+  if (request.status !== "PENDING") {
+    logger.warn("Approve request failed: request already decided", { approvalRequestId: request.id, status: request.status });
+    req.flash("error", `This request was already ${request.status.toLowerCase()}.`);
+    return res.redirect("/teacher/dashboard");
+  }
 
   request.status = "APPROVED";
   request.decidedByUserId = req.currentUser.id;
@@ -107,6 +124,8 @@ exports.approveRequest = async (req, res) => {
   studentUser.isActive = true;
   await studentUser.save();
 
+  logger.info("Student approved", { approvalRequestId: request.id, studentUserId: studentUser.id, teacherProfileId: teacherProfile.id });
+
   // Fire-and-forget via the mailer plugin (src/plugins/mailer) — not
   // awaited, so a slow/unreachable mail server can't stall this approval.
   // Errors are caught and logged inside notificationService.js.
@@ -118,6 +137,7 @@ exports.approveRequest = async (req, res) => {
     tempPassword,
   });
 
+  req.flash("success", `${studentUser.firstName} ${studentUser.lastName} approved — they've been emailed their login details.`);
   res.redirect("/teacher/dashboard");
 };
 
@@ -127,7 +147,18 @@ exports.rejectRequest = async (req, res) => {
     where: { id: req.params.id, requestedTeacherId: teacherProfile.id },
     include: [{ model: StudentProfile, include: [User] }],
   });
-  if (!request) return res.redirect("/teacher/dashboard");
+  if (!request) {
+    logger.warn("Reject request failed: no matching pending request", {
+      approvalRequestId: req.params.id, teacherProfileId: teacherProfile.id, actingUserId: req.currentUser.id,
+    });
+    req.flash("error", "Couldn't reject that request — it may already have been decided, or it wasn't sent to you.");
+    return res.redirect("/teacher/dashboard");
+  }
+  if (request.status !== "PENDING") {
+    logger.warn("Reject request failed: request already decided", { approvalRequestId: request.id, status: request.status });
+    req.flash("error", `This request was already ${request.status.toLowerCase()}.`);
+    return res.redirect("/teacher/dashboard");
+  }
 
   request.status = "REJECTED";
   request.decidedByUserId = req.currentUser.id;
@@ -149,11 +180,26 @@ exports.bulkApprove = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
   let ids = req.body.requestIds || [];
   if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.filter(Boolean);
+
+  if (!ids.length) {
+    req.flash("error", "No students were selected — nothing was approved.");
+    return res.redirect("/teacher/dashboard");
+  }
 
   const requests = await ApprovalRequest.findAll({
     where: { id: ids, requestedTeacherId: teacherProfile.id, status: "PENDING" },
     include: [{ model: StudentProfile, include: [User] }],
   });
+
+  if (!requests.length) {
+    logger.warn("Bulk approve matched nothing", { requestedIds: ids, teacherProfileId: teacherProfile.id, actingUserId: req.currentUser.id });
+    req.flash("error", "None of the selected requests could be approved — they may already have been decided.");
+    return res.redirect("/teacher/dashboard");
+  }
+  if (requests.length < ids.length) {
+    logger.warn("Bulk approve matched fewer requests than selected", { requestedCount: ids.length, matchedCount: requests.length, teacherProfileId: teacherProfile.id });
+  }
 
   for (const request of requests) {
     request.status = "APPROVED";
@@ -176,5 +222,7 @@ exports.bulkApprove = async (req, res) => {
     });
   }
 
+  logger.info("Bulk approved students", { count: requests.length, teacherProfileId: teacherProfile.id });
+  req.flash("success", `${requests.length} student(s) approved and emailed their login details.` + (requests.length < ids.length ? ` (${ids.length - requests.length} selected request(s) couldn't be approved.)` : ""));
   res.redirect("/teacher/dashboard");
 };

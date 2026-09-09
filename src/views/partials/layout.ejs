@@ -18,9 +18,9 @@
 
       /* 1. The container/overall scrollbar area */
       ::-webkit-scrollbar {
-        width: 5px;
+        width: 0px;
         /* Width of vertical scrollbar */
-        height: 5px;
+        height:0px;
         /* Height of horizontal scrollbar */
       }
 
@@ -85,7 +85,22 @@
         </header>
         <main class="mx-auto w-full max-w-7xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <%- include('breadcrumbs') %>
-            <%- body %>
+            <% if (typeof flashSuccess !=='undefined' && flashSuccess.length) { %>
+              <% flashSuccess.forEach(function(msg) { %>
+                <div class="mb-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+                  <%= msg %>
+                </div>
+                <% }) %>
+                  <% } %>
+                    <% if (typeof flashError !=='undefined' && flashError.length) { %>
+                      <% flashError.forEach(function(msg) { %>
+                        <div
+                          class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          <%= msg %>
+                        </div>
+                        <% }) %>
+                          <% } %>
+                            <%- body %>
         </main>
       </div>
     </div>
