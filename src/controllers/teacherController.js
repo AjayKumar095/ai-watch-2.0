@@ -76,20 +76,40 @@ exports.roster = async (req, res) => {
   });
 
   // Group enrollments by subject offering for the view.
+  // const grouped = {};
+  // for (const m of mappings) {
+  //   grouped[m.subjectOfferingId] = {
+  //     mapping: m,
+  //     students: enrollments.filter((e) => {
+  //       if (e.subjectOfferingId !== m.subjectOfferingId) return false;
+  //       if (!m.sectionId) return true;
+  //       if (e.sectionId === m.sectionId) return true;
+  //       if (e.Section && e.Section.parentSectionId === m.sectionId) return true;
+  //       return false;
+  //     }),
+  //   };
+  // }
   const grouped = {};
+
   for (const m of mappings) {
-    grouped[m.subjectOfferingId] = {
+    // Subject offering + section must uniquely identify a mapping
+    const key = `${m.subjectOfferingId}-${m.sectionId || "all"}`;
+
+    grouped[key] = {
       mapping: m,
       students: enrollments.filter((e) => {
         if (e.subjectOfferingId !== m.subjectOfferingId) return false;
+
         if (!m.sectionId) return true;
+
         if (e.sectionId === m.sectionId) return true;
+
         if (e.Section && e.Section.parentSectionId === m.sectionId) return true;
+
         return false;
       }),
     };
   }
-
   res.render("teacher/roster", { title: "My Roster", grouped: Object.values(grouped), breadcrumbs: [ROOT, { label: "My Roster" }] });
 };
 
