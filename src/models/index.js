@@ -27,6 +27,11 @@ const PromotionRecord = require("./PromotionRecord")(sequelize, DataTypes);
 const AuditLog = require("./AuditLog")(sequelize, DataTypes);
 const AcademicYear = require("./AcademicYear")(sequelize, DataTypes);
 
+const TeacherSubjectMappingSpecialization =
+  require("./TeacherSubjectMappingSpecialization")(
+    sequelize,
+    DataTypes
+  );
 // ---------------------------------------------------------------------------
 // Associations
 // ---------------------------------------------------------------------------
@@ -87,6 +92,40 @@ TeacherSubjectMapping.belongsTo(SubjectOffering, { foreignKey: "subjectOfferingI
 
 Section.hasMany(TeacherSubjectMapping, { foreignKey: "sectionId", onDelete: "CASCADE" });
 TeacherSubjectMapping.belongsTo(Section, { foreignKey: "sectionId" }); // nullable = all sections
+
+TeacherSubjectMapping.hasMany(
+  TeacherSubjectMappingSpecialization,
+  {
+    foreignKey: "mappingId",
+    as: "mappingSpecializations",
+    onDelete: "CASCADE",
+  }
+);
+
+TeacherSubjectMappingSpecialization.belongsTo(
+  TeacherSubjectMapping,
+  {
+    foreignKey: "mappingId",
+    as: "mapping",
+  }
+);
+
+Specialization.hasMany(
+  TeacherSubjectMappingSpecialization,
+  {
+    foreignKey: "specializationId",
+    as: "teacherMappingSpecializations",
+    onDelete: "CASCADE",
+  }
+);
+
+TeacherSubjectMappingSpecialization.belongsTo(
+  Specialization,
+  {
+    foreignKey: "specializationId",
+    as: "Specialization",
+  }
+);
 
 // RESTRICT: deleting a subject offering that already has enrolled students
 // must be blocked, not silently un-enrolled.
@@ -189,6 +228,7 @@ module.exports = {
   TeacherProfile,
   StudentProfile,
   TeacherSubjectMapping,
+  TeacherSubjectMappingSpecialization,
   SubjectEnrollment,
   ApprovalRequest,
   Assessment,
