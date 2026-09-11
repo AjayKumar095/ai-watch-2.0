@@ -35,18 +35,24 @@
             <th class="py-2 pr-3">Title</th>
             <th class="py-2 pr-3">Due</th>
             <th class="py-2 pr-3">Status</th>
+            <th class="py-2 pr-3"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-navy-50">
           <% assessments.forEach(function(a) { const sub = submissionByAssessment[a.id]; %>
             <tr>
               <td class="py-2 pr-3 font-medium text-navy-800"><%= a.SubjectOffering.SubjectPool.name %></td>
-              <td class="py-2 pr-3 text-navy-600"><%= a.title %></td>
+              <td class="py-2 pr-3 text-navy-600">
+                <a href="/student/assessments/<%= a.id %>" class="font-medium text-info-600 hover:underline"><%= a.title %></a>
+              </td>
               <td class="py-2 pr-3 text-navy-500"><%= new Date(a.endAt).toLocaleDateString() %></td>
               <td class="py-2 pr-3">
                 <% if (!sub) { %><span class="badge-amber">Not submitted</span>
                 <% } else if (sub.status === 'EVALUATED') { %><span class="badge-info">Evaluated · <%= sub.marksObtained %>/<%= a.maxMarks %></span>
                 <% } else { %><span class="badge-navy">Submitted</span><% } %>
+              </td>
+              <td class="py-2 pr-3">
+                <a href="/student/assessments/<%= a.id %>" class="btn-secondary !px-3 !py-1.5 text-xs"><%= sub ? 'View / Update' : 'View & Submit' %></a>
               </td>
             </tr>
           <% }) %>

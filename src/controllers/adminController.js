@@ -122,47 +122,132 @@ const {
   SubjectOffering,
   Section,
   TeacherSubjectMapping,
+  TeacherSubjectMappingSpecialization,
+  Specialization,
   SubjectEnrollment,
 } = require("../models");
 
 exports.showCreateMapping = async (req, res) => {
-  const [teachers, offerings, sections] = await Promise.all([
+  // Sections and specializations are scoped to whichever Subject Offering
+  // gets picked (a section belongs to a program+semester+admission-year
+  // cohort, a specialization belongs to a program) — see
+  // getSectionsForOffering below. Loading them here for every offering at
+  // once is what produced the "A, B, A, C, B, A, C" confused dropdown.
+  const [teachers, offerings] = await Promise.all([
     TeacherProfile.findAll({ include: [User] }),
     SubjectOffering.findAll({ include: [SubjectPool, Program] }),
-    Section.findAll(),
   ]);
-  res.render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error: null, formData: {}, breadcrumbs: [ROOT, { label: "Teacher Mappings", url: "/admin/mappings" }, { label: "Add Mapping" }] });
+  res.render("admin/create-mapping", {
+    title: "Map Teacher to Subject",
+    teachers,
+    offerings,
+    error: null,
+    formData: {},
+    breadcrumbs: [ROOT, { label: "Teacher Mappings", url: "/admin/mappings" }, { label: "Add Mapping" }],
+  });
+};
+
+// ---------------------------------------------------------------------------
+// AJAX: sections + specializations valid for a given subject offering.
+// A Section belongs to a ProgramOffering (program + semester + admission
+// year); a Specialization belongs to a program. The offering itself
+// carries all three, so both lists can be derived from it. Powers the
+// dynamic Section / Specialization pickers on the Add Mapping form.
+// ---------------------------------------------------------------------------
+exports.getSectionsForOffering = async (req, res) => {
+  const { subjectOfferingId } = req.query;
+  if (!subjectOfferingId) return res.status(400).json({ error: "subjectOfferingId is required." });
+
+  const offering = await SubjectOffering.findByPk(subjectOfferingId);
+  if (!offering) return res.status(404).json({ error: "Subject offering not found." });
+
+  const [sections, specializations] = await Promise.all([
+    Section.findAll({
+      include: [
+        {
+          association: "ProgramOffering",
+          required: true,
+          attributes: [],
+          where: {
+            programId: offering.programId,
+            semesterNumber: offering.semesterNumber,
+            admissionYear: offering.admissionYear,
+          },
+        },
+      ],
+      order: [["name", "ASC"]],
+    }),
+    Specialization.findAll({
+      where: { programId: offering.programId, isActive: true },
+      order: [["name", "ASC"]],
+    }),
+  ]);
+
+  res.json({
+    sections: sections.map((s) => ({ id: s.id, name: s.name, kind: s.kind, parentSectionId: s.parentSectionId })),
+    specializations: specializations.map((sp) => ({ id: sp.id, name: sp.name })),
+  });
 };
 
 exports.createMapping = async (req, res) => {
-  const { teacherId, subjectOfferingId, sectionId } = req.body;
-  const [teachers, offerings, sections] = await Promise.all([
+  const { teacherId, subjectOfferingId, sectionId, allSpecializations } = req.body;
+
+  // Checkboxes come through as a single value, an array, or absent.
+  const rawSpecializationIds = Array.isArray(req.body.specializationIds)
+    ? req.body.specializationIds
+    : req.body.specializationIds
+      ? [req.body.specializationIds]
+      : [];
+  // The "All specializations" checkbox wins over any stray individual
+  // picks left over from before it was ticked.
+  const specializationIds = allSpecializations === "on" || allSpecializations === "true" ? [] : rawSpecializationIds;
+
+  const [teachers, offerings] = await Promise.all([
     TeacherProfile.findAll({ include: [User] }),
     SubjectOffering.findAll({ include: [SubjectPool, Program] }),
-    Section.findAll(),
   ]);
   const breadcrumbs = [ROOT, { label: "Teacher Mappings", url: "/admin/mappings" }, { label: "Add Mapping" }];
   const rerender = (error, status = 400) =>
-    res.status(status).render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, sections, error, formData: req.body, breadcrumbs });
+    res.status(status).render("admin/create-mapping", { title: "Map Teacher to Subject", teachers, offerings, error, formData: req.body, breadcrumbs });
 
   if (!teacherId || !subjectOfferingId) return rerender("Please select both a teacher and a subject offering.");
 
   try {
-    await createMapping({ teacherId, subjectOfferingId, sectionId: sectionId || null });
+    await createMapping({
+      teacherId,
+      subjectOfferingId,
+      sectionId: sectionId || null,
+      specializationIds,
+    });
     await AuditLog.create({
       userId: req.currentUser.id,
       action: "CREATE_MAPPING",
       entityType: "TeacherSubjectMapping",
       entityId: subjectOfferingId,
-      metadata: { teacherId, sectionId },
+      metadata: { teacherId, sectionId, specializationIds },
     });
     res.redirect("/admin/dashboard");
   } catch (err) {
     if (err.code === "MAPPING_CONFLICT") {
+      const sectionScope = err.conflict.allSections ? "all sections" : "this section";
+      const specScope = err.conflict.allSpecializations
+        ? "all specializations"
+        : `specialization(s) that overlap yours`;
       return rerender(
-        `⚠️ Conflict: this subject${err.conflict.sectionId ? "/section" : " (all sections)"} is already mapped to ${err.conflict.teacherName} (${err.conflict.teacherEmail}). Remove that mapping first, or choose a different section.`,
+        `⚠️ Conflict: ${sectionScope} / ${specScope} for this subject is already mapped to ${err.conflict.teacherName} (${err.conflict.teacherEmail}). Remove that mapping first, or narrow your section/specialization selection.`,
         409
       );
+    }
+    if (
+      [
+        "SUBJECT_OFFERING_NOT_FOUND",
+        "TEACHER_NOT_FOUND",
+        "SECTION_NOT_FOUND",
+        "INVALID_SECTION_FOR_OFFERING",
+        "INVALID_SPECIALIZATION_FOR_OFFERING",
+      ].includes(err.code)
+    ) {
+      return rerender(err.message);
     }
     throw err;
   }
@@ -219,6 +304,11 @@ exports.listMappings = async (req, res) => {
       { model: TeacherProfile, include: [User] },
       { model: SubjectOffering, include: [SubjectPool, Program] },
       Section,
+      {
+        model: TeacherSubjectMappingSpecialization,
+        as: "mappingSpecializations",
+        include: [{ model: Specialization, as: "Specialization" }],
+      },
     ],
     order: [["createdAt", "DESC"]],
   });

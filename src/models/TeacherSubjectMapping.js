@@ -10,16 +10,39 @@
 //      a transaction to avoid a race between two admins mapping at once.
 //   3) Once on Postgres, add the two partial unique indexes described in
 //      the schema doc as a raw migration for a second, DB-level guarantee.
+// module.exports = (sequelize, DataTypes) => {
+//   return sequelize.define(
+//     "TeacherSubjectMapping",
+//     {
+//       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+//       // sectionId is nullable at the association level: null = mapped to ALL sections of the offering
+//     },
+//     {
+//       tableName: "teacher_subject_mappings",
+//       indexes: [{ unique: true, fields: ["subject_offering_id", "section_id"] }],
+//     }
+//   );
+// };
+
 module.exports = (sequelize, DataTypes) => {
   return sequelize.define(
     "TeacherSubjectMapping",
     {
-      id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-      // sectionId is nullable at the association level: null = mapped to ALL sections of the offering
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+      },
     },
     {
       tableName: "teacher_subject_mappings",
-      indexes: [{ unique: true, fields: ["subject_offering_id", "section_id"] }],
+
+      indexes: [
+        {
+          fields: ["subject_offering_id", "section_id"],
+          name: "teacher_subject_mapping_offering_section_idx",
+        },
+      ],
     }
   );
 };

@@ -1,13 +1,15 @@
-<div class="mx-auto mt-4 max-w-lg">
+<div class="mx-auto mt-4 max-w-2xl">
   <div class="card">
     <h1 class="text-xl font-bold text-navy-900">Map Teacher to Subject</h1>
-    <p class="mt-1 text-sm text-navy-500">Leave section blank to map the teacher to ALL sections of this offering.</p>
+    <p class="mt-1 text-sm text-navy-500">
+      Leave section blank to map ALL sections. Leave specialization blank (or tick "All specializations") to cover every specialization in that section.
+    </p>
 
     <% if (error) { %>
       <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
     <% } %>
 
-    <form action="/admin/mappings/new" method="POST" class="mt-6 space-y-4">
+    <form action="/admin/mappings/new" method="POST" class="mt-6 space-y-4" id="mapping-form">
       <div>
         <label class="form-label">Teacher</label>
         <select class="form-input searchable-select" name="teacherId" data-placeholder="Search teacher by name or code..." required>
@@ -17,25 +19,210 @@
           <% }) %>
         </select>
       </div>
+
       <div>
         <label class="form-label">Subject Offering</label>
-        <select class="form-input searchable-select" name="subjectOfferingId" data-placeholder="Search subject or program..." required>
+        <select class="form-input searchable-select" name="subjectOfferingId" id="subjectOfferingId" data-placeholder="Search subject or program..." required>
           <option value="">Select a subject offering</option>
           <% offerings.forEach(function(o) { %>
             <option value="<%= o.id %>" <%= formData.subjectOfferingId === o.id ? 'selected' : '' %>><%= o.SubjectPool.name %> — <%= o.Program.name %> Sem <%= o.semesterNumber %> (<%= o.admissionYear %>)</option>
           <% }) %>
         </select>
       </div>
+
       <div>
-        <label class="form-label">Section (optional — blank = all sections)</label>
-        <select class="form-input" name="sectionId">
+        <label class="form-label">Section</label>
+        <select class="form-input" name="sectionId" id="sectionId" disabled>
           <option value="">All sections</option>
-          <% sections.forEach(function(s) { %>
-            <option value="<%= s.id %>" <%= formData.sectionId === s.id ? 'selected' : '' %>><%= s.name %></option>
-          <% }) %>
         </select>
+        <p class="mt-1 text-xs text-navy-400" id="section-hint">Select a subject offering first.</p>
       </div>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <label class="form-label mb-0">Specializations</label>
+          <label class="flex items-center gap-1.5 text-xs text-navy-500">
+            <input type="checkbox" id="allSpecializations" name="allSpecializations" class="rounded border-navy-300" disabled>
+            All specializations
+          </label>
+        </div>
+        <div id="specialization-list" class="mt-2 flex flex-wrap gap-2">
+          <span class="text-xs text-navy-400">Select a subject offering first.</span>
+        </div>
+      </div>
+
+      <div class="hidden rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-xs text-info-800" id="scope-summary">
+        <strong>This mapping covers:</strong> <span id="scope-summary-text"></span>
+      </div>
+
       <button type="submit" class="btn-primary w-full">Create mapping</button>
     </form>
   </div>
 </div>
+
+<style>
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    border: 1px solid var(--color-navy-200, #d9dee7);
+    color: var(--color-navy-600, #4b5768);
+    background: #fff;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    user-select: none;
+  }
+  .chip:hover { border-color: var(--color-teal, #0f9e8f); }
+  .chip.active {
+    background: var(--color-teal, #0f9e8f);
+    border-color: var(--color-teal, #0f9e8f);
+    color: #fff;
+  }
+  .chip input { display: none; }
+</style>
+
+<script>
+(function () {
+  var offeringSelect = document.getElementById("subjectOfferingId");
+  var sectionSelect = document.getElementById("sectionId");
+  var sectionHint = document.getElementById("section-hint");
+  var allSpecCheckbox = document.getElementById("allSpecializations");
+  var specList = document.getElementById("specialization-list");
+  var scopeSummary = document.getElementById("scope-summary");
+  var scopeSummaryText = document.getElementById("scope-summary-text");
+
+  function resetPickers(message) {
+    sectionSelect.innerHTML = '<option value="">All sections</option>';
+    sectionSelect.disabled = true;
+    sectionHint.textContent = message;
+
+    allSpecCheckbox.checked = false;
+    allSpecCheckbox.disabled = true;
+    specList.innerHTML = '<span class="text-xs text-navy-400">' + message + '</span>';
+    scopeSummary.classList.add("hidden");
+  }
+
+  function updateScopeSummary() {
+    var sectionLabel = sectionSelect.value
+      ? sectionSelect.options[sectionSelect.selectedIndex].text
+      : "All sections";
+
+    var specLabel;
+    if (allSpecCheckbox.checked) {
+      specLabel = "All specializations";
+    } else {
+      var checked = Array.prototype.slice
+        .call(specList.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(function (el) { return el.dataset.name; });
+      specLabel = checked.length ? checked.join(", ") : "All specializations";
+    }
+
+    scopeSummaryText.textContent = sectionLabel + " — " + specLabel;
+    scopeSummary.classList.remove("hidden");
+  }
+
+  function renderSections(sections) {
+    sectionSelect.innerHTML = '<option value="">All sections</option>';
+    sections.forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.parentSectionId ? "↳ " + s.name : s.name;
+      sectionSelect.appendChild(opt);
+    });
+    sectionSelect.disabled = false;
+    sectionHint.textContent = sections.length
+      ? 'Leave as "All sections" to map the whole cohort.'
+      : "No sections found for this offering yet.";
+  }
+
+  function renderSpecializations(specs) {
+    if (!specs.length) {
+      specList.innerHTML = '<span class="text-xs text-navy-400">This program has no specializations — the mapping applies to everyone in the section.</span>';
+      allSpecCheckbox.disabled = true;
+      allSpecCheckbox.checked = false;
+      return;
+    }
+
+    allSpecCheckbox.disabled = false;
+    allSpecCheckbox.checked = false;
+    specList.innerHTML = "";
+
+    specs.forEach(function (sp) {
+      var label = document.createElement("label");
+      label.className = "chip";
+
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "specialization-checkbox";
+      input.name = "specializationIds";
+      input.value = sp.id;
+      input.dataset.name = sp.name;
+
+      input.addEventListener("change", function () {
+        label.classList.toggle("active", input.checked);
+        updateScopeSummary();
+      });
+
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(sp.name));
+      specList.appendChild(label);
+    });
+  }
+
+  allSpecCheckbox.addEventListener("change", function () {
+    var boxes = specList.querySelectorAll(".specialization-checkbox");
+    // "All specializations" clears and disables the individual chips —
+    // zero specialization rows on the mapping means ALL, per the schema.
+    boxes.forEach(function (b) {
+      b.checked = false;
+      b.disabled = allSpecCheckbox.checked;
+      b.closest(".chip").classList.toggle("active", false);
+    });
+    updateScopeSummary();
+  });
+
+  sectionSelect.addEventListener("change", updateScopeSummary);
+
+  offeringSelect.addEventListener("change", function () {
+    var offeringId = offeringSelect.value;
+    if (!offeringId) {
+      resetPickers("Select a subject offering first.");
+      return;
+    }
+
+    resetPickers("Loading…");
+
+    fetch("/admin/mappings/sections?subjectOfferingId=" + encodeURIComponent(offeringId))
+      .then(function (res) {
+        if (!res.ok) throw new Error("Failed to load sections/specializations.");
+        return res.json();
+      })
+      .then(function (data) {
+        renderSections(data.sections || []);
+        renderSpecializations(data.specializations || []);
+        updateScopeSummary();
+      })
+      .catch(function () {
+        sectionHint.textContent = "Couldn't load sections. Try reselecting the offering.";
+        specList.innerHTML = '<span class="text-xs text-amber-700">Couldn\'t load specializations.</span>';
+      });
+  });
+
+  // The searchable-select widget replaces the native <select> with its own
+  // element, so it doesn't fire native "change" — listen on the underlying
+  // select if the widget re-dispatches change, and also cover a plain
+  // native select in case searchable-select isn't applied to this field.
+  offeringSelect.addEventListener("input", function () {
+    offeringSelect.dispatchEvent(new Event("change"));
+  });
+
+  // Re-trigger on load in case this is a validation re-render with
+  // formData already filled in.
+  if (offeringSelect.value) {
+    offeringSelect.dispatchEvent(new Event("change"));
+  }
+})();
+</script>

@@ -39,6 +39,7 @@ router.post("/users/:id/delete", userAdminController.delete);
 
 router.get("/mappings", adminController.listMappings);
 router.get("/mappings/new", adminController.showCreateMapping);
+router.get("/mappings/sections", adminController.getSectionsForOffering);
 router.post("/mappings/new", adminController.createMapping);
 router.post("/mappings/:id/delete", adminController.deleteMapping);
 
