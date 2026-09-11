@@ -16,12 +16,11 @@ const {
   notifyPasswordReset,
 } = require("../services/notificationService");
 const {
-  signAccessToken,
-  signRefreshToken,
   verifyRefreshToken,
   hashToken,
   COOKIE_OPTS,
 } = require("../utils/jwt");
+const { issueSession, rotateSession } = require("../services/sessionService");
 const logger = require("../utils/logger");
 
 const DASHBOARD_BY_ROLE = {
@@ -31,6 +30,13 @@ const DASHBOARD_BY_ROLE = {
 };
 
 exports.showLogin = (req, res) => {
+  // A logged-in user landing on /login (stale bookmark, back button, a
+  // session that's still valid, etc.) should never see the login form
+  // rendered inside their own authenticated layout — send them straight
+  // to their dashboard instead.
+  if (req.currentUser) {
+    return res.redirect(DASHBOARD_BY_ROLE[req.currentUser.role] || "/");
+  }
   res.render("auth/login", { title: "Login", error: null });
 };
 
@@ -73,20 +79,6 @@ exports.login = async (req, res) => {
   res.redirect(DASHBOARD_BY_ROLE[user.role] || "/");
 };
 
-async function issueSession(user, res) {
-  const accessToken = signAccessToken(user);
-  const refreshToken = signRefreshToken(user);
-
-  await RefreshToken.create({
-    userId: user.id,
-    tokenHash: hashToken(refreshToken),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  });
-
-  res.cookie("access_token", accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-  res.cookie("refresh_token", refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
-}
-
 exports.refresh = async (req, res) => {
   const token = req.cookies && req.cookies.refresh_token;
   if (!token) return res.status(401).json({ error: "No refresh token" });
@@ -100,9 +92,7 @@ exports.refresh = async (req, res) => {
     if (!user || !user.isActive) throw new Error("User inactive");
 
     // Rotate: revoke the old refresh token, issue a new pair.
-    stored.revokedAt = new Date();
-    await stored.save();
-    await issueSession(user, res);
+    await rotateSession(stored, user, res);
 
     res.json({ ok: true });
   } catch (err) {
@@ -125,6 +115,10 @@ exports.logout = async (req, res) => {
 // --- Student onboarding -----------------------------------------------------
 
 exports.showStudentSignup = async (req, res) => {
+  if (req.currentUser) {
+    return res.redirect(DASHBOARD_BY_ROLE[req.currentUser.role] || "/");
+  }
+
   const [schools, teachers, years, academicYears, defaultYear] = await Promise.all([
     School.findAll({ where: { isActive: true }, order: [["name", "ASC"]] }),
     TeacherProfile.findAll({ include: [User] }),
@@ -260,6 +254,9 @@ exports.studentSignup = async (req, res) => {
 // --- Forgot password ---------------------------------------------------------
 
 exports.showForgotPassword = (req, res) => {
+  if (req.currentUser) {
+    return res.redirect(DASHBOARD_BY_ROLE[req.currentUser.role] || "/");
+  }
   res.render("auth/forgot-password", { title: "Forgot Password", error: null, submitted: false });
 };
 
