@@ -100,6 +100,20 @@
     </div>
   <% } else { %>
 
+    <div class="mb-4 flex items-center justify-between rounded-lg border border-navy-100 bg-white px-3 py-2">
+      <span class="text-sm text-navy-600">
+        This semester offering is currently
+        <span class="font-semibold <%= workspace.offering.isActive ? 'text-info-600' : 'text-amber-600' %>"><%= workspace.offering.isActive ? 'active' : 'disabled' %></span>.
+        <% if (!workspace.offering.isActive) { %><span class="text-navy-400">Sections/subjects below are still editable while disabled.</span><% } %>
+      </span>
+      <form action="/admin/programs/<%= program.id %>/offerings/toggle" method="POST">
+        <input type="hidden" name="year" value="<%= workspace.year %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
+        <button type="submit" class="btn-secondary !px-3 !py-1.5 text-xs <%= workspace.offering.isActive ? '!border-amber-300 !text-amber-700 hover:!bg-amber-50' : '' %>">
+          <%= workspace.offering.isActive ? 'Disable this semester' : 'Re-enable this semester' %>
+        </button>
+      </form>
+    </div>
+
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <!-- Sections & Sub-Groups -->
       <div class="card">
@@ -165,8 +179,13 @@
 
               <div class="mt-2 space-y-1">
                 <% so.TeacherSubjectMappings.forEach(function(m) { %>
+                  <% var mSpecs = m.mappingSpecializations || []; %>
                   <div class="flex items-center justify-between rounded bg-navy-50 px-2 py-1 text-xs">
-                    <span><%= m.TeacherProfile.User.firstName %> <%= m.TeacherProfile.User.lastName %> — <%= m.Section ? 'Section ' + m.Section.name : 'All sections' %></span>
+                    <span>
+                      <%= m.TeacherProfile.User.firstName %> <%= m.TeacherProfile.User.lastName %>
+                      — <%= m.Section ? 'Section ' + m.Section.name : 'All sections' %>
+                      — <%= mSpecs.length === 0 ? 'All specializations' : mSpecs.map(function(s) { return s.Specialization.name; }).join(', ') %>
+                    </span>
                     <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/mappings/<%= m.id %>/delete" method="POST">
                       <input type="hidden" name="year" value="<%= workspace.year %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
                       <button class="text-amber-700 hover:underline">Remove</button>
@@ -175,17 +194,34 @@
                 <% }) %>
               </div>
 
-              <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/mappings/new" method="POST" class="mt-2 flex flex-wrap gap-1">
+              <form action="/admin/programs/<%= program.id %>/subject-offerings/<%= so.id %>/mappings/new" method="POST" class="mt-2 space-y-2 rounded-lg border border-navy-100 p-2">
                 <input type="hidden" name="year" value="<%= workspace.year %>" /><input type="hidden" name="semesterNumber" value="<%= workspace.semesterNumber %>" />
-                <select class="form-input !w-auto !py-1 text-xs" name="teacherId" required>
-                  <option value="">Teacher</option>
-                  <% workspace.allTeachers.forEach(function(t) { %><option value="<%= t.id %>"><%= t.User.firstName %> <%= t.User.lastName %></option><% }) %>
-                </select>
-                <select class="form-input !w-auto !py-1 text-xs" name="sectionId">
-                  <option value="">All sections</option>
-                  <% workspace.allSectionsFlat.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
-                </select>
-                <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Map</button>
+                <div class="flex flex-wrap gap-1">
+                  <select class="form-input !w-auto !py-1 text-xs" name="teacherId" required>
+                    <option value="">Teacher</option>
+                    <% workspace.allTeachers.forEach(function(t) { %><option value="<%= t.id %>"><%= t.User.firstName %> <%= t.User.lastName %></option><% }) %>
+                  </select>
+                  <select class="form-input !w-auto !py-1 text-xs" name="sectionId">
+                    <option value="">All sections</option>
+                    <% workspace.allSectionsFlat.forEach(function(s) { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+                  </select>
+                  <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Map</button>
+                </div>
+
+                <% if (workspace.specializations.length) { %>
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <label class="mapping-chip">
+                      <input type="checkbox" name="allSpecializations" class="mapping-all-spec-toggle" data-scope="<%= so.id %>" checked>
+                      <span>All specializations</span>
+                    </label>
+                    <% workspace.specializations.forEach(function(sp) { %>
+                      <label class="mapping-chip">
+                        <input type="checkbox" name="specializationIds" value="<%= sp.id %>" class="mapping-spec-checkbox" data-scope="<%= so.id %>" disabled>
+                        <span><%= sp.name %></span>
+                      </label>
+                    <% }) %>
+                  </div>
+                <% } %>
               </form>
             </div>
           <% }) %>
@@ -208,3 +244,39 @@
     </div>
   <% } %>
 <% } %>
+
+<style>
+  .mapping-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    border: 1px solid var(--color-navy-200, #d9dee7);
+    color: var(--color-navy-600, #4b5768);
+    background: #fff;
+  }
+  .mapping-chip:has(input:checked) {
+    background: var(--color-teal, #0f9e8f);
+    border-color: var(--color-teal, #0f9e8f);
+    color: #fff;
+  }
+  .mapping-chip input:disabled { cursor: not-allowed; }
+</style>
+
+<script>
+  // "All specializations" (checked by default, per mapping form) disables
+  // and unchecks the individual chips — zero specialization rows on the
+  // mapping means ALL, same rule as the standalone Add Mapping page.
+  document.querySelectorAll(".mapping-all-spec-toggle").forEach(function (allBox) {
+    allBox.addEventListener("change", function () {
+      var scope = allBox.dataset.scope;
+      document.querySelectorAll('.mapping-spec-checkbox[data-scope="' + scope + '"]').forEach(function (box) {
+        box.disabled = allBox.checked;
+        if (allBox.checked) box.checked = false;
+      });
+    });
+  });
+</script>

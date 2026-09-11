@@ -13,54 +13,70 @@
   <% }) %>
 </div>
 
-<div class="card">
-  <form action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST">
-    <div class="mb-3 flex flex-wrap items-end gap-3 rounded-lg bg-navy-50 p-3">
-      <div>
-        <label class="form-label !mb-0.5 text-xs">Bulk marks</label>
-        <input class="form-input !py-1.5" type="number" step="0.5" name="marksObtained" placeholder="e.g. 8" />
-      </div>
-      <div class="flex-1">
-        <label class="form-label !mb-0.5 text-xs">Bulk remarks</label>
-        <input class="form-input !py-1.5" name="remarks" placeholder="Applied to all checked rows" />
-      </div>
-      <button type="submit" class="btn-primary !py-2 text-sm">Apply to selected</button>
-    </div>
+<!--
+  IMPORTANT: this form is intentionally declared here, EMPTY, and does NOT
+  wrap the table. Every bulk-evaluate field below (marks/remarks inputs,
+  the per-row checkboxes, and the "Apply to selected" button) points at it
+  via the form="bulk-evaluate-form" attribute instead of physical nesting.
 
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-navy-100 text-sm">
-        <thead>
-          <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-            <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.sub-check').forEach(c=>c.checked=this.checked)" /></th>
-            <th class="py-2 pr-3">Student</th>
-            <th class="py-2 pr-3">Section</th>
-            <th class="py-2 pr-3">Status</th>
-            <th class="py-2 pr-3">Submission</th>
-            <th class="py-2 pr-3">Evaluate</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-navy-50">
-          <% submissions.forEach(function(s) { %>
-            <tr>
-              <td class="py-2 pr-3"><input class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
-              <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
-              <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
-              <td class="py-2 pr-3">
-                <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= s.marksObtained %>/<%= assessment.maxMarks %></span>
-                <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
-              </td>
-              <td class="py-2 pr-3 text-navy-500"><%= s.url ? s.url : (s.description ? s.description.slice(0,40) : '—') %></td>
-              <td class="py-2 pr-3">
-                <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
-                  <input class="form-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained || '' %>" />
-                  <input class="form-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
-                  <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Save</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+  Why: the table also contains one real <form> per row (the individual
+  "Save" button), and a <form> can never be nested inside another <form>
+  in HTML — browsers silently drop the inner tag when that happens, which
+  merges every row's inputs into the outer form. That's what caused
+  remarks/marksObtained to arrive as ARRAYS on the server (every row's
+  value bundled into one submit) instead of one row's values going to
+  /teacher/submissions/:id/evaluate as intended. Keeping the bulk form
+  separate and non-wrapping avoids the nesting entirely.
+-->
+<form id="bulk-evaluate-form" action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST"></form>
+
+<div class="card">
+  <div class="mb-3 flex flex-wrap items-end gap-3 rounded-lg bg-navy-50 p-3">
+    <div>
+      <label class="form-label !mb-0.5 text-xs">Bulk marks</label>
+      <input form="bulk-evaluate-form" class="form-input !py-1.5" type="number" step="0.5" name="marksObtained" placeholder="e.g. 8" />
     </div>
-  </form>
+    <div class="flex-1">
+      <label class="form-label !mb-0.5 text-xs">Bulk remarks</label>
+      <input form="bulk-evaluate-form" class="form-input !py-1.5" name="remarks" placeholder="Applied to all checked rows" />
+    </div>
+    <button form="bulk-evaluate-form" type="submit" class="btn-primary !py-2 text-sm">Apply to selected</button>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-navy-100 text-sm">
+      <thead>
+        <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+          <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.sub-check').forEach(c=>c.checked=this.checked)" /></th>
+          <th class="py-2 pr-3">Student</th>
+          <th class="py-2 pr-3">Section</th>
+          <th class="py-2 pr-3">Status</th>
+          <th class="py-2 pr-3">Submission</th>
+          <th class="py-2 pr-3">Evaluate</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-navy-50">
+        <% submissions.forEach(function(s) { %>
+          <tr>
+            <td class="py-2 pr-3"><input form="bulk-evaluate-form" class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
+            <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
+            <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
+            <td class="py-2 pr-3">
+              <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= s.marksObtained %>/<%= assessment.maxMarks %></span>
+              <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
+            </td>
+            <td class="py-2 pr-3 text-navy-500"><%= s.url ? s.url : (s.description ? s.description.slice(0,40) : '—') %></td>
+            <td class="py-2 pr-3">
+              <!-- A real, standalone form — no longer inside the bulk form above. -->
+              <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
+                <input class="form-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained || '' %>" />
+                <input class="form-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
+                <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Save</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </div>

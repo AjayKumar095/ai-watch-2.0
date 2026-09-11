@@ -1,45 +1,3 @@
-// const { Op } = require("sequelize");
-// const { TeacherSubjectMapping, TeacherProfile, User } = require("../models");
-
-// Enforces the teacher-subject-section conflict rule at the application
-// layer (see schema notes: Sequelize/Postgres partial-unique-index caveat).
-// Throws a MAPPING_CONFLICT error carrying the conflicting teacher's
-// details so the caller can show a clear flag instead of a generic error.
-// async function createMapping({ teacherId, subjectOfferingId, sectionId }) {
-//   const { sequelize } = require("../models");
-//   return sequelize.transaction(async (t) => {
-//     const whereConflict = sectionId
-//       ? { subjectOfferingId, [Op.or]: [{ sectionId }, { sectionId: null }] }
-//       : { subjectOfferingId }; // requesting ALL sections conflicts with any existing mapping on this offering
-
-//     const existing = await TeacherSubjectMapping.findOne({
-//       where: whereConflict,
-//       include: [{ model: TeacherProfile, include: [User] }],
-//       transaction: t,
-//       lock: t.LOCK.UPDATE,
-//     });
-
-//     if (existing && existing.teacherId !== teacherId) {
-//       const err = new Error("MAPPING_CONFLICT");
-//       err.code = "MAPPING_CONFLICT";
-//       err.conflict = {
-//         teacherName: `${existing.TeacherProfile.User.firstName} ${existing.TeacherProfile.User.lastName}`,
-//         teacherEmail: existing.TeacherProfile.User.email,
-//         sectionId: existing.sectionId,
-//       };
-//       throw err;
-//     }
-
-//     if (existing && existing.teacherId === teacherId) {
-//       return existing; // already mapped, idempotent
-//     }
-
-//     return TeacherSubjectMapping.create({ teacherId, subjectOfferingId, sectionId: sectionId || null }, { transaction: t });
-//   });
-// }
-
-// module.exports = { createMapping };
-
 const { Op } = require("sequelize");
 
 const {
@@ -117,14 +75,6 @@ async function createMapping({
 
     if (sectionId) {
       const selectedSection = await Section.findByPk(sectionId, {
-        // include: [
-        //   {
-        //     association: "parentSection",
-        //   },
-        //   {
-        //     association: "ProgramOffering",
-        //   },
-        // ],
         transaction: t,
       });
 
@@ -192,29 +142,47 @@ async function createMapping({
 
     // ---------------------------------------------------------
     // 6. Load existing mappings for this subject offering
+    //
+    // IMPORTANT (Postgres): "SELECT ... FOR UPDATE" cannot be combined
+    // with a query that produces a LEFT OUTER JOIN on the locked table's
+    // side — and both of the includes below (TeacherProfile->User, and
+    // the hasMany TeacherSubjectMappingSpecialization) default to LEFT
+    // JOINs. Postgres then throws "FOR UPDATE cannot be applied to the
+    // nullable side of an outer join" (surfaces here as a bare 500 with
+    // no message). SQLite has no FOR UPDATE support at all, so it just
+    // silently no-ops the lock — which is why this only broke in
+    // production (Postgres), not in local/dev testing (SQLite).
+    //
+    // Fix: lock the bare TeacherSubjectMapping rows first (no joins), then
+    // fetch the full, association-loaded copies of exactly those rows in
+    // a second, unlocked query. The lock on the mapping rows themselves is
+    // what actually prevents the race between two admins mapping the same
+    // offering at once — the joined data doesn't need to be locked too.
     // ---------------------------------------------------------
 
-    const existingMappings =
-      await TeacherSubjectMapping.findAll({
-        where: {
-          subjectOfferingId,
-        },
+    const lockedMappingRows = await TeacherSubjectMapping.findAll({
+      where: { subjectOfferingId },
+      attributes: ["id"],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
 
-        include: [
-          {
-            model: TeacherProfile,
-            include: [User],
-          },
-          {
-            model: TeacherSubjectMappingSpecialization,
-            as: "mappingSpecializations",
-          },
-        ],
-
-        transaction: t,
-
-        lock: t.LOCK.UPDATE,
-      });
+    const existingMappings = lockedMappingRows.length
+      ? await TeacherSubjectMapping.findAll({
+          where: { id: lockedMappingRows.map((m) => m.id) },
+          include: [
+            {
+              model: TeacherProfile,
+              include: [User],
+            },
+            {
+              model: TeacherSubjectMappingSpecialization,
+              as: "mappingSpecializations",
+            },
+          ],
+          transaction: t,
+        })
+      : [];
 
     // ---------------------------------------------------------
     // 7. Check conflicts

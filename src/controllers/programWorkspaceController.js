@@ -15,6 +15,7 @@ const {
   SubjectPool,
   SubjectOffering,
   TeacherSubjectMapping,
+  TeacherSubjectMappingSpecialization,
   TeacherProfile,
   User,
   StudentProfile,
@@ -58,12 +59,28 @@ async function loadWorkspaceData(program, tab, year, semesterNumber) {
           include: [
             SubjectPool,
             Specialization,
-            { model: TeacherSubjectMapping, include: [{ model: TeacherProfile, include: [User] }, Section] },
+            {
+              model: TeacherSubjectMapping,
+              include: [
+                { model: TeacherProfile, include: [User] },
+                Section,
+                // Needed so the mapping list can show "PG-1, PG-2" / "All
+                // specializations" per mapping instead of just teacher+section
+                // — this was missing entirely before, which is why the
+                // inline mapping UI here never reflected the specialization
+                // model at all.
+                {
+                  model: TeacherSubjectMappingSpecialization,
+                  as: "mappingSpecializations",
+                  include: [{ model: Specialization, as: "Specialization" }],
+                },
+              ],
+            },
           ],
         });
 
         data.allSubjects = await SubjectPool.findAll({ where: { isActive: true }, order: [["name", "ASC"]] });
-        data.specializations = await Specialization.findAll({ where: { programId: program.id } });
+        data.specializations = await Specialization.findAll({ where: { programId: program.id }, order: [["name", "ASC"]] });
         data.allTeachers = await TeacherProfile.findAll({ include: [User] });
         // flatten top+sub sections for the mapping-target dropdown
         data.allSectionsFlat = [];
@@ -204,11 +221,38 @@ exports.ensureOffering = async (req, res) => {
   const program = await Program.findByPk(req.params.id);
   if (!program) return res.redirect("/admin/programs");
   const { year, semesterNumber } = req.body;
-  await ProgramOffering.findOrCreate({
+
+  const [offering] = await ProgramOffering.findOrCreate({
     where: { programId: program.id, semesterNumber: parseInt(semesterNumber, 10), admissionYear: parseInt(year, 10) },
     defaults: {},
   });
+  // findOrCreate can also match a previously-DISABLED offering (it's still
+  // the same row) — re-enable it here so "Enable Semester" always means
+  // what it says, even the second time around.
+  if (!offering.isActive) {
+    offering.isActive = true;
+    await offering.save();
+  }
+
   res.redirect(`/admin/programs/${program.id}?tab=structure&year=${year}&semester=${semesterNumber}`);
+};
+
+// Flip an existing ProgramOffering's isActive flag. Unlike ensureOffering,
+// this never creates one — if it doesn't exist yet there's nothing to
+// disable, so we just redirect back (the "Enable Semester" create-flow
+// stays the only way to first bring one into existence).
+exports.toggleOffering = async (req, res) => {
+  const { year, semesterNumber } = req.body;
+  const redirectTo = `/admin/programs/${req.params.id}?tab=structure&year=${year}&semester=${semesterNumber}`;
+
+  const offering = await ProgramOffering.findOne({
+    where: { programId: req.params.id, semesterNumber: parseInt(semesterNumber, 10), admissionYear: parseInt(year, 10) },
+  });
+  if (!offering) return res.redirect(redirectTo);
+
+  offering.isActive = !offering.isActive;
+  await offering.save();
+  res.redirect(redirectTo);
 };
 
 // --- Sections & sub-groups, scoped to the current offering ---
@@ -277,15 +321,43 @@ exports.deleteSubjectOffering = async (req, res) => {
 
 // --- Teacher mappings, scoped to a subject offering within the workspace ---
 exports.createMapping = async (req, res) => {
-  const { teacherId, sectionId, year, semesterNumber } = req.body;
+  const { teacherId, sectionId, year, semesterNumber, allSpecializations } = req.body;
   const redirectTo = `/admin/programs/${req.params.id}?tab=structure&year=${year}&semester=${semesterNumber}`;
+
+  // Checkboxes come through as a single value, an array, or absent —
+  // same normalization as the standalone admin/create-mapping form.
+  const rawSpecializationIds = Array.isArray(req.body.specializationIds)
+    ? req.body.specializationIds
+    : req.body.specializationIds
+      ? [req.body.specializationIds]
+      : [];
+  const specializationIds = allSpecializations === "on" || allSpecializations === "true" ? [] : rawSpecializationIds;
+
   try {
-    await createMapping({ teacherId, subjectOfferingId: req.params.subjectOfferingId, sectionId: sectionId || null });
+    await createMapping({
+      teacherId,
+      subjectOfferingId: req.params.subjectOfferingId,
+      sectionId: sectionId || null,
+      specializationIds,
+    });
     res.redirect(redirectTo);
   } catch (err) {
     if (err.code === "MAPPING_CONFLICT") {
-      const msg = `Conflict: already mapped to ${err.conflict.teacherName} (${err.conflict.teacherEmail}).`;
+      const sectionScope = err.conflict.allSections ? "all sections" : "this section";
+      const specScope = err.conflict.allSpecializations ? "all specializations" : "specialization(s) that overlap yours";
+      const msg = `Conflict: ${sectionScope} / ${specScope} is already mapped to ${err.conflict.teacherName} (${err.conflict.teacherEmail}).`;
       return res.redirect(redirectTo + "&error=" + encodeURIComponent(msg));
+    }
+    if (
+      [
+        "SUBJECT_OFFERING_NOT_FOUND",
+        "TEACHER_NOT_FOUND",
+        "SECTION_NOT_FOUND",
+        "INVALID_SECTION_FOR_OFFERING",
+        "INVALID_SPECIALIZATION_FOR_OFFERING",
+      ].includes(err.code)
+    ) {
+      return res.redirect(redirectTo + "&error=" + encodeURIComponent(err.message));
     }
     throw err;
   }

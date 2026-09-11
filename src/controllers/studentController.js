@@ -10,6 +10,8 @@ const {
   ApprovalRequest,
   Program,
   Section,
+  TeacherProfile,
+  User,
 } = require("../models");
 const { visibleSectionIdsForStudent } = require("../services/sectionScope");
 const { sectionsFor } = require("../services/sectionLookupService");
@@ -18,11 +20,45 @@ const renderBlocks = require("../utils/renderBlocks");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 
+// Resolves this student's current top-level Section's sub-groups — PG-1,
+// PG-2, G1, G2, or whatever your admins named them — scoped the same way
+// every other section option is resolved: program + admission year +
+// semester (see sectionLookupService.sectionsFor, also used by
+// showProfile/chooseSection below). Returns [] if the student has no
+// section yet, is already IN a sub-group (so no further confirmation is
+// possible), or their section simply has no sub-groups defined.
+async function getSubGroupsForCurrentSection(studentProfile) {
+  if (!studentProfile.currentSectionId) return [];
+
+  const options = await sectionsFor({
+    programId: studentProfile.programId,
+    admissionYear: studentProfile.admissionYear,
+    semesterNumber: studentProfile.currentSemesterNumber,
+  });
+
+  // sectionsFor only returns TOP-LEVEL sections for this cohort. If the
+  // student's currentSectionId isn't in this list, they're either already
+  // sitting in a sub-group themselves, or their section isn't part of this
+  // cohort's active options — either way, nothing further to confirm.
+  const current = options.find((s) => s.id === studentProfile.currentSectionId);
+  return current ? current.subGroups || [] : [];
+}
+
+async function sectionNeedsConfirmation(studentProfile) {
+  if (!studentProfile.currentSectionId || studentProfile.sectionConfirmed) return false;
+  const subGroups = await getSubGroupsForCurrentSection(studentProfile);
+  return subGroups.length > 0;
+}
+
 exports.dashboard = async (req, res) => {
   const studentProfile = await StudentProfile.findOne({
     where: { userId: req.currentUser.id },
     include: [Program, { model: Section, as: "currentSection" }],
   });
+
+  if (await sectionNeedsConfirmation(studentProfile)) {
+    return res.redirect("/student/confirm-section");
+  }
 
   const enrollments = await SubjectEnrollment.findAll({
     where: { studentId: studentProfile.id },
@@ -64,8 +100,87 @@ exports.dashboard = async (req, res) => {
   });
 };
 
-// --- Submission (link-based for now; production swaps this for a signed
-// object-storage upload URL per the architecture report §4.2) -------------
+// --- Confirm PG/group (one-time, optional) -------------------------------
+// Shown when a student's account already has a top-level Section but no
+// one has ever pinned down which sub-group/PG they're actually in — most
+// commonly because an admin created the account and assigned the Section
+// without knowing the PG split. This is a soft gate off the dashboard, not
+// a hard block: skipping it is a valid, permanent choice (sectionConfirmed
+// still flips to true), same as picking a group.
+
+async function loadMentorContact(studentProfile) {
+  // "Mentor" = the teacher who requested/approved this student's account.
+  // Falls back to null if there's no ApprovalRequest on file (e.g. an
+  // admin-created account with no approval flow), and the view shows a
+  // generic "contact your admin" message in that case.
+  const approval = await ApprovalRequest.findOne({
+    where: { studentId: studentProfile.id },
+    include: [{ model: TeacherProfile, as: "requestedTeacher", include: [User] }],
+  });
+  if (!approval || !approval.requestedTeacher || !approval.requestedTeacher.User) return null;
+  const u = approval.requestedTeacher.User;
+  return { name: `${u.firstName} ${u.lastName}`, email: u.email };
+}
+
+exports.showConfirmSection = async (req, res) => {
+  const studentProfile = await StudentProfile.findOne({
+    where: { userId: req.currentUser.id },
+    include: [Program, { model: Section, as: "currentSection" }],
+  });
+
+  if (!(await sectionNeedsConfirmation(studentProfile))) {
+    return res.redirect("/student/dashboard");
+  }
+
+  const subGroups = await getSubGroupsForCurrentSection(studentProfile);
+  const mentor = await loadMentorContact(studentProfile);
+
+  res.render("student/confirm-section", {
+    title: "Confirm Your Section",
+    studentProfile,
+    subGroups,
+    mentor,
+    error: null,
+    breadcrumbs: [ROOT, { label: "Confirm Your Section" }],
+  });
+};
+
+exports.confirmSection = async (req, res) => {
+  const studentProfile = await StudentProfile.findOne({
+    where: { userId: req.currentUser.id },
+    include: [Program, { model: Section, as: "currentSection" }],
+  });
+
+  if (!(await sectionNeedsConfirmation(studentProfile))) {
+    return res.redirect("/student/dashboard");
+  }
+
+  const subGroups = await getSubGroupsForCurrentSection(studentProfile);
+  const { subGroupId } = req.body;
+
+  if (subGroupId) {
+    const chosen = subGroups.find((g) => g.id === subGroupId);
+    if (!chosen) {
+      const mentor = await loadMentorContact(studentProfile);
+      return res.status(400).render("student/confirm-section", {
+        title: "Confirm Your Section",
+        studentProfile,
+        subGroups,
+        mentor,
+        error: "That group doesn't belong to your section. Please pick from the list, or skip for now.",
+        breadcrumbs: [ROOT, { label: "Confirm Your Section" }],
+      });
+    }
+    studentProfile.currentSectionId = subGroupId;
+  }
+
+  // Whether they picked a group or explicitly skipped, this is a settled,
+  // one-time decision — don't ask again on future logins.
+  studentProfile.sectionConfirmed = true;
+  await studentProfile.save();
+
+  res.redirect("/student/dashboard");
+};
 
 const { AssessmentStudentOverride } = require("../models");
 
@@ -206,6 +321,7 @@ exports.chooseSection = async (req, res) => {
   }
 
   studentProfile.currentSectionId = subGroupId || sectionId;
+  studentProfile.sectionConfirmed = true;
   await studentProfile.save();
 
   // If the student is already verified, auto-enroll them in active offerings now that section is set

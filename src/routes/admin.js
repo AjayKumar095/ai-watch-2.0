@@ -74,6 +74,7 @@ router.post("/programs/:id/specializations/new", programWorkspaceController.crea
 router.post("/programs/:id/specializations/:specId/edit", programWorkspaceController.updateSpecialization);
 router.post("/programs/:id/specializations/:specId/delete", programWorkspaceController.deleteSpecialization);
 router.post("/programs/:id/offerings/ensure", programWorkspaceController.ensureOffering);
+router.post("/programs/:id/offerings/toggle", programWorkspaceController.toggleOffering);
 router.post("/programs/:id/sections/new", programWorkspaceController.createSection);
 router.post("/programs/:id/sections/:sectionId/delete", programWorkspaceController.deleteSection);
 router.post("/programs/:id/subject-offerings/new", programWorkspaceController.createSubjectOffering);

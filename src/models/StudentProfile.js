@@ -17,6 +17,14 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "ACTIVE",
       },
       isVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
+      // False when the account (or its current section) was set up without
+      // the student ever confirming which sub-group/PG they belong to —
+      // e.g. an admin assigning a top-level Section at account-creation
+      // time without knowing the PG split. Drives the one-time "confirm
+      // your section" prompt in studentController.js. Set true either when
+      // the student explicitly picks a sub-group/skips via that prompt, or
+      // when they make their first self-service section choice.
+      sectionConfirmed: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
     { tableName: "student_profiles" }
   );
