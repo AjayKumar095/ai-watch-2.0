@@ -28,4 +28,8 @@ router.post("/submissions/:submissionId/evaluate", evaluationController.evaluate
 router.get("/assessments/:id/override", assessmentController.showOverride);
 router.post("/assessments/:id/override", assessmentController.applyOverride);
 
+router.get("/assessments/:id/edit", assessmentController.showEdit);
+router.post("/assessments/:id/edit", assessmentController.edit);
+router.post("/assessments/:id/delete", assessmentController.delete);
+
 module.exports = router;
