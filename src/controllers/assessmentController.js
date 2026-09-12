@@ -16,6 +16,9 @@ const {
   User,
 } = require("../models");
 const { notifyAssessmentCreated } = require("../services/notificationService");
+const fs = require("fs");
+const path = require("path");
+const { UPLOAD_DIR } = require("../middleware/submissionUpload");
 
 // <input type="datetime-local"> sends a NAIVE string with no timezone
 // offset (e.g. "2026-09-12T14:00"). Passing that straight to
@@ -30,10 +33,22 @@ const { notifyAssessmentCreated } = require("../services/notificationService");
 // as Asia/Kolkata wall-clock time explicitly, regardless of server TZ.
 // If a string somehow already carries an explicit offset/Z, trust it as-is.
 const INSTITUTION_UTC_OFFSET = "+05:30"; // Asia/Kolkata, no DST — update if the institution isn't IST
+const INSTITUTION_UTC_OFFSET_MINUTES = 5 * 60 + 30; // same offset, in minutes, for the reverse (display) direction below
 function toInstitutionUtc(value) {
   if (!value) return null;
   if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return new Date(value);
   return new Date(`${value}${INSTITUTION_UTC_OFFSET}`);
+}
+
+// Inverse of the above, for pre-filling a <input type="datetime-local">
+// with an existing UTC instant — shifts the epoch by the institution's
+// fixed offset, then reads the UTC-formatted digits of THAT shifted
+// instant, which are exactly the institution's local wall-clock digits.
+// This works correctly regardless of the server process's own timezone.
+function toInstitutionLocalInputValue(date) {
+  if (!date) return "";
+  const shifted = new Date(new Date(date).getTime() + INSTITUTION_UTC_OFFSET_MINUTES * 60 * 1000);
+  return shifted.toISOString().slice(0, 16);
 }
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
@@ -261,4 +276,125 @@ exports.applyOverride = async (req, res) => {
   }
 
   res.redirect(`/teacher/assessments`);
+};
+
+// ---------------------------------------------------------------------------
+// Edit — title, content, dates, and max marks. Deliberately does NOT let a
+// teacher change which sections/subject offering the assessment targets:
+// students may have already submitted or been notified against the
+// original targets, and reassigning sections after the fact could silently
+// orphan those submissions or notify the wrong cohort. To retarget, delete
+// and recreate instead.
+// ---------------------------------------------------------------------------
+exports.showEdit = async (req, res) => {
+  const assessment = await Assessment.findOne({
+    where: { id: req.params.id, createdById: req.currentUser.id },
+    include: [
+      { model: SubjectOffering, include: [SubjectPool, Program] },
+      { model: AssessmentSection, include: [Section] },
+    ],
+  });
+  if (!assessment) return res.redirect("/teacher/assessments");
+
+  res.render("teacher/assessments/edit", {
+    title: "Edit Assessment",
+    assessment,
+    error: null,
+    formData: {
+      title: assessment.title,
+      attachmentUrl: assessment.attachmentUrl,
+      startAt: toInstitutionLocalInputValue(assessment.startAt),
+      endAt: toInstitutionLocalInputValue(assessment.endAt),
+      maxMarks: assessment.maxMarks,
+    },
+    // Passed to the client as the BlockNote editor's initialContent, same
+    // as showCreate — pre-fills with the assessment's existing content.
+    initialDescriptionJson: JSON.stringify(assessment.description || null),
+    breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Edit" }],
+  });
+};
+
+exports.edit = async (req, res) => {
+  const assessment = await Assessment.findOne({
+    where: { id: req.params.id, createdById: req.currentUser.id },
+    include: [{ model: SubjectOffering, include: [SubjectPool, Program] }],
+  });
+  if (!assessment) return res.redirect("/teacher/assessments");
+
+  const { title, attachmentUrl, startAt, endAt, maxMarks, descriptionBlocks } = req.body;
+  const breadcrumbs = [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Edit" }];
+  const rerender = (error) =>
+    res.status(400).render("teacher/assessments/edit", {
+      title: "Edit Assessment",
+      assessment,
+      error,
+      formData: req.body,
+      initialDescriptionJson: JSON.stringify(assessment.description || null),
+      breadcrumbs,
+    });
+
+  if (!title || !startAt || !endAt || !maxMarks) {
+    return rerender("Please fill in all fields.");
+  }
+
+  let description = assessment.description;
+  if (descriptionBlocks) {
+    try {
+      description = JSON.parse(descriptionBlocks);
+    } catch (e) {
+      return rerender("Couldn't read the assessment content — please try again.");
+    }
+  }
+
+  assessment.title = title;
+  assessment.description = description || null;
+  assessment.attachmentUrl = attachmentUrl || null;
+  // Same timezone-safe parsing as create() and applyOverride() — editing
+  // through a plain naive datetime-local string would otherwise reintroduce
+  // the exact server-timezone-drift bug that was just fixed.
+  assessment.startAt = toInstitutionUtc(startAt);
+  assessment.endAt = toInstitutionUtc(endAt);
+  assessment.maxMarks = maxMarks;
+  await assessment.save();
+
+  res.redirect("/teacher/assessments");
+};
+
+// ---------------------------------------------------------------------------
+// Delete — removes the assessment and everything that depends on it:
+// submissions (and their uploaded files on disk), per-student override
+// windows, and the section-targeting rows. Confirmation that this is
+// destructive lives client-side (a confirm() on the Delete button in
+// teacher/assessments/index.ejs) — this handler assumes the teacher has
+// already agreed once the request reaches here.
+//
+// Dependent rows are deleted explicitly rather than relying solely on the
+// model association's onDelete: "CASCADE" option — several tables in this
+// app were set up via hand-written migrations (see the comment block in
+// models/TeacherSubjectMapping.js for a concrete example), so trusting
+// that the actual DB foreign key constraint matches what the Sequelize
+// association declares isn't safe without checking the real schema.
+// ---------------------------------------------------------------------------
+exports.delete = async (req, res) => {
+  const assessment = await Assessment.findOne({ where: { id: req.params.id, createdById: req.currentUser.id } });
+  if (!assessment) return res.redirect("/teacher/assessments");
+
+  const submissions = await Submission.findAll({ where: { assessmentId: assessment.id } });
+
+  for (const sub of submissions) {
+    if (Array.isArray(sub.attachments)) {
+      for (const att of sub.attachments) {
+        const filePath = path.join(UPLOAD_DIR, path.basename(att.url));
+        fs.unlink(filePath, () => {}); // best-effort — a missing file shouldn't block deletion
+      }
+    }
+  }
+
+  await Submission.destroy({ where: { assessmentId: assessment.id } });
+  await AssessmentSection.destroy({ where: { assessmentId: assessment.id } });
+  await AssessmentStudentOverride.destroy({ where: { assessmentId: assessment.id } });
+
+  await assessment.destroy();
+
+  res.redirect("/teacher/assessments");
 };

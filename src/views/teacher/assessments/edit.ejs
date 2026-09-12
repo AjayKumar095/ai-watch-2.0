@@ -1,0 +1,96 @@
+<div class="mx-auto mt-2 max-w-5xl">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-navy-900">Edit Assessment</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      <%= assessment.SubjectOffering.SubjectPool.name %> · <%= assessment.SubjectOffering.Program.name %> Sem <%= assessment.SubjectOffering.semesterNumber %>
+    </p>
+  </div>
+
+  <% if (error) { %>
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+  <% } %>
+
+  <form id="assessment-form" action="/teacher/assessments/<%= assessment.id %>/edit" method="POST" class="space-y-6">
+    <!-- Details -->
+    <div class="card">
+      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-circle-info text-info-500"></i> Details
+      </h2>
+      <div class="space-y-4">
+        <div>
+          <label class="form-label">Title</label>
+          <input class="form-input" name="title" value="<%= formData.title || '' %>" required placeholder="e.g. Week 3 Quiz" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="form-label">Opens</label>
+            <input class="form-input" type="datetime-local" name="startAt" value="<%= formData.startAt || '' %>" required />
+          </div>
+          <div>
+            <label class="form-label">Closes</label>
+            <input class="form-input" type="datetime-local" name="endAt" value="<%= formData.endAt || '' %>" required />
+          </div>
+          <div>
+            <label class="form-label">Max marks</label>
+            <input class="form-input" type="number" step="0.5" name="maxMarks" value="<%= formData.maxMarks || '' %>" required placeholder="e.g. 10" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Attachment URL (optional)</label>
+          <input class="form-input" name="attachmentUrl" value="<%= formData.attachmentUrl || '' %>" placeholder="https://..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="card">
+      <h2 class="mb-4 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-file-lines text-info-500"></i> Assessment Content
+      </h2>
+      <div id="assessment-editor" class="editor-shell overflow-hidden rounded-lg border border-navy-200"></div>
+      <input type="hidden" id="descriptionBlocks" name="descriptionBlocks" />
+      <p class="mt-2 text-xs text-navy-400">Use "/" inside the editor for headings, lists, images, code blocks, and more.</p>
+    </div>
+
+    <!-- Target sections — read-only. Retargeting isn't supported from
+         here: students may have already submitted or been notified
+         against the original targets. Delete and recreate instead if the
+         targets themselves need to change. -->
+    <div class="card">
+      <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <i class="fa-solid fa-bullseye text-info-500"></i> Target Sections
+      </h2>
+      <p class="mb-3 text-xs text-navy-400">
+        Not editable here — targeting is fixed once students may have already submitted. Delete and recreate this assessment if you need to change who it's assigned to.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <% assessment.AssessmentSections.forEach(function(as) { %>
+          <span class="badge-navy"><%= as.Section ? 'Section ' + as.Section.name : 'Unknown section' %></span>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <a href="/teacher/assessments" class="btn-secondary !px-6">Cancel</a>
+      <button type="submit" class="btn-primary !px-8">Save changes</button>
+    </div>
+  </form>
+</div>
+
+<link rel="stylesheet" href="/js/assessmentEditorEntry.css" />
+<script src="/js/assessmentEditorEntry.js"></script>
+<script>
+  (function () {
+    var initialContent = null;
+    try {
+      initialContent = JSON.parse(<%- JSON.stringify(initialDescriptionJson) %>);
+    } catch (e) {
+      initialContent = null;
+    }
+    var editorHandle = window.AssessmentEditorApp.mount("assessment-editor", initialContent);
+
+    document.getElementById("assessment-form").addEventListener("submit", function () {
+      document.getElementById("descriptionBlocks").value = JSON.stringify(editorHandle.getContent());
+    });
+  })();
+</script>

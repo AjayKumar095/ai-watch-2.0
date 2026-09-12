@@ -22,8 +22,26 @@
         <span class="badge-info"><%= c.total %> total</span>
         <a href="/teacher/assessments/<%= a.id %>/submissions" class="btn-secondary !px-3 !py-1.5 text-xs">View submissions</a>
         <a href="/teacher/assessments/<%= a.id %>/override" class="btn-ghost text-xs">Open for students</a>
+        <a href="/teacher/assessments/<%= a.id %>/edit" class="btn-ghost text-xs">Edit</a>
         <a href="/teacher/assessments/new?duplicateFrom=<%= a.id %>" class="btn-ghost text-xs">Duplicate</a>
+        <form action="/teacher/assessments/<%= a.id %>/delete" method="POST" class="delete-assessment-form" data-title="<%= a.title %>" data-total="<%= c.total %>">
+          <button type="submit" class="btn-ghost text-xs !text-amber-700">Delete</button>
+        </form>
       </div>
     </div>
   <% }) %>
 </div>
+
+<script>
+  document.querySelectorAll('.delete-assessment-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var title = form.dataset.title;
+      var total = form.dataset.total;
+      var message = 'Delete "' + title + '"? This also permanently deletes all ' + total +
+        ' student submission(s) for it, any files they uploaded, and per-student submission-window exceptions. This cannot be undone.';
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+  });
+</script>
