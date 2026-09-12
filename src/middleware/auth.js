@@ -1,6 +1,7 @@
 const { verifyAccessToken, verifyRefreshToken, hashToken } = require("../utils/jwt");
 const { User, TeacherProfile, StudentProfile, RefreshToken } = require("../models");
 const { rotateSession } = require("../services/sessionService");
+const { DASHBOARD_BY_ROLE } = require("../utils/roles");
 
 // Populates req.currentUser if a valid access token cookie is present —
 // and, if it's missing/expired, transparently falls back to the refresh
@@ -74,10 +75,17 @@ function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.currentUser) return res.redirect("/login");
     if (!roles.includes(req.currentUser.role)) {
-      return res.status(403).render("error", {
-        title: "Forbidden",
-        message: "You don't have permission to view this page.",
-      });
+      // Previously rendered a standalone "Forbidden" page — the access
+      // control itself was correct (this runs before any controller code,
+      // so nothing from the disallowed route ever actually executes), but
+      // landing on a bare 403 screen out of nowhere — especially after a
+      // silent 7-day auto-login — reads as alarming/broken even though
+      // nothing was leaked. Quietly send them back to the dashboard that
+      // actually belongs to their role instead, with a small explanation.
+      if (typeof req.flash === "function") {
+        req.flash("error", "You don't have access to that page.");
+      }
+      return res.redirect(DASHBOARD_BY_ROLE[req.currentUser.role] || "/login");
     }
     next();
   };

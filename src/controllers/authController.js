@@ -21,13 +21,8 @@ const {
   COOKIE_OPTS,
 } = require("../utils/jwt");
 const { issueSession, rotateSession } = require("../services/sessionService");
+const { DASHBOARD_BY_ROLE } = require("../utils/roles");
 const logger = require("../utils/logger");
-
-const DASHBOARD_BY_ROLE = {
-  SUPERADMIN: "/admin/dashboard",
-  TEACHER: "/teacher/dashboard",
-  STUDENT: "/student/dashboard",
-};
 
 // Student self-signup is restricted to the university's own email domain,
 // and roll numbers are a fixed 10 characters. Both are enforced here
