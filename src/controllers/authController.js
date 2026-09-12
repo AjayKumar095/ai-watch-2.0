@@ -29,6 +29,13 @@ const DASHBOARD_BY_ROLE = {
   STUDENT: "/student/dashboard",
 };
 
+// Student self-signup is restricted to the university's own email domain,
+// and roll numbers are a fixed 10 characters. Both are enforced here
+// server-side (the authoritative check) and mirrored client-side in
+// signup.ejs for instant feedback — never trust the client-side copy alone.
+const STUDENT_EMAIL_DOMAIN = "@geetauniversity.edu.in";
+const ROLL_NO_LENGTH = 10;
+
 exports.showLogin = (req, res) => {
   // A logged-in user landing on /login (stale bookmark, back button, a
   // session that's still valid, etc.) should never see the login form
@@ -175,6 +182,36 @@ exports.sectionsForProgram = async (req, res) => {
   res.json(sections);
 };
 
+// Public, unauthenticated — the signup form calls these on blur so a
+// student finds out their email/roll number is invalid or already taken
+// before filling out the rest of a 4-step form, instead of only at final
+// submit. These mirror the exact same rules enforced in studentSignup
+// below; that server-side check remains authoritative regardless of what
+// the client did or didn't call first.
+exports.checkEmailAvailability = async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email) return res.json({ valid: false, available: false, reason: "missing" });
+
+  if (!email.endsWith(STUDENT_EMAIL_DOMAIN)) {
+    return res.json({ valid: false, available: false, reason: "domain" });
+  }
+
+  const existing = await User.findOne({ where: { email } });
+  res.json({ valid: true, available: !existing, reason: existing ? "taken" : null });
+};
+
+exports.checkRollNoAvailability = async (req, res) => {
+  const rollNo = String(req.query.rollNo || "").trim();
+  if (!rollNo) return res.json({ valid: false, available: false, reason: "missing" });
+
+  if (rollNo.length !== ROLL_NO_LENGTH) {
+    return res.json({ valid: false, available: false, reason: "length" });
+  }
+
+  const existing = await StudentProfile.findOne({ where: { rollNo } });
+  res.json({ valid: true, available: !existing, reason: existing ? "taken" : null });
+};
+
 exports.studentSignup = async (req, res) => {
   const {
     email, firstName, lastName, rollNo, schoolId, programId, specializationId,
@@ -204,10 +241,20 @@ exports.studentSignup = async (req, res) => {
     return rerender("Please fill in all required fields.");
   }
 
-  const existing = await User.findOne({ where: { email } });
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.endsWith(STUDENT_EMAIL_DOMAIN)) {
+    return rerender(`Please sign up with your official university email address (must end with ${STUDENT_EMAIL_DOMAIN}).`);
+  }
+
+  const trimmedRollNo = rollNo.trim();
+  if (trimmedRollNo.length !== ROLL_NO_LENGTH) {
+    return rerender(`Roll number must be exactly ${ROLL_NO_LENGTH} characters (you entered ${trimmedRollNo.length}).`);
+  }
+
+  const existing = await User.findOne({ where: { email: normalizedEmail } });
   if (existing) return rerender("An account with this email already exists.");
 
-  const existingRoll = await StudentProfile.findOne({ where: { rollNo } });
+  const existingRoll = await StudentProfile.findOne({ where: { rollNo: trimmedRollNo } });
   if (existingRoll) return rerender("This roll number is already registered.");
 
   const requestedTeacher = await TeacherProfile.findOne({ where: { id: requestedTeacherId }, include: [User] });
@@ -221,7 +268,7 @@ exports.studentSignup = async (req, res) => {
   const passwordHash = await hashPassword(generateTempPassword());
 
   const user = await User.create({
-    email,
+    email: normalizedEmail,
     firstName,
     lastName,
     passwordHash,
@@ -231,7 +278,7 @@ exports.studentSignup = async (req, res) => {
 
   const studentProfile = await StudentProfile.create({
     userId: user.id,
-    rollNo,
+    rollNo: trimmedRollNo,
     programId,
     specializationId: specializationId || null,
     admissionYear: parseInt(admissionYear, 10),

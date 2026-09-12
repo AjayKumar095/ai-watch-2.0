@@ -11,6 +11,7 @@ const {
 } = require("../models");
 const { hashPassword } = require("../utils/password");
 const { distinctAdmissionYears } = require("../services/admissionYearService");
+const logger = require("../utils/logger");
 const crypto = require("crypto");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
@@ -249,7 +250,27 @@ exports.createMapping = async (req, res) => {
     ) {
       return rerender(err.message);
     }
-    throw err;
+
+    // A DB-level UNIQUE constraint rejected the insert even though our own
+    // conflict check upstream in teacherMappingService.js already approved
+    // it — almost always a stale unique index left over from before
+    // per-specialization mappings existed (see the comment block at the
+    // top of models/TeacherSubjectMapping.js, and the migration that drops
+    // it). Whatever the exact cause, never leave the admin looking at a
+    // bare crash with no explanation — log the real error for us instead.
+    if (err.name === "SequelizeUniqueConstraintError" || (err.original && err.original.code === "23505")) {
+      logger.error("Unique constraint hit creating a mapping the app-layer conflict check already approved — likely a stale DB index", {
+        subjectOfferingId, teacherId, sectionId, specializationIds, error: err.message,
+      });
+      return rerender(
+        "This mapping couldn't be saved due to a database rule that looks out of date — it should be allowed. Please try again; if it keeps happening, tell your developer (there may be a stale unique index on teacher_subject_mappings)."
+      );
+    }
+
+    logger.error("Unexpected error creating teacher mapping", {
+      subjectOfferingId, teacherId, sectionId, error: err.message, stack: err.stack,
+    });
+    return rerender("Something went wrong while saving this mapping. Please try again.", 500);
   }
 };
 

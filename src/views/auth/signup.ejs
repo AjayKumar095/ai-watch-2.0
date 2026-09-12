@@ -36,7 +36,18 @@
         </div>
         <div class="mt-4">
           <label class="form-label" for="email">Email</label>
-          <input class="form-input" type="email" id="email" name="email" value="<%= formData.email || '' %>" required />
+          <input
+            class="form-input"
+            type="email"
+            id="email"
+            name="email"
+            value="<%= formData.email || '' %>"
+            pattern=".+@geetauniversity\.edu\.in$"
+            title="Must be your official @geetauniversity.edu.in email address."
+            placeholder="you@geetauniversity.edu.in"
+            required
+          />
+          <p id="email-hint" class="mt-1 text-xs text-navy-400">Must be your official @geetauniversity.edu.in address.</p>
         </div>
         <p class="mt-3 text-xs text-navy-400">
           No password to set here — once your requested teacher approves your account, we'll email you a temporary login password.
@@ -81,7 +92,18 @@
         <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label class="form-label" for="rollNo">Roll number <span class="text-rose-500">*</span></label>
-            <input class="form-input" id="rollNo" name="rollNo" value="<%= formData.rollNo || '' %>" placeholder="e.g. 24BBA001" required />
+            <input
+              class="form-input"
+              id="rollNo"
+              name="rollNo"
+              value="<%= formData.rollNo || '' %>"
+              placeholder="Exactly 10 characters"
+              minlength="10"
+              maxlength="10"
+              title="Roll number must be exactly 10 characters."
+              required
+            />
+            <p id="rollno-hint" class="mt-1 text-xs text-navy-400">0/10 characters</p>
           </div>
           <div>
             <label class="form-label" for="admissionYear">Admission year <span class="text-rose-500">*</span></label>
@@ -381,6 +403,110 @@
     teacherCards.forEach(function (card) {
       card.addEventListener('click', function () { selectTeacher(card); });
       if (teacherInput.value && card.dataset.teacherId === teacherInput.value) selectTeacher(card);
+    });
+
+    // --- Live email/roll-number validation ---------------------------------
+    // Both fields use the native constraint API: setCustomValidity() marks
+    // the input invalid with a message the browser shows via
+    // reportValidity() — which validateStep() above already calls via
+    // checkValidity() on every "Continue" click. No changes needed there;
+    // these just feed it.
+    var EMAIL_DOMAIN = '@geetauniversity.edu.in';
+    var ROLL_NO_LENGTH = 10;
+
+    var emailInput = document.getElementById('email');
+    var emailHint = document.getElementById('email-hint');
+    var emailCheckToken = 0;
+
+    function setHint(el, text, tone) {
+      if (!el) return;
+      el.textContent = text;
+      el.classList.remove('text-amber-600', 'text-teal-600', 'text-navy-400');
+      el.classList.add(tone || 'text-navy-400');
+    }
+
+    function checkEmail() {
+      var val = emailInput.value.trim();
+      var myToken = ++emailCheckToken;
+
+      if (!val) {
+        emailInput.setCustomValidity('');
+        setHint(emailHint, 'Must be your official ' + EMAIL_DOMAIN + ' address.');
+        return;
+      }
+      if (val.toLowerCase().indexOf(EMAIL_DOMAIN) === -1 || val.toLowerCase().slice(-EMAIL_DOMAIN.length) !== EMAIL_DOMAIN) {
+        emailInput.setCustomValidity('Must be your official ' + EMAIL_DOMAIN + ' email address.');
+        setHint(emailHint, 'Must end with ' + EMAIL_DOMAIN, 'text-amber-600');
+        return;
+      }
+
+      setHint(emailHint, 'Checking availability…');
+      fetch('/api/check-email?email=' + encodeURIComponent(val))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (myToken !== emailCheckToken) return; // a newer check superseded this one
+          if (!data.available) {
+            emailInput.setCustomValidity('An account with this email already exists.');
+            setHint(emailHint, 'This email is already registered.', 'text-amber-600');
+          } else {
+            emailInput.setCustomValidity('');
+            setHint(emailHint, 'Looks good.', 'text-teal-600');
+          }
+        })
+        .catch(function () {
+          // Network hiccup — don't block the user over a failed availability
+          // check; the server re-validates on actual submit regardless.
+          emailInput.setCustomValidity('');
+        });
+    }
+
+    emailInput.addEventListener('blur', checkEmail);
+    emailInput.addEventListener('input', function () {
+      emailInput.setCustomValidity('');
+      setHint(emailHint, 'Must be your official ' + EMAIL_DOMAIN + ' address.');
+    });
+
+    var rollNoInput = document.getElementById('rollNo');
+    var rollNoHint = document.getElementById('rollno-hint');
+    var rollNoCheckToken = 0;
+
+    function checkRollNo() {
+      var val = rollNoInput.value.trim();
+      var myToken = ++rollNoCheckToken;
+
+      if (!val) {
+        rollNoInput.setCustomValidity('');
+        setHint(rollNoHint, '0/' + ROLL_NO_LENGTH + ' characters');
+        return;
+      }
+      if (val.length !== ROLL_NO_LENGTH) {
+        rollNoInput.setCustomValidity('Roll number must be exactly ' + ROLL_NO_LENGTH + ' characters.');
+        setHint(rollNoHint, val.length + '/' + ROLL_NO_LENGTH + ' characters', 'text-amber-600');
+        return;
+      }
+
+      setHint(rollNoHint, 'Checking availability…');
+      fetch('/api/check-rollno?rollNo=' + encodeURIComponent(val))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (myToken !== rollNoCheckToken) return;
+          if (!data.available) {
+            rollNoInput.setCustomValidity('This roll number is already registered.');
+            setHint(rollNoHint, 'This roll number is already registered.', 'text-amber-600');
+          } else {
+            rollNoInput.setCustomValidity('');
+            setHint(rollNoHint, 'Looks good.', 'text-teal-600');
+          }
+        })
+        .catch(function () {
+          rollNoInput.setCustomValidity('');
+        });
+    }
+
+    rollNoInput.addEventListener('blur', checkRollNo);
+    rollNoInput.addEventListener('input', function () {
+      rollNoInput.setCustomValidity('');
+      setHint(rollNoHint, rollNoInput.value.trim().length + '/' + ROLL_NO_LENGTH + ' characters');
     });
 
     showStep(1);

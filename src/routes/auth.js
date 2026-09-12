@@ -18,4 +18,7 @@ router.get("/api/programs/:programId/specializations", authController.specializa
 router.get("/api/programs/:programId/years/:admissionYear/sections", authController.sectionsForProgram);
 router.get("/api/programs/:programId/years/:admissionYear/semesters/:semesterNumber/sections", authController.sectionsForProgram);
 
+router.get("/api/check-email", authController.checkEmailAvailability);
+router.get("/api/check-rollno", authController.checkRollNoAvailability);
+
 module.exports = router;

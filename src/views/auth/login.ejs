@@ -14,10 +14,36 @@
       </div>
       <div>
         <label class="form-label" for="password">Password</label>
-        <input class="form-input" type="password" id="password" name="password" required />
+        <div class="relative">
+          <input class="form-input" style="padding-right: 2.5rem" type="password" id="password" name="password" required />
+          <button
+            type="button"
+            id="toggle-password"
+            class="absolute inset-y-0 right-0 flex items-center px-3 text-navy-400 hover:text-navy-600"
+            aria-label="Show password"
+            tabindex="-1"
+          >
+            <i class="fa-solid fa-eye" id="toggle-password-icon"></i>
+          </button>
+        </div>
       </div>
       <button type="submit" class="btn-primary w-full">Log in</button>
     </form>
+
+    <script>
+      (function () {
+        var toggleBtn = document.getElementById('toggle-password');
+        var pwInput = document.getElementById('password');
+        var icon = document.getElementById('toggle-password-icon');
+        toggleBtn.addEventListener('click', function () {
+          var showing = pwInput.type === 'text';
+          pwInput.type = showing ? 'password' : 'text';
+          icon.classList.toggle('fa-eye', showing);
+          icon.classList.toggle('fa-eye-slash', !showing);
+          toggleBtn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        });
+      })();
+    </script>
     <p class="mt-4 text-center text-sm text-navy-500">
       <a href="/forgot-password" class="font-medium text-navy-700 hover:text-amber-600">Forgot your password?</a>
     </p>

@@ -359,7 +359,44 @@ exports.createMapping = async (req, res) => {
     ) {
       return res.redirect(redirectTo + "&error=" + encodeURIComponent(err.message));
     }
-    throw err;
+
+    // A DB-level UNIQUE constraint rejected the insert even though our own
+    // conflict check upstream in teacherMappingService.js said this
+    // combination was fine — almost always a stale unique index left over
+    // from before per-specialization mappings existed (see
+    // models/TeacherSubjectMapping.js's comment block, and the migration
+    // that drops it). Whatever the exact cause, the admin should never see
+    // a bare crash here — log the real error for us, show them something
+    // they can act on.
+    if (err.name === "SequelizeUniqueConstraintError" || (err.original && err.original.code === "23505")) {
+      logger.error("Unique constraint hit creating a mapping the app-layer conflict check already approved — likely a stale DB index", {
+        subjectOfferingId: req.params.subjectOfferingId,
+        teacherId,
+        sectionId,
+        specializationIds,
+        error: err.message,
+      });
+      return res.redirect(
+        redirectTo +
+          "&error=" +
+          encodeURIComponent(
+            "This mapping couldn't be saved due to a database rule that looks out of date — it should be allowed. Please try again; if it keeps happening, tell your developer (there may be a stale unique index on teacher_subject_mappings)."
+          )
+      );
+    }
+
+    // Anything else unexpected — same principle: never leave the admin
+    // looking at a bare crash with no explanation.
+    logger.error("Unexpected error creating teacher mapping", {
+      subjectOfferingId: req.params.subjectOfferingId,
+      teacherId,
+      sectionId,
+      error: err.message,
+      stack: err.stack,
+    });
+    return res.redirect(
+      redirectTo + "&error=" + encodeURIComponent("Something went wrong while saving this mapping. Please try again.")
+    );
   }
 };
 
