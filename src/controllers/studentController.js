@@ -50,6 +50,38 @@ async function sectionNeedsConfirmation(studentProfile) {
   return subGroups.length > 0;
 }
 
+// Resolves this student's TOP-LEVEL section id and its subgroups,
+// regardless of whether currentSectionId currently points at that
+// top-level section itself or at one of its subgroups already. Used by the
+// persistent "set/change your group" control on the profile page — unlike
+// getSubGroupsForCurrentSection above (which is only for the one-time
+// onboarding gate and intentionally returns [] once a subgroup is picked),
+// this needs to keep working afterwards so the student can change their
+// mind later.
+async function getTopLevelSectionAndSubGroups(studentProfile) {
+  if (!studentProfile.currentSectionId) return { topLevelId: null, subGroups: [] };
+
+  const options = await sectionsFor({
+    programId: studentProfile.programId,
+    admissionYear: studentProfile.admissionYear,
+    semesterNumber: studentProfile.currentSemesterNumber,
+  });
+
+  const asTopLevel = options.find((s) => s.id === studentProfile.currentSectionId);
+  if (asTopLevel) return { topLevelId: asTopLevel.id, subGroups: asTopLevel.subGroups || [] };
+
+  for (const s of options) {
+    if ((s.subGroups || []).some((g) => g.id === studentProfile.currentSectionId)) {
+      return { topLevelId: s.id, subGroups: s.subGroups || [] };
+    }
+  }
+
+  // currentSectionId doesn't match anything sectionsFor currently returns
+  // for this cohort (e.g. a section from a differently-configured
+  // program/year) — nothing safe to offer.
+  return { topLevelId: null, subGroups: [] };
+}
+
 exports.dashboard = async (req, res) => {
   const studentProfile = await StudentProfile.findOne({
     where: { userId: req.currentUser.id },
@@ -274,10 +306,13 @@ exports.showProfile = async (req, res) => {
     });
   }
 
+  const { subGroups } = await getTopLevelSectionAndSubGroups(studentProfile);
+
   res.render("student/profile", {
     title: "My Profile",
     studentProfile,
     availableSections,
+    subGroups,
     error: null,
     breadcrumbs: [ROOT, { label: "My Profile" }],
   });
@@ -304,11 +339,13 @@ exports.chooseSection = async (req, res) => {
     semesterNumber: studentProfile.currentSemesterNumber,
   });
 
-  const rerender = (error) =>
-    res.status(400).render("student/profile", {
-      title: "My Profile", studentProfile, availableSections, error,
+  const rerender = async (error) => {
+    const { subGroups } = await getTopLevelSectionAndSubGroups(studentProfile);
+    return res.status(400).render("student/profile", {
+      title: "My Profile", studentProfile, availableSections, subGroups, error,
       breadcrumbs: [ROOT, { label: "My Profile" }],
     });
+  };
 
   if (!sectionId) return rerender("Please select a section.");
 
@@ -332,6 +369,58 @@ exports.chooseSection = async (req, res) => {
       // Log and continue
     }
   }
+
+  res.redirect("/student/profile");
+};
+
+// --- Set/change group from the profile page (persistent, not one-time) --
+// Unlike confirmSection (the one-time onboarding gate) and chooseSection
+// (only for a student with NO section yet), this is always available once
+// a section with subgroups exists — a student can come back and change
+// their mind, e.g. if they picked the wrong PG the first time.
+exports.updateSubGroup = async (req, res) => {
+  const studentProfile = await StudentProfile.findOne({
+    where: { userId: req.currentUser.id },
+    include: [Program, { model: Section, as: "currentSection" }],
+  });
+
+  const { topLevelId, subGroups } = await getTopLevelSectionAndSubGroups(studentProfile);
+
+  const rerender = async (error) => {
+    let availableSections = [];
+    if (!studentProfile.currentSectionId) {
+      availableSections = await sectionsFor({
+        programId: studentProfile.programId,
+        admissionYear: studentProfile.admissionYear,
+        semesterNumber: studentProfile.currentSemesterNumber,
+      });
+    }
+    return res.status(400).render("student/profile", {
+      title: "My Profile", studentProfile, availableSections, subGroups, error,
+      breadcrumbs: [ROOT, { label: "My Profile" }],
+    });
+  };
+
+  if (!subGroups.length) {
+    return rerender("Your section doesn't have any groups set up right now.");
+  }
+
+  const { subGroupId } = req.body;
+
+  if (!subGroupId) {
+    // "None" — revert to the plain top-level section.
+    if (!topLevelId) return rerender("Couldn't resolve your section. Please contact your mentor.");
+    studentProfile.currentSectionId = topLevelId;
+  } else {
+    const chosen = subGroups.find((g) => g.id === subGroupId);
+    if (!chosen) return rerender("That group doesn't belong to your section.");
+    studentProfile.currentSectionId = subGroupId;
+  }
+
+  // An explicit choice here always counts as "confirmed" too, in case this
+  // student still had the one-time confirm-section prompt pending.
+  studentProfile.sectionConfirmed = true;
+  await studentProfile.save();
 
   res.redirect("/student/profile");
 };

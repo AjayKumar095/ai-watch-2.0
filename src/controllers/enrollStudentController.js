@@ -15,6 +15,7 @@ const { hashPassword, generateTempPassword } = require("../utils/password");
 const { notifyApprovalDecision } = require("../services/notificationService");
 const { enrollStudentInOfferings } = require("../services/enrollmentService");
 const { getActiveAcademicYears, getDefaultAcademicYear } = require("../services/admissionYearService");
+const { STUDENT_EMAIL_DOMAIN, ROLL_NO_LENGTH, isValidStudentEmail, isValidRollNo } = require("../utils/studentValidation");
 const logger = require("../utils/logger");
 
 function getBreadcrumbs(req, label) {
@@ -126,6 +127,16 @@ exports.singleEnroll = async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedRoll = rollNo.trim();
+
+  if (!isValidStudentEmail(normalizedEmail)) {
+    req.flash("error", `Email must be a university address ending in ${STUDENT_EMAIL_DOMAIN}.`);
+    return res.redirect(`${basePath}/enroll?tab=single`);
+  }
+
+  if (!isValidRollNo(normalizedRoll)) {
+    req.flash("error", `Roll number must be exactly ${ROLL_NO_LENGTH} characters (got ${normalizedRoll.length}).`);
+    return res.redirect(`${basePath}/enroll?tab=single`);
+  }
 
   // Validate uniqueness
   const existingUser = await User.findOne({ where: { email: normalizedEmail } });
@@ -252,6 +263,16 @@ exports.bulkEnroll = async (req, res) => {
 
     if (!email || !rollNo) {
       skipped.push({ email: email || "(blank)", rollNo: rollNo || "(blank)", reason: "Missing email or roll number" });
+      continue;
+    }
+
+    if (!isValidStudentEmail(email)) {
+      skipped.push({ email, rollNo, reason: `Invalid email — must end with ${STUDENT_EMAIL_DOMAIN}` });
+      continue;
+    }
+
+    if (!isValidRollNo(rollNo)) {
+      skipped.push({ email, rollNo, reason: `Roll number must be exactly ${ROLL_NO_LENGTH} characters (got ${rollNo.length})` });
       continue;
     }
 

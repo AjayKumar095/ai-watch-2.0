@@ -26,6 +26,27 @@
         You're in <strong><%= studentProfile.currentSection.name %></strong>.
       </p>
       <p class="mt-1 text-xs text-navy-400">To change sections, ask your teacher or admin — this isn't self-service once set, since it affects your enrollments and assignments.</p>
+
+      <% if (subGroups && subGroups.length) { %>
+        <div class="mt-4 border-t border-navy-100 pt-4">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-navy-400">Your Group / PG</h3>
+          <p class="mt-1 text-sm text-navy-500">
+            Unlike your section, your group is self-service — set it now or change it anytime if you picked the wrong one.
+          </p>
+
+          <% if (error) { %><div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div><% } %>
+
+          <form action="/student/profile/group" method="POST" class="mt-3 flex flex-wrap items-center gap-2">
+            <select class="form-input !w-auto flex-1" name="subGroupId">
+              <option value="">None / not applicable</option>
+              <% subGroups.forEach(function(g) { %>
+                <option value="<%= g.id %>" <%= studentProfile.currentSectionId === g.id ? 'selected' : '' %>><%= g.name %></option>
+              <% }) %>
+            </select>
+            <button type="submit" class="btn-secondary !px-4 !py-2 text-sm">Save</button>
+          </form>
+        </div>
+      <% } %>
     <% } else { %>
       <p class="mt-1 text-sm text-navy-500">You haven't been placed in a section yet — pick one if it's set up, or check back later.</p>
 

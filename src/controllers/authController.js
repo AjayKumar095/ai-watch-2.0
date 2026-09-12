@@ -23,13 +23,7 @@ const {
 const { issueSession, rotateSession } = require("../services/sessionService");
 const { DASHBOARD_BY_ROLE } = require("../utils/roles");
 const logger = require("../utils/logger");
-
-// Student self-signup is restricted to the university's own email domain,
-// and roll numbers are a fixed 10 characters. Both are enforced here
-// server-side (the authoritative check) and mirrored client-side in
-// signup.ejs for instant feedback — never trust the client-side copy alone.
-const STUDENT_EMAIL_DOMAIN = "@geetauniversity.edu.in";
-const ROLL_NO_LENGTH = 10;
+const { STUDENT_EMAIL_DOMAIN, ROLL_NO_LENGTH, isValidStudentEmail, isValidRollNo } = require("../utils/studentValidation");
 
 exports.showLogin = (req, res) => {
   // A logged-in user landing on /login (stale bookmark, back button, a

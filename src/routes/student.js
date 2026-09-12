@@ -9,6 +9,7 @@ router.get("/profile", studentController.showProfile);
 router.post("/profile/section", studentController.chooseSection);
 router.get("/assessments/:id", studentController.showAssessment);
 router.post("/assessments/:id/submit", studentController.submitAssessment);
+router.post("/profile/group", studentController.updateSubGroup);
 
 router.get("/confirm-section", studentController.showConfirmSection);
 router.post("/confirm-section", studentController.confirmSection);
