@@ -5,7 +5,7 @@
 const { sendTemplateMail } = require("../plugins/mailer");
 const logger = require("../utils/logger");
 
-const APP_URL = process.env.APP_URL || "http://localhost:3000";
+const APP_URL = process.env. || "http://localhost:3000";
 
 async function safeSend(args) {
   try {
