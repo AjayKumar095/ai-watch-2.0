@@ -17,6 +17,9 @@ const { visibleSectionIdsForStudent } = require("../services/sectionScope");
 const { sectionsFor } = require("../services/sectionLookupService");
 const { enrollStudentInOfferings } = require("../services/enrollmentService");
 const renderBlocks = require("../utils/renderBlocks");
+const fs = require("fs");
+const path = require("path");
+const { UPLOAD_DIR, MAX_TOTAL_BYTES } = require("../middleware/submissionUpload");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 
@@ -245,7 +248,7 @@ exports.showAssessment = async (req, res) => {
 
   const descriptionHtml = Array.isArray(assessment.description) ? renderBlocks(assessment.description) : "";
 
-  res.render("student/assessment-detail", { title: assessment.title, assessment, descriptionHtml, enrollment, existingSubmission, override, error: null, breadcrumbs: [ROOT, { label: assessment.title }] });
+  res.render("student/assessment-detail", { title: assessment.title, assessment, descriptionHtml, enrollment, existingSubmission, override, error: req.query.error || null, breadcrumbs: [ROOT, { label: assessment.title }] });
 };
 
 exports.submitAssessment = async (req, res) => {
@@ -271,16 +274,76 @@ exports.submitAssessment = async (req, res) => {
     return res.status(403).render("error", { title: "Not yet open", message: "This assessment isn't open for submissions yet." });
   }
 
-  const isLate = now > windowEnd;
+  // Previously nothing ever blocked a late submission here — isLate was
+  // computed but never checked, so every student could submit at any time
+  // forever, override or not. That silently made the whole "open this
+  // assessment for selected students after the deadline" override feature
+  // a no-op, since everyone already had unlimited late access anyway. Now
+  // the deadline (or a student's overridden window) is actually enforced.
+  if (now > windowEnd) {
+    return res.status(403).render("error", {
+      title: "Submission window closed",
+      message: "This assessment's submission window has closed. If you need to submit late, ask your teacher to open an exception for you.",
+    });
+  }
+
+  // isLate is tracked against the assessment's REAL deadline, not the
+  // (possibly extended) override window — so a submission let through via
+  // an override still shows as "late" in the teacher's records, which is
+  // the whole point of an override existing rather than just moving the
+  // deadline for everyone.
+  const isLate = now > new Date(assessment.endAt);
 
   const { url, description } = req.body;
+  const uploadedFiles = req.files || [];
+
+  // Multer only enforces a PER-FILE size cap — the "5MB single or
+  // combined" requirement needs this explicit combined check.
+  const totalBytes = uploadedFiles.reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_TOTAL_BYTES) {
+    uploadedFiles.forEach((f) => fs.unlink(f.path, () => {})); // clean up what multer already wrote to disk
+    return res.redirect(
+      `/student/assessments/${assessment.id}?error=` +
+        encodeURIComponent(`Attached files total ${(totalBytes / (1024 * 1024)).toFixed(1)}MB — the combined limit is 5MB.`)
+    );
+  }
+
+  // Resubmitting REPLACES the whole submission, not merges with it: any
+  // previously attached files are superseded, so delete them from disk.
+  // Also explicitly clear marksObtained/remarks/evaluatedById — previously
+  // these were left STALE after a resubmission (status reset to PENDING,
+  // but Sequelize's upsert() only touches the columns you pass it, so old
+  // marks/remarks from a prior evaluation silently stuck around on a
+  // "pending" submission). The actual warning about losing the previous
+  // file/grade is a client-side confirm() in assessment-detail.ejs, shown
+  // before this request is ever sent.
+  const existingSubmission = await Submission.findOne({
+    where: { assessmentId: assessment.id, studentId: studentProfile.id },
+  });
+  if (existingSubmission && Array.isArray(existingSubmission.attachments)) {
+    existingSubmission.attachments.forEach((att) => {
+      const filePath = path.join(UPLOAD_DIR, path.basename(att.url));
+      fs.unlink(filePath, () => {}); // best-effort — a missing file shouldn't block resubmission
+    });
+  }
+
+  const attachments = uploadedFiles.map((f) => ({
+    url: `/uploads/submissions/${f.filename}`,
+    originalName: f.originalname,
+    size: f.size,
+  }));
+
   await Submission.upsert({
     assessmentId: assessment.id,
     studentId: studentProfile.id,
     sectionId: enrollment.sectionId,
     url: url || null,
     description: description || null,
+    attachments: attachments.length ? attachments : null,
     status: "PENDING",
+    marksObtained: null,
+    remarks: null,
+    evaluatedById: null,
     submittedAt: now,
     isLate,
   });

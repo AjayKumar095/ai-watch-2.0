@@ -9,6 +9,13 @@ module.exports = (sequelize, DataTypes) => {
       fileUrl: { type: DataTypes.STRING, allowNull: true },
       url: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
+      // Array of { url, originalName, size } — one entry per uploaded
+      // file (PDF/Word/PowerPoint, 5MB combined max, enforced in
+      // middleware/submissionUpload.js + studentController.submitAssessment).
+      // Kept separate from the older single fileUrl column rather than
+      // reusing it, since fileUrl was never actually wired up to anything
+      // and multi-file support needs an array either way.
+      attachments: { type: DataTypes.JSON, allowNull: true },
       status: {
         type: DataTypes.ENUM("PENDING", "REJECTED", "EVALUATED"),
         allowNull: false,

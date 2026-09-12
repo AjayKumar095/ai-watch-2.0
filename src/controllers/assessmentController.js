@@ -17,6 +17,25 @@ const {
 } = require("../models");
 const { notifyAssessmentCreated } = require("../services/notificationService");
 
+// <input type="datetime-local"> sends a NAIVE string with no timezone
+// offset (e.g. "2026-09-12T14:00"). Passing that straight to
+// Assessment.create() lets it get parsed using whatever timezone the
+// SERVER PROCESS happens to be running in — not necessarily India time —
+// which silently shifts the stored instant by hours depending on
+// deployment. That's what caused startAt/endAt to drift from what the
+// teacher actually entered, which then surfaced as students seeing a
+// "Not yet open" 403 even when the displayed window looked correct (the
+// display was converting that same already-wrong stored value back to
+// their local time). Fix: always interpret naive datetime-local strings
+// as Asia/Kolkata wall-clock time explicitly, regardless of server TZ.
+// If a string somehow already carries an explicit offset/Z, trust it as-is.
+const INSTITUTION_UTC_OFFSET = "+05:30"; // Asia/Kolkata, no DST — update if the institution isn't IST
+function toInstitutionUtc(value) {
+  if (!value) return null;
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return new Date(value);
+  return new Date(`${value}${INSTITUTION_UTC_OFFSET}`);
+}
+
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
 const ASSESSMENTS = { label: "Assessments", url: "/teacher/assessments" };
 
@@ -171,8 +190,8 @@ exports.create = async (req, res) => {
       title,
       description: description || null,
       attachmentUrl: attachmentUrl || null,
-      startAt,
-      endAt,
+      startAt: toInstitutionUtc(startAt),
+      endAt: toInstitutionUtc(endAt),
       maxMarks,
       isActive: true,
     });
@@ -229,13 +248,15 @@ exports.applyOverride = async (req, res) => {
   let studentIds = req.body.studentIds || [];
   if (!Array.isArray(studentIds)) studentIds = [studentIds];
   const { startAt, endAt } = req.body;
+  const overrideStartAt = toInstitutionUtc(startAt);
+  const overrideEndAt = toInstitutionUtc(endAt);
 
   for (const studentId of studentIds) {
     await AssessmentStudentOverride.upsert({
       assessmentId: assessment.id,
       studentId,
-      startAt: startAt || null,
-      endAt: endAt || null,
+      startAt: overrideStartAt,
+      endAt: overrideEndAt,
     });
   }
 

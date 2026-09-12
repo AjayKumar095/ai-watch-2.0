@@ -63,7 +63,27 @@
           <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
         <% } %>
 
-        <form action="/student/assessments/<%= assessment.id %>/submit" method="POST" class="space-y-4">
+        <% if (existingSubmission && Array.isArray(existingSubmission.attachments) && existingSubmission.attachments.length) { %>
+          <div class="mb-3 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
+            <p class="mb-1 text-xs font-medium text-navy-500">Currently attached:</p>
+            <ul class="space-y-0.5 text-xs">
+              <% existingSubmission.attachments.forEach(function(att) { %>
+                <li>
+                  <a href="<%= att.url %>" target="_blank" rel="noopener" class="text-info-600 hover:underline"><%= att.originalName %></a>
+                  <span class="text-navy-400">(<%= (att.size / (1024 * 1024)).toFixed(2) %> MB)</span>
+                </li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+
+        <form
+          id="submission-form"
+          action="/student/assessments/<%= assessment.id %>/submit"
+          method="POST"
+          enctype="multipart/form-data"
+          class="space-y-4"
+        >
           <div>
             <label class="form-label">Submission link (Drive/GitHub/etc.)</label>
             <input class="form-input" name="url" value="<%= existingSubmission ? existingSubmission.url || '' : '' %>" placeholder="https://..." />
@@ -72,10 +92,86 @@
             <label class="form-label">Notes</label>
             <textarea class="form-input" name="description" rows="4"><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
           </div>
-          <button type="submit" class="btn-primary w-full"><%= existingSubmission ? 'Update submission' : 'Submit' %></button>
+          <div>
+            <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>
+            <input
+              id="submission-attachments"
+              class="form-input !py-2 text-sm"
+              type="file"
+              name="attachments"
+              multiple
+              accept=".pdf,.doc,.docx,.ppt,.pptx"
+            />
+            <p id="attachments-hint" class="mt-1 text-xs text-navy-400">Uploading new files replaces any currently attached ones.</p>
+          </div>
+          <button type="submit" id="submit-btn" class="btn-primary w-full"><%= existingSubmission ? 'Update submission' : 'Submit' %></button>
         </form>
       </div>
     </div>
+
+    <script>
+      (function () {
+        var form = document.getElementById('submission-form');
+        var fileInput = document.getElementById('submission-attachments');
+        var hint = document.getElementById('attachments-hint');
+        var submitBtn = document.getElementById('submit-btn');
+        var MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx'];
+        var hasExistingSubmission = <%- JSON.stringify(!!existingSubmission) %>;
+        var wasEvaluated = <%- JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
+
+        function extOf(name) {
+          var i = name.lastIndexOf('.');
+          return i === -1 ? '' : name.slice(i).toLowerCase();
+        }
+
+        // Client-side validation is instant feedback only — the server
+        // (middleware/submissionUpload.js + studentController.submitAssessment)
+        // re-validates both the extension allow-list and the combined 5MB
+        // limit regardless of what happens here.
+        fileInput.addEventListener('change', function () {
+          var files = Array.prototype.slice.call(fileInput.files);
+          var total = files.reduce(function (sum, f) { return sum + f.size; }, 0);
+          var badFile = files.find(function (f) { return ALLOWED_EXTENSIONS.indexOf(extOf(f.name)) === -1; });
+
+          if (badFile) {
+            hint.textContent = '"' + badFile.name + '" isn\'t an allowed type — only PDF, Word, and PowerPoint files are accepted.';
+            hint.classList.add('text-amber-600');
+            fileInput.setCustomValidity('Remove or replace the disallowed file.');
+            return;
+          }
+          if (total > MAX_TOTAL_BYTES) {
+            hint.textContent = 'Total ' + (total / (1024 * 1024)).toFixed(1) + 'MB — the combined limit is 5MB.';
+            hint.classList.add('text-amber-600');
+            fileInput.setCustomValidity('Files exceed the 5MB combined limit.');
+            return;
+          }
+
+          fileInput.setCustomValidity('');
+          hint.classList.remove('text-amber-600');
+          hint.textContent = files.length
+            ? files.length + ' file(s) selected, ' + (total / (1024 * 1024)).toFixed(2) + 'MB total.'
+            : 'Uploading new files replaces any currently attached ones.';
+        });
+
+        form.addEventListener('submit', function (e) {
+          if (hasExistingSubmission) {
+            var message = wasEvaluated
+              ? 'Resubmitting will delete your previous submission and its file(s), AND clear the marks/remarks already given for it. Continue?'
+              : 'Resubmitting will replace your previous submission and its file(s). Continue?';
+            if (!confirm(message)) {
+              e.preventDefault();
+              return;
+            }
+          }
+
+          // Disable + relabel to prevent a double submit while the
+          // (potentially slow, file-upload) request is in flight.
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Submitting…';
+        });
+      })();
+    </script>
   </div>
 </div>
 
