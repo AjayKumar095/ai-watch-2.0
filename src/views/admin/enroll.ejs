@@ -73,32 +73,11 @@
           </div>
           <div>
             <label class="form-label" for="single-email">Email Address <span class="text-rose-500">*</span></label>
-            <input
-              type="email"
-              id="single-email"
-              name="email"
-              class="form-input"
-              placeholder="student@geetauniversity.edu.in"
-              pattern=".+@geetauniversity\.edu\.in$"
-              title="Must be a @geetauniversity.edu.in address."
-              required
-            />
-            <p id="single-email-hint" class="mt-1 text-xs text-navy-400">Must end with @geetauniversity.edu.in.</p>
+            <input type="email" id="single-email" name="email" class="form-input" placeholder="student@example.com" required />
           </div>
           <div>
             <label class="form-label" for="single-rollNo">Roll Number <span class="text-rose-500">*</span></label>
-            <input
-              type="text"
-              id="single-rollNo"
-              name="rollNo"
-              class="form-input"
-              placeholder="Exactly 10 characters"
-              minlength="10"
-              maxlength="10"
-              title="Roll number must be exactly 10 characters."
-              required
-            />
-            <p id="single-rollno-hint" class="mt-1 text-xs text-navy-400">0/10 characters</p>
+            <input type="text" id="single-rollNo" name="rollNo" class="form-input" placeholder="e.g. 24BBA001" required />
           </div>
         </div>
       </div>
@@ -117,6 +96,14 @@
                   <%= p.name %> (<%= p.code %>) <%= p.School ? '— ' + p.School.name : '' %>
                 </option>
               <% }) %>
+            </select>
+          </div>
+
+          <!-- Specialization (Dynamic, Optional) -->
+          <div class="sm:col-span-2">
+            <label class="form-label" for="single-specializationId">Specialization (Optional)</label>
+            <select id="single-specializationId" name="specializationId" class="form-input">
+              <option value="">Select a program first</option>
             </select>
           </div>
 
@@ -260,6 +247,15 @@
             </select>
           </div>
 
+          <!-- Specialization (Dynamic, Optional) — applies to the whole
+               CSV batch, same as Section/Sub-Group below. -->
+          <div class="sm:col-span-2">
+            <label class="form-label" for="bulk-specializationId">Specialization (Optional)</label>
+            <select id="bulk-specializationId" name="specializationId" class="form-input">
+              <option value="">Select a program first</option>
+            </select>
+          </div>
+
           <!-- Admission Year -->
           <div>
             <label class="form-label" for="bulk-admissionYear">Admission Year <span class="text-rose-500">*</span></label>
@@ -341,10 +337,6 @@
             ></textarea>
             <p class="text-[11px] text-navy-400 mt-1">
               Required headers: <code>email</code> and <code>rollNo</code>. Optional: <code>firstName</code>, <code>lastName</code>.
-            </p>
-            <p class="text-[11px] text-amber-600 mt-1">
-              <i class="fa-solid fa-circle-info mr-1"></i>
-              Rows are skipped (not the whole upload) if the email isn't a @geetauniversity.edu.in address, the roll number isn't exactly 10 characters, or either is already registered — see the skipped-rows list below after uploading.
             </p>
           </div>
         </div>
@@ -428,6 +420,7 @@
     var programSelect = document.getElementById(prefix + '-programId');
     var yearSelect = document.getElementById(prefix + '-admissionYear');
     var semesterSelect = document.getElementById(prefix + '-semesterNumber');
+    var specializationSelect = document.getElementById(prefix + '-specializationId');
     var sectionSelect = document.getElementById(prefix + '-sectionId');
     var subGroupWrapper = document.getElementById(prefix + '-subgroup-wrapper');
     var subGroupSelect = document.getElementById(prefix + '-subGroupId');
@@ -447,6 +440,35 @@
         if (String(i) === String(curVal)) opt.selected = true;
         semesterSelect.appendChild(opt);
       }
+    }
+
+    // Reuses the same public endpoint signup.ejs already calls for its
+    // Program -> Specialization cascade — a program with none configured
+    // just yields an empty list, which collapses back to "None" (skip),
+    // same as sections with no sub-groups.
+    function refreshSpecializations() {
+      var programId = programSelect.value;
+      specializationSelect.innerHTML = '<option value="">Loading specializations...</option>';
+
+      if (!programId) {
+        specializationSelect.innerHTML = '<option value="">Select a program first</option>';
+        return;
+      }
+
+      fetch('/api/programs/' + programId + '/specializations')
+        .then(function(r) { return r.json(); })
+        .then(function(specializations) {
+          specializationSelect.innerHTML = '<option value="">None / Not applicable</option>';
+          (specializations || []).forEach(function(sp) {
+            var opt = document.createElement('option');
+            opt.value = sp.id;
+            opt.textContent = sp.name;
+            specializationSelect.appendChild(opt);
+          });
+        })
+        .catch(function() {
+          specializationSelect.innerHTML = '<option value="">Error loading specializations — leave as none</option>';
+        });
     }
 
     function refreshSections() {
@@ -513,6 +535,7 @@
 
     programSelect.addEventListener('change', function() {
       updateSemesters();
+      refreshSpecializations();
       refreshSections();
     });
     yearSelect.addEventListener('change', refreshSections);
@@ -522,109 +545,11 @@
     // Initial trigger if program is pre-selected
     if (programSelect.value) {
       updateSemesters();
+      refreshSpecializations();
       refreshSections();
     }
   }
 
   setupHierarchySync('single');
   setupHierarchySync('bulk');
-
-  // --- Live email/roll-number validation (single-enroll tab only — bulk
-  // rows are validated server-side per-row and reported in the skipped
-  // list, since there's no single field to check live there). Same
-  // setCustomValidity() pattern as the student self-signup form, reusing
-  // the same public /api/check-email and /api/check-rollno endpoints.
-  (function () {
-    var EMAIL_DOMAIN = '@geetauniversity.edu.in';
-    var ROLL_NO_LENGTH = 10;
-
-    var emailInput = document.getElementById('single-email');
-    var emailHint = document.getElementById('single-email-hint');
-    var emailCheckToken = 0;
-
-    function setHint(el, text, tone) {
-      if (!el) return;
-      el.textContent = text;
-      el.classList.remove('text-amber-600', 'text-teal-600', 'text-navy-400');
-      el.classList.add(tone || 'text-navy-400');
-    }
-
-    function checkEmail() {
-      var val = emailInput.value.trim();
-      var myToken = ++emailCheckToken;
-
-      if (!val) {
-        emailInput.setCustomValidity('');
-        setHint(emailHint, 'Must end with ' + EMAIL_DOMAIN + '.');
-        return;
-      }
-      if (val.toLowerCase().slice(-EMAIL_DOMAIN.length) !== EMAIL_DOMAIN) {
-        emailInput.setCustomValidity('Must be a ' + EMAIL_DOMAIN + ' address.');
-        setHint(emailHint, 'Must end with ' + EMAIL_DOMAIN, 'text-amber-600');
-        return;
-      }
-
-      setHint(emailHint, 'Checking availability…');
-      fetch('/api/check-email?email=' + encodeURIComponent(val))
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (myToken !== emailCheckToken) return;
-          if (!data.available) {
-            emailInput.setCustomValidity('An account with this email already exists.');
-            setHint(emailHint, 'This email is already registered.', 'text-amber-600');
-          } else {
-            emailInput.setCustomValidity('');
-            setHint(emailHint, 'Looks good.', 'text-teal-600');
-          }
-        })
-        .catch(function () { emailInput.setCustomValidity(''); });
-    }
-
-    emailInput.addEventListener('blur', checkEmail);
-    emailInput.addEventListener('input', function () {
-      emailInput.setCustomValidity('');
-      setHint(emailHint, 'Must end with ' + EMAIL_DOMAIN + '.');
-    });
-
-    var rollNoInput = document.getElementById('single-rollNo');
-    var rollNoHint = document.getElementById('single-rollno-hint');
-    var rollNoCheckToken = 0;
-
-    function checkRollNo() {
-      var val = rollNoInput.value.trim();
-      var myToken = ++rollNoCheckToken;
-
-      if (!val) {
-        rollNoInput.setCustomValidity('');
-        setHint(rollNoHint, '0/' + ROLL_NO_LENGTH + ' characters');
-        return;
-      }
-      if (val.length !== ROLL_NO_LENGTH) {
-        rollNoInput.setCustomValidity('Roll number must be exactly ' + ROLL_NO_LENGTH + ' characters.');
-        setHint(rollNoHint, val.length + '/' + ROLL_NO_LENGTH + ' characters', 'text-amber-600');
-        return;
-      }
-
-      setHint(rollNoHint, 'Checking availability…');
-      fetch('/api/check-rollno?rollNo=' + encodeURIComponent(val))
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (myToken !== rollNoCheckToken) return;
-          if (!data.available) {
-            rollNoInput.setCustomValidity('This roll number is already registered.');
-            setHint(rollNoHint, 'This roll number is already registered.', 'text-amber-600');
-          } else {
-            rollNoInput.setCustomValidity('');
-            setHint(rollNoHint, 'Looks good.', 'text-teal-600');
-          }
-        })
-        .catch(function () { rollNoInput.setCustomValidity(''); });
-    }
-
-    rollNoInput.addEventListener('blur', checkRollNo);
-    rollNoInput.addEventListener('input', function () {
-      rollNoInput.setCustomValidity('');
-      setHint(rollNoHint, rollNoInput.value.trim().length + '/' + ROLL_NO_LENGTH + ' characters');
-    });
-  })();
 </script>
