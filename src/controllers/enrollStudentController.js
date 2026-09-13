@@ -69,6 +69,18 @@ exports.showEnrollPage = async (req, res) => {
   const isTeacher = req.currentUser.role === "TEACHER";
   const basePath = isTeacher ? "/teacher" : "/admin";
 
+  // Bulk results are stashed in the session by bulkEnroll and read
+  // (then immediately cleared) here — this is the Post-Redirect-Get
+  // pattern. Previously bulkEnroll rendered the results directly as the
+  // POST response itself, which meant reloading the page silently
+  // RE-SUBMITTED the exact same CSV upload (browsers resend the POST body
+  // on refresh) — that's why a reload showed "0 enrolled, 53 skipped":
+  // that reload was actually a second real run, after the first one had
+  // already succeeded. Session-then-clear means a reload just re-fetches
+  // this plain GET, which does nothing destructive and shows a blank form.
+  const bulkResult = req.session.bulkEnrollResult || null;
+  delete req.session.bulkEnrollResult;
+
   const [programs, academicYears, defaultYear, offerings] = await Promise.all([
     Program.findAll({
       where: { isActive: true },
@@ -86,7 +98,7 @@ exports.showEnrollPage = async (req, res) => {
         }),
   ]);
 
-  const activeTab = req.query.tab || "single";
+  const activeTab = req.query.tab || (bulkResult ? "bulk" : "single");
 
   res.render("admin/enroll", {
     title: "Enroll Students",
@@ -98,7 +110,7 @@ exports.showEnrollPage = async (req, res) => {
     offerings,
     activeTab,
     result: null,
-    bulkResult: null,
+    bulkResult,
     breadcrumbs: getBreadcrumbs(req, "Enroll Students"),
   });
 };
@@ -363,38 +375,17 @@ exports.bulkEnroll = async (req, res) => {
     },
   });
 
-  const [programs, academicYears, defaultYear, offerings] = await Promise.all([
-    Program.findAll({
-      where: { isActive: true },
-      include: [School],
-      order: [["name", "ASC"]],
-    }),
-    getActiveAcademicYears(),
-    getDefaultAcademicYear(),
-    isTeacher
-      ? []
-      : SubjectOffering.findAll({
-          where: { isActive: true },
-          include: [SubjectPool, Program],
-          order: [["createdAt", "DESC"]],
-        }),
-  ]);
+  // Stash the result in the session and redirect to the plain GET page
+  // instead of rendering it directly here. Rendering it as this POST's own
+  // response was the actual bug: a page reload resubmits the POST body
+  // (same CSV, same target class), silently re-running the entire upload —
+  // by the second run everything's already created, so it looked like
+  // "0 enrolled, 53 skipped." showEnrollPage reads this once and clears it.
+  req.session.bulkEnrollResult = {
+    total: rows.length,
+    created,
+    skipped,
+  };
 
-  res.render("admin/enroll", {
-    title: "Enroll Students",
-    basePath,
-    isTeacher,
-    programs,
-    academicYears,
-    defaultYear: defaultYear ? defaultYear.admissionYear : new Date().getFullYear(),
-    offerings,
-    activeTab: "bulk",
-    result: null,
-    bulkResult: {
-      total: rows.length,
-      created,
-      skipped,
-    },
-    breadcrumbs: getBreadcrumbs(req, "Enroll Students"),
-  });
+  res.redirect(`${basePath}/enroll?tab=bulk`);
 };
