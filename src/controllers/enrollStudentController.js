@@ -167,7 +167,7 @@ exports.singleEnroll = async (req, res) => {
   const passwordHash = await hashPassword(tempPassword);
 
   const finalFirstName = firstName && firstName.trim() ? firstName.trim() : normalizedEmail.split("@")[0];
-  const finalLastName = lastName && lastName.trim() ? lastName.trim() : "Student";
+  const finalLastName = lastName && lastName.trim() ? lastName.trim() : ".";
 
   const user = await User.create({
     email: normalizedEmail,
