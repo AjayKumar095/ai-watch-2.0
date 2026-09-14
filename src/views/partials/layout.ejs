@@ -48,16 +48,26 @@
     <div class="flex h-screen">
       <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-navy-900/50 md:hidden"></div>
 
-      <!-- Sidebar: fixed to viewport height. Its own header/footer stay put;
-           only the middle nav list (see partials/sidebar.ejs) scrolls. -->
+      <!-- Sidebar: ALWAYS position:fixed (not "md:static" + in-flow at
+           desktop widths) — deliberately not relying on the sidebar's own
+           `position` flipping between breakpoints. If that utility class
+           doesn't take effect for any reason (stale/partial Tailwind
+           build, content-scanning gap, etc.), a `fixed` element silently
+           stops reserving layout space, and everything to its right
+           overlaps/hides underneath it — which is exactly the bug this
+           replaces. Instead, the content column explicitly reserves room
+           for it via a plain margin (see md:ml-64 below), which is a much
+           more common, low-risk utility to depend on being compiled. -->
       <aside id="sidebar"
-        class="fixed inset-y-0 left-0 z-40 h-screen w-64 -translate-x-full transform bg-navy-900 transition-transform duration-200 ease-in-out md:static md:h-screen md:translate-x-0 md:shrink-0">
+        class="fixed inset-y-0 left-0 z-40 h-screen w-64 -translate-x-full transform bg-navy-900 transition-transform duration-200 ease-in-out md:translate-x-0">
         <%- include('sidebar') %>
       </aside>
 
       <!-- Right column: also capped to viewport height. Header is fixed in
-           place; only <main> below it scrolls. -->
-      <div class="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+           place; only <main> below it scrolls. md:ml-64 reserves exactly
+           the sidebar's width (w-64) once it's visible at md+, regardless
+           of the sidebar's own position value. -->
+      <div class="flex h-screen min-w-0 flex-1 flex-col overflow-hidden md:ml-64">
         <header class="flex shrink-0 items-center justify-between border-b border-navy-100 bg-white px-4 py-3">
           <div class="flex items-center gap-4">
             <button id="sidebar-toggle" class="text-xl text-navy-600 md:hidden"><i
@@ -83,7 +93,7 @@
             </div>
           </div>
         </header>
-        <main class="mx-auto w-full max-w-7xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+        <main class="mx-auto w-full max-w-7xl flex-1 overflow-x-auto overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <%- include('breadcrumbs') %>
             <% if (typeof flashSuccess !=='undefined' && flashSuccess.length) { %>
               <% flashSuccess.forEach(function(msg) { %>
