@@ -163,10 +163,15 @@
 
             <% if (g.students.length) { %>
 
-              <!-- Scrollable Student List -->
-              <div class="max-h-96 overflow-y-auto">
+              <!-- Scrollable Student List. overflow-x-auto added alongside
+                   the existing overflow-y-auto — a table's natural sizing
+                   can shrink-to-fit when nested inside another
+                   overflow:auto ancestor, so width is forced explicitly on
+                   the table itself (w-full) rather than left to figure
+                   itself out inside two stacked scroll contexts. -->
+              <div class="max-h-96 w-full overflow-x-auto overflow-y-auto">
 
-                <table class="min-w-full text-sm">
+                <table class="w-full min-w-full text-sm">
 
                   <!-- Table Header -->
                   <thead class="sticky top-0 z-10 bg-navy-50">

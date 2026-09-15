@@ -40,25 +40,6 @@
         background: var(--color-teal);
       }
     }
-
-    /* Global responsive-table safety net: every <table> in the project
-       scrolls horizontally WITHIN ITS OWN BOX when it's wider than its
-       container, instead of forcing the whole page (or <main>) to scroll
-       sideways — which is what broke the Users page layout on mobile.
-       display:block on the outer <table> (children keep their normal
-       table-row/table-cell display) is the standard, low-risk technique
-       for this; cell text still wraps normally where a page's own CSS
-       already allows it (e.g. a "Detail" column), this only kicks in once
-       a table is ACTUALLY too wide for its container. This is a global
-       safety net, not a replacement for wrapping a specific table in its
-       own <div class="overflow-x-auto"> where you want tighter control
-       over exactly what scrolls. */
-    table {
-      display: block;
-      width: 100%;
-      max-width: 100%;
-      overflow-x: auto;
-    }
   </style>
 </head>
 
