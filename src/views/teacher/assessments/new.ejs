@@ -58,18 +58,24 @@
         <h2 class="flex items-center gap-2 text-sm font-semibold text-navy-900">
           <i class="fa-solid fa-bullseye text-info-500"></i> Target Sections
         </h2>
-        <% if (targetOptions.length > 3) { %>
-          <div class="relative w-64">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-navy-400"></i>
-            <input
-              type="text"
-              id="filter-targets"
-              placeholder="Search sections or subjects..."
-              class="form-input !py-1 !pl-8 text-xs w-full"
-              oninput="filterTargetSections(this.value)"
-            />
-          </div>
-        <% } %>
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-1.5 text-xs text-navy-500">
+            <input type="checkbox" id="select-all-targets" onclick="toggleAllTargets(this.checked)">
+            Select all
+          </label>
+          <% if (targetOptions.length > 3) { %>
+            <div class="relative w-64">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-navy-400"></i>
+              <input
+                type="text"
+                id="filter-targets"
+                placeholder="Search sections or subjects..."
+                class="form-input !py-1 !pl-8 text-xs w-full"
+                oninput="filterTargetSections(this.value)"
+              />
+            </div>
+          <% } %>
+        </div>
       </div>
       <% if (!targetOptions.length) { %>
         <p class="text-sm text-navy-400">You have no subject mappings yet — ask the admin to map you to a subject.</p>
@@ -77,10 +83,25 @@
       <div id="target-options-list" class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-navy-100 p-3 sm:grid-cols-2">
         <% targetOptions.forEach(function(opt) { %>
           <label class="flex items-start gap-2 rounded-lg border border-transparent px-3 py-2 text-sm hover:border-navy-100 hover:bg-navy-50">
-            <input type="checkbox" class="mt-0.5" name="targets" value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>" />
+            <input
+              type="checkbox"
+              class="target-checkbox mt-0.5"
+              name="targets"
+              value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>:<%= opt.specSignature %>"
+            />
             <span>
-              <span class="block font-medium text-navy-800"><%= opt.subjectOffering.SubjectPool.name %></span>
-              <span class="text-xs text-navy-400"><%= opt.subjectOffering.Program.name %> · Sem <%= opt.subjectOffering.semesterNumber %> · Section <%= opt.section.name %></span>
+              <span class="block font-medium text-navy-800">
+                <%= opt.subjectOffering.SubjectPool.name %>
+                <span class="font-normal text-navy-400">(<%= opt.subjectOffering.SubjectPool.code %>)</span>
+              </span>
+              <span class="text-xs text-navy-400">
+                <%= opt.subjectOffering.Program.name %> · Sem <%= opt.subjectOffering.semesterNumber %> · <%= opt.sectionLabel %>
+              </span>
+              <span class="mt-0.5 block text-xs">
+                <span class="<%= opt.specializationNames.length ? 'badge-navy' : 'badge-info' %>">
+                  <%= opt.specializationNames.length ? opt.specializationNames.join(', ') : 'All specializations' %>
+                </span>
+              </span>
             </span>
           </label>
         <% }) %>
@@ -120,6 +141,22 @@
       } else {
         l.classList.add('hidden');
       }
+    });
+    // Search changed which rows are visible — "Select all" no longer
+    // reliably reflects the visible set, so reset it rather than leave a
+    // stale checked state that doesn't match what's actually on screen.
+    document.getElementById('select-all-targets').checked = false;
+  }
+
+  // Only toggles checkboxes belonging to currently VISIBLE (non-filtered-
+  // out) rows — selecting "all" while a search is active shouldn't
+  // silently also select the hidden ones the teacher can't currently see.
+  function toggleAllTargets(checked) {
+    var labels = document.querySelectorAll('#target-options-list label');
+    labels.forEach(function(l) {
+      if (l.classList.contains('hidden')) return;
+      var checkbox = l.querySelector('.target-checkbox');
+      if (checkbox) checkbox.checked = checked;
     });
   }
 </script>

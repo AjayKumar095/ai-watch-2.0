@@ -1,6 +1,8 @@
 const {
   TeacherProfile,
   TeacherSubjectMapping,
+  TeacherSubjectMappingSpecialization,
+  Specialization,
   SubjectOffering,
   SubjectPool,
   SubjectEnrollment,
@@ -15,6 +17,7 @@ const {
 const { hashPassword, generateTempPassword } = require("../utils/password");
 const { notifyApprovalDecision } = require("../services/notificationService");
 const { enrollStudentInOfferings } = require("../services/enrollmentService");
+const { specializationMatches } = require("../services/sectionScope");
 const logger = require("../utils/logger");
 
 const ROOT = { label: "Dashboard", url: "/teacher/dashboard" };
@@ -66,6 +69,7 @@ exports.roster = async (req, res) => {
     include: [
       { model: SubjectOffering, include: [SubjectPool, Program] },
       Section,
+      { model: TeacherSubjectMappingSpecialization, as: "mappingSpecializations", include: [{ model: Specialization, as: "Specialization" }] },
     ],
   });
 
@@ -75,38 +79,35 @@ exports.roster = async (req, res) => {
     include: [{ model: StudentProfile, include: [User] }, Section],
   });
 
-  // Group enrollments by subject offering for the view.
-  // const grouped = {};
-  // for (const m of mappings) {
-  //   grouped[m.subjectOfferingId] = {
-  //     mapping: m,
-  //     students: enrollments.filter((e) => {
-  //       if (e.subjectOfferingId !== m.subjectOfferingId) return false;
-  //       if (!m.sectionId) return true;
-  //       if (e.sectionId === m.sectionId) return true;
-  //       if (e.Section && e.Section.parentSectionId === m.sectionId) return true;
-  //       return false;
-  //     }),
-  //   };
-  // }
   const grouped = {};
 
   for (const m of mappings) {
-    // Subject offering + section must uniquely identify a mapping
-    const key = `${m.subjectOfferingId}-${m.sectionId || "all"}`;
+    const specializationIds = (m.mappingSpecializations || []).map((s) => s.specializationId);
+
+    // Specialization is now part of the key too — a teacher CAN legitimately
+    // hold two separate mappings on the same subject+section with different
+    // specialization scopes (e.g. PG-1..5 via one mapping, PG-6 via
+    // another), and each deserves its own roster row rather than being
+    // merged/overwritten by key collision.
+    const key = `${m.subjectOfferingId}-${m.sectionId || "all"}-${specializationIds.slice().sort().join(",") || "all"}`;
 
     grouped[key] = {
       mapping: m,
       students: enrollments.filter((e) => {
         if (e.subjectOfferingId !== m.subjectOfferingId) return false;
 
-        if (!m.sectionId) return true;
+        const sectionMatches =
+          !m.sectionId ||
+          e.sectionId === m.sectionId ||
+          (e.Section && e.Section.parentSectionId === m.sectionId);
+        if (!sectionMatches) return false;
 
-        if (e.sectionId === m.sectionId) return true;
-
-        if (e.Section && e.Section.parentSectionId === m.sectionId) return true;
-
-        return false;
+        // The actual fix: previously any student matching the SECTION was
+        // included, regardless of whether this mapping was scoped to
+        // specific specializations. A mapping scoped to only PG-1..5 was
+        // showing the section's PG-6 students too — students who belong to
+        // a completely different teacher's mapping.
+        return specializationMatches(e.StudentProfile.specializationId, specializationIds);
       }),
     };
   }

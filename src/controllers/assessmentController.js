@@ -2,13 +2,16 @@ const { Op } = require("sequelize");
 const {
   Assessment,
   AssessmentSection,
+  AssessmentSectionSpecialization,
   AssessmentStudentOverride,
   Section,
   ProgramOffering,
   SubjectOffering,
   SubjectPool,
   Program,
+  Specialization,
   TeacherSubjectMapping,
+  TeacherSubjectMappingSpecialization,
   TeacherProfile,
   Submission,
   StudentProfile,
@@ -58,25 +61,68 @@ async function loadTeacherProfile(req) {
   return TeacherProfile.findOne({ where: { userId: req.currentUser.id } });
 }
 
-const { targetableSectionsForMapping } = require("../services/sectionScope");
+const {
+  targetableSectionsForMapping,
+  specializationIdsForMapping,
+  enrollmentsForAssessmentSections,
+} = require("../services/sectionScope");
 
-// Builds the list of "subjectOffering + concrete sections" combos a teacher
-// can target. A mapping scoped to a specific top-level Section covers that
-// whole class (including its sub-groups) as ONE target; a mapping scoped to
-// a specific sub-group is scoped to just that sub-group; an "all sections"
-// mapping (sectionId = null) expands to one option per TOP-LEVEL section
-// under the offering (each of which still covers its own sub-groups) — see
-// src/services/sectionScope.js for the shared hierarchy rule.
+// Builds the list of "subjectOffering + concrete section + specialization
+// scope" combos a teacher can target. A mapping scoped to a specific
+// top-level Section covers that whole class (including its sub-groups) as
+// ONE target; a mapping scoped to a specific sub-group is scoped to just
+// that sub-group; an "all sections" mapping (sectionId = null) expands to
+// one option per TOP-LEVEL section under the offering (each of which still
+// covers its own sub-groups) — see src/services/sectionScope.js for the
+// shared hierarchy rule.
+//
+// Each option also carries specializationIds (the OWNING MAPPING's own
+// scope — [] means the mapping covers ALL specializations of that
+// section). This is what was missing before: a mapping scoped to only
+// PG-1..5 offered "Section C" as a target with no record that the
+// teacher's real authority stopped at PG-5 — so the resulting assessment
+// was visible to the section's PG-6 students too, who belong to a
+// different teacher's mapping. Carrying specializationIds through here is
+// the first half of the fix; create() below is the second half (actually
+// persisting it onto the AssessmentSection).
 async function buildTargetOptions(teacherProfile) {
   const mappings = await TeacherSubjectMapping.findAll({
     where: { teacherId: teacherProfile.id },
-    include: [{ model: SubjectOffering, include: [SubjectPool, Program] }, Section],
+    include: [
+      { model: SubjectOffering, include: [SubjectPool, Program] },
+      { model: Section, include: [{ model: Section, as: "parentSection" }] },
+      { model: TeacherSubjectMappingSpecialization, as: "mappingSpecializations", include: [{ model: Specialization, as: "Specialization" }] },
+    ],
   });
+
+  // A sub-group's own name (e.g. "PG-1") is meaningless on its own — the
+  // same "PG-1" label can exist under Section A, Section B, Section C,
+  // etc. Every option's section needs to be labeled with its PARENT
+  // section too when it has one, not just its own name.
+  function labelFor(section) {
+    if (!section) return "Unknown section";
+    return section.parentSection ? `Section ${section.parentSection.name} - ${section.name}` : `Section ${section.name}`;
+  }
 
   const options = [];
   for (const m of mappings) {
+    const specializationIds = specializationIdsForMapping(m);
+    const specializationNames = (m.mappingSpecializations || []).map((s) => s.Specialization.name);
+    // Same encoding create() decodes: "ALL" or a sorted, comma-joined list
+    // of specialization ids. Pre-computed here so the view never has to
+    // reconstruct it.
+    const specSignature = specializationIds.length ? specializationIds.slice().sort().join(",") : "ALL";
+
     if (m.sectionId) {
-      options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: m.Section });
+      options.push({
+        subjectOfferingId: m.subjectOfferingId,
+        subjectOffering: m.SubjectOffering,
+        section: m.Section,
+        sectionLabel: labelFor(m.Section),
+        specializationIds,
+        specializationNames,
+        specSignature,
+      });
     } else {
       // Scoped by admissionYear, not just programId+semesterNumber: a
       // program+semester pair is no longer unique to one cohort once
@@ -95,7 +141,17 @@ async function buildTargetOptions(teacherProfile) {
       for (const po of offerings) {
         const topSections = await targetableSectionsForMapping(null, po.id);
         for (const sec of topSections) {
-          options.push({ subjectOfferingId: m.subjectOfferingId, subjectOffering: m.SubjectOffering, section: sec });
+          // Top-level sections from this expansion never have a parent,
+          // so labelFor is safe here too.
+          options.push({
+            subjectOfferingId: m.subjectOfferingId,
+            subjectOffering: m.SubjectOffering,
+            section: sec,
+            sectionLabel: labelFor(sec),
+            specializationIds,
+            specializationNames,
+            specSignature,
+          });
         }
       }
     }
@@ -143,27 +199,18 @@ exports.showCreate = async (req, res) => {
   });
 };
 
-// Given the section ids an assessment was targeted at (top-level and/or
-// sub-group), returns the matching SubjectOffering enrollments — including
-// students enrolled directly in a targeted top-level section's sub-groups,
-// mirroring the visibility rule in services/sectionScope.js.
-async function enrolledStudentsForTarget(subjectOfferingId, sectionIds) {
-  const childSections = await Section.findAll({ where: { parentSectionId: sectionIds } });
-  const allSectionIds = [...new Set([...sectionIds, ...childSections.map((s) => s.id)])];
-
-  const enrollments = await SubjectEnrollment.findAll({
-    where: { subjectOfferingId, sectionId: allSectionIds },
-    include: [{ model: StudentProfile, include: [User] }],
-  });
-  return enrollments.map((e) => e.StudentProfile.User);
-}
-
 exports.create = async (req, res) => {
   const teacherProfile = await loadTeacherProfile(req);
   const targetOptions = await buildTargetOptions(teacherProfile);
 
   const { title, attachmentUrl, startAt, endAt, maxMarks, descriptionBlocks } = req.body;
-  let targets = req.body.targets || []; // format: "<subjectOfferingId>:<sectionId>"
+  // Format: "<subjectOfferingId>:<sectionId>:<specSignature>", where
+  // specSignature is either "ALL" or a comma-joined, sorted list of
+  // specializationIds — this is what actually carries a target's
+  // specialization scope from the checkbox the teacher picked through to
+  // what gets persisted below. See buildTargetOptions above for where each
+  // option's specializationIds comes from (the owning mapping's own scope).
+  let targets = req.body.targets || [];
   if (!Array.isArray(targets)) targets = [targets];
 
   const breadcrumbs = [ROOT, ASSESSMENTS, { label: "Create Assessment" }];
@@ -187,18 +234,24 @@ exports.create = async (req, res) => {
 
   // Group selected targets by subjectOfferingId — one Assessment row per
   // subject offering, however many sections/programs it spans (this is the
-  // "same assessment across multiple global-subject programs at once" fix).
+  // "same assessment across multiple global-subject programs at once"
+  // fix). Each target now keeps its OWN specializationIds instead of being
+  // flattened into a bare sectionId list — the same section can legitimately
+  // appear twice with different specialization scopes if a teacher holds
+  // two separate mappings on it (e.g. PG-1..5 via one mapping, and PG-6
+  // via a second, unrelated one — unusual, but the data model allows it).
   const grouped = {};
   for (const t of targets) {
-    const [subjectOfferingId, sectionId] = t.split(":");
+    const [subjectOfferingId, sectionId, specSignature] = t.split(":");
+    const specializationIds = specSignature === "ALL" || !specSignature ? [] : specSignature.split(",").filter(Boolean);
     if (!grouped[subjectOfferingId]) grouped[subjectOfferingId] = [];
-    grouped[subjectOfferingId].push(sectionId);
+    grouped[subjectOfferingId].push({ sectionId, specializationIds });
   }
 
   const created = [];
   const mentorName = req.currentUser.fullName ? req.currentUser.fullName() : req.currentUser.firstName;
 
-  for (const [subjectOfferingId, sectionIds] of Object.entries(grouped)) {
+  for (const [subjectOfferingId, sectionTargets] of Object.entries(grouped)) {
     const assessment = await Assessment.create({
       subjectOfferingId,
       createdById: req.currentUser.id,
@@ -210,13 +263,34 @@ exports.create = async (req, res) => {
       maxMarks,
       isActive: true,
     });
-    for (const sectionId of sectionIds) {
-      await AssessmentSection.create({ assessmentId: assessment.id, sectionId });
+
+    // Built alongside the DB rows so enrollmentsForAssessmentSections below
+    // can use them immediately without a round-trip re-fetch.
+    const createdAssessmentSections = [];
+
+    for (const { sectionId, specializationIds } of sectionTargets) {
+      const assessmentSection = await AssessmentSection.create({ assessmentId: assessment.id, sectionId });
+
+      if (specializationIds.length > 0) {
+        await AssessmentSectionSpecialization.bulkCreate(
+          specializationIds.map((specializationId) => ({
+            assessmentSectionId: assessmentSection.id,
+            specializationId,
+          }))
+        );
+      }
+
+      createdAssessmentSections.push({
+        sectionId,
+        sectionSpecializations: specializationIds.map((specializationId) => ({ specializationId })),
+      });
     }
+
     created.push(assessment);
 
     const subjectOffering = await SubjectOffering.findByPk(subjectOfferingId, { include: [SubjectPool] });
-    const studentUsers = await enrolledStudentsForTarget(subjectOfferingId, sectionIds);
+    const enrollments = await enrollmentsForAssessmentSections(subjectOfferingId, createdAssessmentSections);
+    const studentUsers = enrollments.map((e) => e.StudentProfile.User);
     if (studentUsers.length) {
       notifyAssessmentCreated({
         studentUsers,
@@ -242,16 +316,26 @@ exports.uploadImage = (req, res) => {
 exports.showOverride = async (req, res) => {
   const assessment = await Assessment.findOne({
     where: { id: req.params.id, createdById: req.currentUser.id },
-    include: [{ model: SubjectOffering, include: [SubjectPool] }, { model: AssessmentSection, include: [Section] }],
+    include: [
+      { model: SubjectOffering, include: [SubjectPool] },
+      {
+        model: AssessmentSection,
+        include: [
+          Section,
+          { model: AssessmentSectionSpecialization, as: "sectionSpecializations" },
+        ],
+      },
+    ],
   });
   if (!assessment) return res.redirect("/teacher/assessments");
 
-  const sectionIds = assessment.AssessmentSections.map((as) => as.sectionId);
-  const { SubjectEnrollment } = require("../models");
-  const enrollments = await SubjectEnrollment.findAll({
-    where: { subjectOfferingId: assessment.subjectOfferingId, sectionId: sectionIds },
-    include: [{ model: StudentProfile, include: [User] }],
-  });
+  // Same specialization- and sub-group-aware resolution used when the
+  // assessment was created and when notifying students — this candidate
+  // list previously used a bare section-only query with no specialization
+  // check AND no sub-group expansion, so a teacher could grant a late-
+  // submission exception to (or simply see in this list) students outside
+  // their actual mapped scope.
+  const enrollments = await enrollmentsForAssessmentSections(assessment.subjectOfferingId, assessment.AssessmentSections);
 
   res.render("teacher/assessments/override", { title: "Open Submission Window", assessment, enrollments, breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Open Submission Window" }] });
 };
@@ -291,7 +375,13 @@ exports.showEdit = async (req, res) => {
     where: { id: req.params.id, createdById: req.currentUser.id },
     include: [
       { model: SubjectOffering, include: [SubjectPool, Program] },
-      { model: AssessmentSection, include: [Section] },
+      {
+        model: AssessmentSection,
+        include: [
+          Section,
+          { model: AssessmentSectionSpecialization, as: "sectionSpecializations", include: [{ model: Specialization, as: "Specialization" }] },
+        ],
+      },
     ],
   });
   if (!assessment) return res.redirect("/teacher/assessments");

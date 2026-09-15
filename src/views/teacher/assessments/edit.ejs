@@ -65,7 +65,11 @@
       </p>
       <div class="flex flex-wrap gap-2">
         <% assessment.AssessmentSections.forEach(function(as) { %>
-          <span class="badge-navy"><%= as.Section ? 'Section ' + as.Section.name : 'Unknown section' %></span>
+          <% var specs = as.sectionSpecializations || []; %>
+          <span class="badge-navy">
+            <%= as.Section ? 'Section ' + as.Section.name : 'Unknown section' %>
+            <% if (specs.length) { %> — <%= specs.map(function(s) { return s.Specialization.name; }).join(', ') %><% } %>
+          </span>
         <% }) %>
       </div>
     </div>

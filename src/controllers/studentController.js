@@ -5,6 +5,7 @@ const {
   SubjectPool,
   Assessment,
   AssessmentSection,
+  AssessmentSectionSpecialization,
   Submission,
   SemesterCertificate,
   ApprovalRequest,
@@ -13,7 +14,7 @@ const {
   TeacherProfile,
   User,
 } = require("../models");
-const { visibleSectionIdsForStudent } = require("../services/sectionScope");
+const { visibleSectionIdsForStudent, specializationMatches } = require("../services/sectionScope");
 const { sectionsFor } = require("../services/sectionLookupService");
 const { enrollStudentInOfferings } = require("../services/enrollmentService");
 const renderBlocks = require("../utils/renderBlocks");
@@ -105,6 +106,13 @@ exports.dashboard = async (req, res) => {
   // Section" assessment is visible to every sub-group under it) — see
   // src/services/sectionScope.js. Enrollment alone is not enough: it
   // establishes the subject, not which section-scoped assessments apply.
+  //
+  // AND, as of the specialization-scoping fix: only if the targeted
+  // AssessmentSection's own specialization scope matches this student's
+  // specializationId (or the target covers ALL specializations). Section
+  // matching alone used to be sufficient, which meant a PG-6 student could
+  // see an assessment a teacher created for PG-1..5 only, since nothing
+  // recorded that narrower scope on the AssessmentSection at all.
   const assessments = [];
   for (const e of enrollments) {
     const visibleSectionIds = await visibleSectionIdsForStudent(e.sectionId);
@@ -113,11 +121,22 @@ exports.dashboard = async (req, res) => {
       where: { subjectOfferingId: e.subjectOfferingId, isActive: true },
       include: [
         { model: SubjectOffering, include: [SubjectPool] },
-        { model: AssessmentSection, where: { sectionId: visibleSectionIds }, required: true },
+        {
+          model: AssessmentSection,
+          where: { sectionId: visibleSectionIds },
+          required: true,
+          include: [{ model: AssessmentSectionSpecialization, as: "sectionSpecializations" }],
+        },
       ],
       order: [["endAt", "ASC"]],
     });
-    assessments.push(...matching);
+
+    const visibleMatching = matching.filter((a) =>
+      a.AssessmentSections.some((as) =>
+        specializationMatches(studentProfile.specializationId, (as.sectionSpecializations || []).map((s) => s.specializationId))
+      )
+    );
+    assessments.push(...visibleMatching);
   }
 
   const submissions = await Submission.findAll({ where: { studentId: studentProfile.id } });
@@ -219,11 +238,23 @@ exports.confirmSection = async (req, res) => {
 
 const { AssessmentStudentOverride } = require("../models");
 
-async function assertVisible(assessment, enrollment) {
+// Takes studentProfile (not just enrollment) now — both call sites already
+// have it in scope, and specialization matching needs
+// studentProfile.specializationId. Section matching alone used to be
+// sufficient here, which is exactly the gap that let a student outside an
+// assessment's actual specialization scope both VIEW and SUBMIT to it.
+async function assertVisible(assessment, enrollment, studentProfile) {
   const visibleSectionIds = await visibleSectionIdsForStudent(enrollment.sectionId);
   if (!visibleSectionIds.length) return false;
-  const match = await AssessmentSection.findOne({ where: { assessmentId: assessment.id, sectionId: visibleSectionIds } });
-  return !!match;
+
+  const matches = await AssessmentSection.findAll({
+    where: { assessmentId: assessment.id, sectionId: visibleSectionIds },
+    include: [{ model: AssessmentSectionSpecialization, as: "sectionSpecializations" }],
+  });
+
+  return matches.some((as) =>
+    specializationMatches(studentProfile.specializationId, (as.sectionSpecializations || []).map((s) => s.specializationId))
+  );
 }
 
 exports.showAssessment = async (req, res) => {
@@ -239,7 +270,7 @@ exports.showAssessment = async (req, res) => {
   });
   if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
 
-  if (!(await assertVisible(assessment, enrollment))) {
+  if (!(await assertVisible(assessment, enrollment, studentProfile))) {
     return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
   }
 
@@ -261,7 +292,7 @@ exports.submitAssessment = async (req, res) => {
   });
   if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
 
-  if (!(await assertVisible(assessment, enrollment))) {
+  if (!(await assertVisible(assessment, enrollment, studentProfile))) {
     return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
   }
 

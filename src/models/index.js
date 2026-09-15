@@ -32,6 +32,20 @@ const TeacherSubjectMappingSpecialization =
     sequelize,
     DataTypes
   );
+
+// Mirrors TeacherSubjectMappingSpecialization, but for the OTHER side of
+// the mapping->assessment pipeline: carries a targeted AssessmentSection's
+// specialization scope through, so "this teacher is only mapped to
+// PG-1..5 of Section C" is actually respected when their assessment gets
+// created — previously it wasn't, and every student in Section C
+// (including PG-6, who belong to a different teacher's mapping) could see
+// and submit to it. See services/sectionScope.js for the shared
+// specialization-matching logic this powers.
+const AssessmentSectionSpecialization =
+  require("./AssessmentSectionSpecialization")(
+    sequelize,
+    DataTypes
+  );
 // ---------------------------------------------------------------------------
 // Associations
 // ---------------------------------------------------------------------------
@@ -172,6 +186,38 @@ AssessmentSection.belongsTo(Assessment, { foreignKey: "assessmentId" });
 Section.hasMany(AssessmentSection, { foreignKey: "sectionId", onDelete: "CASCADE" });
 AssessmentSection.belongsTo(Section, { foreignKey: "sectionId" });
 
+AssessmentSection.hasMany(
+  AssessmentSectionSpecialization,
+  {
+    foreignKey: "assessmentSectionId",
+    as: "sectionSpecializations",
+    onDelete: "CASCADE",
+  }
+);
+AssessmentSectionSpecialization.belongsTo(
+  AssessmentSection,
+  {
+    foreignKey: "assessmentSectionId",
+    as: "assessmentSection",
+  }
+);
+
+Specialization.hasMany(
+  AssessmentSectionSpecialization,
+  {
+    foreignKey: "specializationId",
+    as: "assessmentSectionSpecializations",
+    onDelete: "CASCADE",
+  }
+);
+AssessmentSectionSpecialization.belongsTo(
+  Specialization,
+  {
+    foreignKey: "specializationId",
+    as: "Specialization",
+  }
+);
+
 Assessment.hasMany(AssessmentStudentOverride, { foreignKey: "assessmentId", onDelete: "CASCADE" });
 AssessmentStudentOverride.belongsTo(Assessment, { foreignKey: "assessmentId" });
 StudentProfile.hasMany(AssessmentStudentOverride, { foreignKey: "studentId", onDelete: "CASCADE" });
@@ -233,6 +279,7 @@ module.exports = {
   ApprovalRequest,
   Assessment,
   AssessmentSection,
+  AssessmentSectionSpecialization,
   AssessmentStudentOverride,
   AssessmentLock,
   Submission,

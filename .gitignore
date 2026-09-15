@@ -4,3 +4,5 @@ dev.sqlite3
 .DS_Store
 npm-debug.log*
 logs/*.log
+
+public/css/output.css
