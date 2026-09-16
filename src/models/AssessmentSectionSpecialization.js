@@ -16,8 +16,11 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      // INTEGER, not UUID — see the migration's comment: assessment_sections
+      // never explicitly declared a UUID id, so it got Sequelize's default
+      // auto-increment INTEGER PK instead.
       assessmentSectionId: {
-        type: DataTypes.UUID,
+        type: DataTypes.INTEGER,
         allowNull: false,
         field: "assessment_section_id",
       },
