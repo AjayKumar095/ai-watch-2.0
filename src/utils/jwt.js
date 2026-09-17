@@ -47,8 +47,8 @@ function hashToken(token) {
 
 const COOKIE_OPTS = {
   httpOnly: true,
-  // secure: process.env.NODE_ENV === "production",
-  secure: false,
+  secure: process.env.NODE_ENV === "production",
+  // secure: false,
   sameSite: "strict",
 };
 

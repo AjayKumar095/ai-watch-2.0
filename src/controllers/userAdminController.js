@@ -58,7 +58,7 @@ exports.list = async (req, res) => {
       { model: StudentProfile, include: [Program] },
     ],
     order: [["role", "ASC"], ["firstName", "ASC"]],
-    limit: 500,
+    //limit: 500,
   });
 
   res.render("admin/users/index", {
