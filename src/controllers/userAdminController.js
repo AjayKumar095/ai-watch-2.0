@@ -42,29 +42,51 @@ const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const USERS = { label: "Users", url: "/admin/users" };
 
 exports.list = async (req, res) => {
-  const { role, search } = req.query;
+  const { role, search, status } = req.query;
+
+  // Previously hardcoded to `limit: 500` with no offset — any role/search
+  // combo with more than 500 accounts silently never showed the rest,
+  // same bug as the Students list had.
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
   const where = {};
   if (role) where.role = role;
+  if (status === "active") where.isActive = true;
+  else if (status === "inactive") where.isActive = false;
   if (search && search.trim()) {
     const term = `%${search.trim()}%`;
     where[Op.or] = [{ firstName: { [Op.like]: term } }, { lastName: { [Op.like]: term } }, { email: { [Op.like]: term } }];
   }
 
-  const users = await User.findAll({
+  const { rows: users, count: totalCount } = await User.findAndCountAll({
     where,
     include: [
       { model: TeacherProfile, include: [School] },
       { model: StudentProfile, include: [Program] },
     ],
     order: [["role", "ASC"], ["firstName", "ASC"]],
-    limit: 500,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+    // TeacherProfile/StudentProfile are both hasOne from User's side, so
+    // this join can't multiply rows — distinct: true costs nothing and
+    // keeps the count correct if that ever changes.
+    distinct: true,
   });
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const filterParams = new URLSearchParams();
+  if (role) filterParams.set("role", role);
+  if (status) filterParams.set("status", status);
+  if (search) filterParams.set("search", search);
+  const filterQueryString = filterParams.toString();
 
   res.render("admin/users/index", {
     title: "Users",
     users,
-    filters: { role, search },
+    filters: { role, search, status },
+    pagination: { page, totalPages, totalCount, pageSize: PAGE_SIZE, filterQueryString },
     breadcrumbs: [ROOT, USERS],
   });
 };

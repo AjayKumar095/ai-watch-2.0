@@ -14,7 +14,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 // extensions — restricting to only the legacy ones would block the vast
 // majority of students, who save in the modern format by default. Adjust
 // this list if you specifically want to exclude .docx/.pptx.
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx"];
+const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".md"];
 
 const MAX_TOTAL_BYTES = 5 * 1024 * 1024; // 5MB, combined across all files
 const MAX_FILES = 5;

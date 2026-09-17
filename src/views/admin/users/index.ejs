@@ -1,5 +1,13 @@
 <div class="mb-6 flex items-center justify-between">
   <h1 class="text-2xl font-bold text-navy-900">Users</h1>
+  <span class="text-xs text-navy-400">
+    <% if (pagination.totalCount > 0) { %>
+      Showing <%= (pagination.page - 1) * pagination.pageSize + 1 %>–<%= Math.min(pagination.page * pagination.pageSize, pagination.totalCount) %>
+      of <%= pagination.totalCount %>
+    <% } else { %>
+      0 users
+    <% } %>
+  </span>
 </div>
 
 <form method="GET" action="/admin/users" class="card mb-4 flex flex-wrap items-end gap-3">
@@ -16,8 +24,16 @@
       <option value="STUDENT" <%= filters.role === 'STUDENT' ? 'selected' : '' %>>Student</option>
     </select>
   </div>
+  <div>
+    <label class="form-label">Status</label>
+    <select class="form-input" name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+      <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+    </select>
+  </div>
   <button type="submit" class="btn-primary">Filter</button>
-  <% if (filters.role || filters.search) { %><a href="/admin/users" class="btn-ghost text-sm">Clear</a><% } %>
+  <% if (filters.role || filters.status || filters.search) { %><a href="/admin/users" class="btn-ghost text-sm">Clear</a><% } %>
 </form>
 
 <div class="card">
@@ -46,3 +62,37 @@
     </tbody>
   </table>
 </div>
+
+<% if (pagination.totalPages > 1) { %>
+  <% var qs = pagination.filterQueryString ? pagination.filterQueryString + '&' : ''; %>
+  <div class="mt-4 flex items-center justify-center gap-1 text-sm">
+    <% if (pagination.page > 1) { %>
+      <a href="?<%= qs %>page=<%= pagination.page - 1 %>" class="btn-secondary !px-3 !py-1.5 text-xs">← Prev</a>
+    <% } else { %>
+      <span class="btn-secondary !px-3 !py-1.5 text-xs opacity-40">← Prev</span>
+    <% } %>
+
+    <%
+      var pages = [];
+      for (var p = 1; p <= pagination.totalPages; p++) {
+        if (p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 2) pages.push(p);
+      }
+    %>
+    <% var lastShown = 0; %>
+    <% pages.forEach(function(p) { %>
+      <% if (p - lastShown > 1) { %><span class="px-1 text-navy-300">…</span><% } %>
+      <% if (p === pagination.page) { %>
+        <span class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white"><%= p %></span>
+      <% } else { %>
+        <a href="?<%= qs %>page=<%= p %>" class="rounded-lg px-3 py-1.5 text-xs font-medium text-navy-600 hover:bg-navy-50"><%= p %></a>
+      <% } %>
+      <% lastShown = p; %>
+    <% }) %>
+
+    <% if (pagination.page < pagination.totalPages) { %>
+      <a href="?<%= qs %>page=<%= pagination.page + 1 %>" class="btn-secondary !px-3 !py-1.5 text-xs">Next →</a>
+    <% } else { %>
+      <span class="btn-secondary !px-3 !py-1.5 text-xs opacity-40">Next →</span>
+    <% } %>
+  </div>
+<% } %>
