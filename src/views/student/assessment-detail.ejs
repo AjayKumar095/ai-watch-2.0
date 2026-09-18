@@ -90,7 +90,7 @@
           </div>
           <div>
             <label class="form-label">Notes</label>
-            <textarea class="form-input" name="description" rows="4"><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
+            <textarea class="form-input" name="description" rows="4" required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
           </div>
           <div>
             <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>
@@ -116,7 +116,7 @@
         var hint = document.getElementById('attachments-hint');
         var submitBtn = document.getElementById('submit-btn');
         var MAX_TOTAL_BYTES = 5 * 1024 * 1024;
-        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx'];
+        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md'];
         var hasExistingSubmission = <%- JSON.stringify(!!existingSubmission) %>;
         var wasEvaluated = <%- JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
 
