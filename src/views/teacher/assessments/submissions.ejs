@@ -85,9 +85,20 @@
                 </div>
               <% } %>
               <% if (s.description) { %>
-                <div class="mt-1 flex items-start gap-1.5">
-                  <i class="fa-regular fa-note-sticky mt-0.5 text-navy-300"></i>
-                  <p class="max-h-[300px] overflow-y-auto whitespace-pre-wrap text-xs italic text-navy-400"><%= s.description %></p>
+                <button type="button" onclick="document.getElementById('desc-modal-<%= s.id %>').classList.remove('hidden')" class="mt-1 inline-flex items-center gap-1.5 text-xs text-navy-600 hover:underline">
+                  <i class="fa-regular fa-note-sticky text-navy-300"></i> View description
+                </button>
+
+                <div id="desc-modal-<%= s.id %>" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" onclick="if(event.target===this) this.classList.add('hidden')">
+                  <div class="flex w-full flex-col rounded-lg bg-white p-4 shadow-lg" style="min-width:300px; max-width:600px; max-height:500px;">
+                    <div class="mb-2 flex items-center justify-between">
+                      <h3 class="text-sm font-semibold text-navy-800">Submission description</h3>
+                      <button type="button" onclick="document.getElementById('desc-modal-<%= s.id %>').classList.add('hidden')" class="text-navy-400 hover:text-navy-600">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                    <div class="overflow-y-auto whitespace-pre-wrap text-sm text-navy-600" style="max-height:440px;"><%= s.description %></div>
+                  </div>
                 </div>
               <% } %>
               <% if (!s.url && !(Array.isArray(s.attachments) && s.attachments.length) && !s.description) { %>
