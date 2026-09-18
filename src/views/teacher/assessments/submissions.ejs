@@ -65,7 +65,26 @@
               <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= s.marksObtained %>/<%= assessment.maxMarks %></span>
               <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
             </td>
-            <td class="py-2 pr-3 text-navy-500"><%= s.url ? s.url : (s.description ? s.description.slice(0,40) : '—') %></td>
+            <td class="py-2 pr-3 text-navy-500">
+              <% if (s.url) { %>
+                <a href="<%= s.url %>" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline break-all"><%= s.url %></a>
+              <% } %>
+              <% if (Array.isArray(s.attachments) && s.attachments.length) { %>
+                <div class="mt-1 flex flex-wrap gap-2">
+                  <% s.attachments.forEach(function(att, i) { %>
+                    <a href="<%= att.url %>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-navy-600 hover:underline" title="<%= att.name || ('Attachment ' + (i + 1)) %>">
+                      📎 <%= att.name || ('File ' + (i + 1)) %>
+                    </a>
+                  <% }) %>
+                </div>
+              <% } %>
+              <% if (s.description) { %>
+                <p class="mt-1 text-xs italic text-navy-400"><%= s.description %></p>
+              <% } %>
+              <% if (!s.url && !(Array.isArray(s.attachments) && s.attachments.length) && !s.description) { %>
+                &mdash;
+              <% } %>
+            </td>
             <td class="py-2 pr-3">
               <!-- A real, standalone form — no longer inside the bulk form above. -->
               <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
