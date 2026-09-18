@@ -24,6 +24,28 @@ const { UPLOAD_DIR, MAX_TOTAL_BYTES } = require("../middleware/submissionUpload"
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 
+// SubjectEnrollment.sectionId is a SNAPSHOT taken when the enrollment row
+// was created — it's not a live reference to the student's profile. If a
+// student is auto-enrolled once (e.g. right after admin/teacher
+// approval), then LATER sets or changes their section/group via
+// chooseSection, confirmSection, or updateSubGroup below, those three
+// only ever updated studentProfile.currentSectionId — the existing
+// SubjectEnrollment rows kept whatever sectionId they were created with,
+// completely invisibly (nothing in the UI displays the enrollment's own
+// section, only the profile's). Since assessment visibility is resolved
+// from the ENROLLMENT's sectionId (see dashboard below), this silently
+// broke assessment visibility for any student who set/changed their
+// section after their first enrollment. Call this after every
+// currentSectionId change so enrollments stay in sync.
+async function syncEnrollmentSectionIds(studentProfile) {
+  if (!studentProfile.currentSectionId) return;
+  await SubjectEnrollment.update(
+    { sectionId: studentProfile.currentSectionId },
+    { where: { studentId: studentProfile.id } }
+  );
+}
+
+
 // Resolves this student's current top-level Section's sub-groups — PG-1,
 // PG-2, G1, G2, or whatever your admins named them — scoped the same way
 // every other section option is resolved: program + admission year +
@@ -232,6 +254,7 @@ exports.confirmSection = async (req, res) => {
   // one-time decision — don't ask again on future logins.
   studentProfile.sectionConfirmed = true;
   await studentProfile.save();
+  await syncEnrollmentSectionIds(studentProfile);
 
   res.redirect("/student/dashboard");
 };
@@ -454,6 +477,7 @@ exports.chooseSection = async (req, res) => {
   studentProfile.currentSectionId = subGroupId || sectionId;
   studentProfile.sectionConfirmed = true;
   await studentProfile.save();
+  await syncEnrollmentSectionIds(studentProfile);
 
   // If the student is already verified, auto-enroll them in active offerings now that section is set
   if (studentProfile.isVerified) {
@@ -515,6 +539,7 @@ exports.updateSubGroup = async (req, res) => {
   // student still had the one-time confirm-section prompt pending.
   studentProfile.sectionConfirmed = true;
   await studentProfile.save();
+  await syncEnrollmentSectionIds(studentProfile);
 
   res.redirect("/student/profile");
 };
