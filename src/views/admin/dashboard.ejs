@@ -1,4 +1,4 @@
-<div class="mb-6 flex items-center justify-between">
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <div>
     <h1 class="text-2xl font-bold text-navy-900">Superadmin Dashboard</h1>
     <p class="text-sm text-navy-500">Full control over academic structure, people, and system data.</p>
@@ -6,13 +6,64 @@
   <a href="/admin/teachers/new" class="btn-primary">+ Create Teacher</a>
 </div>
 
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-  <div class="card"><p class="text-xs uppercase text-navy-400">Schools</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.schoolCount %></p></div>
-  <div class="card"><p class="text-xs uppercase text-navy-400">Programs</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.programCount %></p></div>
-  <div class="card"><p class="text-xs uppercase text-navy-400">Subjects</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.subjectCount %></p></div>
-  <a href="/admin/academic-years" class="card hover:border-amber-400 transition-colors block"><p class="text-xs uppercase text-navy-400">Academic Years</p><p class="mt-2 text-2xl font-bold text-navy-900"><%= stats.sessionCount %></p></a>
-  <div class="card"><p class="text-xs uppercase text-navy-400">Teachers</p><p class="mt-2 text-2xl font-bold text-info-600"><%= stats.teacherCount %></p></div>
-  <div class="card"><p class="text-xs uppercase text-navy-400">Students</p><p class="mt-2 text-2xl font-bold text-amber-600"><%= stats.studentCount %></p></div>
+<!-- Stat cards -->
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+  <div class="stat-card">
+    <span class="stat-accent bg-sky-500"></span>
+    <div class="stat-icon bg-sky-50 text-sky-600"><i class="fa-solid fa-building-columns"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.schoolCount %></p>
+      <p class="stat-label">Schools</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-accent bg-violet-500"></span>
+    <div class="stat-icon bg-violet-50 text-violet-600"><i class="fa-solid fa-graduation-cap"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.programCount %></p>
+      <p class="stat-label">Programs</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-accent bg-teal-500"></span>
+    <div class="stat-icon bg-teal-50 text-teal-600"><i class="fa-solid fa-book"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.subjectCount %></p>
+      <p class="stat-label">Subjects</p>
+    </div>
+  </div>
+
+  <a href="/admin/academic-years" class="stat-card group">
+    <span class="stat-accent bg-amber-500"></span>
+    <div class="stat-icon bg-amber-50 text-amber-600"><i class="fa-solid fa-calendar-days"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.sessionCount %></p>
+      <p class="stat-label">
+        Academic Years
+        <i class="fa-solid fa-arrow-right ml-1 inline-block -translate-x-0.5 text-[10px] text-navy-300 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"></i>
+      </p>
+    </div>
+  </a>
+
+  <div class="stat-card">
+    <span class="stat-accent bg-info-500"></span>
+    <div class="stat-icon bg-info-50 text-info-600"><i class="fa-solid fa-chalkboard-user"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.teacherCount %></p>
+      <p class="stat-label">Teachers</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-accent bg-rose-500"></span>
+    <div class="stat-icon bg-rose-50 text-rose-600"><i class="fa-solid fa-user-graduate"></i></div>
+    <div>
+      <p class="stat-value"><%= stats.studentCount %></p>
+      <p class="stat-label">Students</p>
+    </div>
+  </div>
 </div>
 
 <% if (pendingApprovalsCount > 0) { %>
@@ -22,14 +73,26 @@
   </div>
 <% } %>
 
+<!-- Charts -->
 <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
   <div class="card lg:col-span-2">
-    <h2 class="mb-3 text-sm font-semibold text-navy-900">Students by Program</h2>
-    <canvas id="programChart" height="120"></canvas>
+    <div class="mb-1 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-navy-900">Students by School</h2>
+      <span class="text-xs text-navy-400">Across all programs</span>
+    </div>
+    <div class="relative h-72 w-full">
+      <div id="schoolChart"></div>
+      <p id="schoolChart-empty" class="hidden absolute inset-0 items-center justify-center text-sm text-navy-400">No student data yet.</p>
+    </div>
   </div>
   <div class="card">
-    <h2 class="mb-3 text-sm font-semibold text-navy-900">Submission Status</h2>
-    <canvas id="submissionChart" height="160"></canvas>
+    <div class="mb-1 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-navy-900">Submission Status</h2>
+    </div>
+    <div class="relative h-72 w-full">
+      <div id="submissionChart"></div>
+      <p id="submissionChart-empty" class="hidden absolute inset-0 items-center justify-center text-sm text-navy-400">No submissions yet.</p>
+    </div>
   </div>
 </div>
 
@@ -55,54 +118,217 @@
   <% } %>
 </div>
 
+<style>
+  .stat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 9.5rem;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid rgb(241 245 249);
+    background: #fff;
+    padding: 1.1rem 1.1rem 1rem;
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  }
+  .stat-card:hover {
+    box-shadow: 0 12px 24px -8px rgba(32, 58, 99, 0.16);
+    border-color: rgb(226 232 240);
+    transform: translateY(-2px);
+  }
+  .stat-card:hover .stat-icon {
+    transform: scale(1.06);
+  }
+  .stat-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+  }
+  .stat-icon {
+    display: inline-flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    font-size: 1.05rem;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    transition: transform 0.18s ease;
+  }
+  .stat-value {
+    font-size: 1.75rem;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: #203A63;
+  }
+  .stat-label {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+  }
+</style>
+
 <script id="dashboard-chart-data" type="application/json">
   <%- JSON.stringify({
-    programLabels: programChart.labels,
-    programData: programChart.data,
+    schoolCodes: schoolChart.codes,
+    schoolFullNames: schoolChart.fullNames,
+    schoolData: schoolChart.data,
     submissionData: [submissionChart.pending, submissionChart.evaluated, submissionChart.rejected]
-  }) %>
+  }).replace(/</g, '\u003c') %>
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="/vendor/apexcharts/apexcharts.min.js"></script>
 <script>
   (function () {
     var chartDataEl = document.getElementById('dashboard-chart-data');
-    var chartData = JSON.parse(chartDataEl ? chartDataEl.textContent : '{}');
+    var chartData = {};
+    try {
+      chartData = JSON.parse(chartDataEl ? chartDataEl.textContent : '{}');
+    } catch (e) {
+      chartData = {};
+    }
 
     var navy = '#203A63';
     var amber = '#F79009';
     var info = '#2E90FA';
+    var teal = '#14B8A6';
+    var rose = '#F43F5E';
 
-    var programCanvas = document.getElementById('programChart');
-    if (programCanvas) {
-      new Chart(programCanvas, {
-        type: 'bar',
-        data: {
-          labels: chartData.programLabels || [],
-          datasets: [{ label: 'Students', data: chartData.programData || [], backgroundColor: info, borderRadius: 6 }],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-        },
-      });
+    function showEmpty(containerId) {
+      var placeholder = document.getElementById(containerId + '-empty');
+      var container = document.getElementById(containerId);
+      if (placeholder) {
+        placeholder.classList.remove('hidden');
+        placeholder.classList.add('flex');
+      }
+      if (container) container.classList.add('hidden');
     }
 
-    var submissionCanvas = document.getElementById('submissionChart');
-    if (submissionCanvas) {
-      new Chart(submissionCanvas, {
-        type: 'doughnut',
-        data: {
+    // If the ApexCharts CDN script failed to load (network restriction,
+    // ad-blocker, offline, etc.) both charts stay blank with no
+    // indication why — this surfaces something readable instead, and
+    // one chart's failure can't take the other down (each in its own
+    // try/catch).
+    if (typeof ApexCharts === 'undefined') {
+      showEmpty('schoolChart');
+      showEmpty('submissionChart');
+      return;
+    }
+
+    try {
+      var schoolData = chartData.schoolData || [];
+      var hasSchoolData = schoolData.some(function (n) { return n > 0; });
+
+      if (!hasSchoolData) {
+        showEmpty('schoolChart');
+      } else {
+        var schoolChartEl = document.getElementById('schoolChart');
+        var schoolFullNames = chartData.schoolFullNames || [];
+        var schoolApexChart = new ApexCharts(schoolChartEl, {
+          chart: {
+            type: 'bar',
+            height: '100%',
+            toolbar: { show: false },
+            fontFamily: 'inherit',
+          },
+          series: [{ name: 'Students', data: schoolData }],
+          xaxis: {
+            categories: chartData.schoolCodes || [],
+            labels: { style: { colors: '#94A3B8', fontSize: '11px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+          },
+          yaxis: {
+            labels: {
+              formatter: function (val) { return Math.round(val); },
+              style: { colors: '#94A3B8', fontSize: '11px' },
+            },
+          },
+          grid: { borderColor: '#F1F5F9', strokeDashArray: 4 },
+          plotOptions: {
+            bar: { borderRadius: 6, columnWidth: '45%', distributed: false },
+          },
+          dataLabels: { enabled: false },
+          colors: [info],
+          tooltip: {
+            y: {
+              title: {
+                formatter: function () { return ''; },
+              },
+              formatter: function (val, opts) {
+                var idx = opts.dataPointIndex;
+                var name = schoolFullNames[idx] || '';
+                return val + ' student' + (val === 1 ? '' : 's') + (name ? ' — ' + name : '');
+              },
+            },
+          },
+        });
+        schoolApexChart.render();
+      }
+    } catch (e) {
+      showEmpty('schoolChart');
+    }
+
+    try {
+      var submissionData = chartData.submissionData || [0, 0, 0];
+      var hasSubmissionData = submissionData.some(function (n) { return n > 0; });
+
+      if (!hasSubmissionData) {
+        showEmpty('submissionChart');
+      } else {
+        var submissionChartEl = document.getElementById('submissionChart');
+        var submissionApexChart = new ApexCharts(submissionChartEl, {
+          chart: {
+            type: 'donut',
+            height: '100%',
+            fontFamily: 'inherit',
+          },
+          series: submissionData,
           labels: ['Pending', 'Evaluated', 'Rejected'],
-          datasets: [{
-            data: chartData.submissionData || [0, 0, 0],
-            backgroundColor: [amber, info, navy],
-          }],
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } },
-      });
+          colors: [amber, teal, rose],
+          legend: {
+            position: 'bottom',
+            fontSize: '12px',
+            markers: { width: 8, height: 8, radius: 8 },
+          },
+          dataLabels: { enabled: false },
+          stroke: { width: 2, colors: ['#fff'] },
+          plotOptions: {
+            pie: {
+              donut: {
+                size: '68%',
+                labels: {
+                  show: true,
+                  total: {
+                    show: true,
+                    label: 'Total',
+                    color: navy,
+                    formatter: function (w) {
+                      return w.globals.seriesTotals.reduce(function (a, b) { return a + b; }, 0);
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        submissionApexChart.render();
+      }
+    } catch (e) {
+      showEmpty('submissionChart');
     }
   })();
 </script>
-

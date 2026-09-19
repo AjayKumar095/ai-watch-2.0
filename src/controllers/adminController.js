@@ -27,16 +27,34 @@ exports.dashboard = async (req, res) => {
   ]);
   const sessionCount = admissionYears.length;
 
-  // Students-by-program, for the chart.
-  const programsWithCounts = await Program.findAll({
-    include: [{ model: StudentProfile, attributes: [] }],
-    attributes: ["id", "name", [User.sequelize.fn("COUNT", User.sequelize.col("StudentProfiles.id")), "studentCount"]],
-    group: ["Program.id"],
+  // Students-by-school, for the chart. Computed without ever naming a
+  // "code" column in raw SQL — School is fetched normally (whatever
+  // columns it actually has), so this can't crash if School turns out not
+  // to have one; the view falls back to an abbreviated name in that case.
+  const schools = await School.findAll({ order: [["name", "ASC"]] });
+  const programsForSchoolChart = await Program.findAll({ attributes: ["id", "schoolId"], raw: true });
+  const programToSchool = {};
+  programsForSchoolChart.forEach((p) => {
+    programToSchool[p.id] = p.schoolId;
+  });
+
+  const studentCountsByProgram = await StudentProfile.findAll({
+    attributes: ["programId", [User.sequelize.fn("COUNT", User.sequelize.col("id")), "studentCount"]],
+    group: ["programId"],
     raw: true,
   });
-  const programChart = {
-    labels: programsWithCounts.map((p) => p.name),
-    data: programsWithCounts.map((p) => parseInt(p.studentCount, 10)),
+
+  const countBySchoolId = {};
+  studentCountsByProgram.forEach((row) => {
+    const schoolId = programToSchool[row.programId];
+    if (!schoolId) return;
+    countBySchoolId[schoolId] = (countBySchoolId[schoolId] || 0) + parseInt(row.studentCount, 10);
+  });
+
+  const schoolChart = {
+    codes: schools.map((s) => s.code || s.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 4).toUpperCase()),
+    fullNames: schools.map((s) => s.name),
+    data: schools.map((s) => countBySchoolId[s.id] || 0),
   };
 
   // Submission status breakdown, for the chart.
@@ -60,7 +78,7 @@ exports.dashboard = async (req, res) => {
   res.render("admin/dashboard", {
     title: "Superadmin Dashboard",
     stats: { teacherCount, studentCount, schoolCount, programCount, subjectCount, sessionCount },
-    programChart,
+    schoolChart,
     submissionChart,
     pendingApprovalsCount,
     recentActivity,

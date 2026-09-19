@@ -33,6 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/vendor/apexcharts", express.static(path.join(__dirname, "node_modules/apexcharts/dist")));
 
 // File-logged request line, separate from morgan (which only goes to the
 // console). Logged on 'finish' so the real status code is included.
