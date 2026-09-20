@@ -41,6 +41,51 @@ module.exports = {
           800: "#1849A9",
           900: "#194185",
         },
+        // Explicitly pinned rather than relying on Tailwind's shipped
+        // defaults — sky/violet/rose were added to Tailwind's palette
+        // later in its history, so depending on them silently breaks
+        // (classes compile to nothing) on an older installed version.
+        // Values match Tailwind's own official palette, so this is a
+        // no-op if your version already ships them.
+        sky: {
+          50: "#F0F9FF",
+          100: "#E0F2FE",
+          200: "#BAE6FD",
+          300: "#7DD3FC",
+          400: "#38BDF8",
+          500: "#0EA5E9",
+          600: "#0284C7",
+          700: "#0369A1",
+          800: "#075985",
+          900: "#0C4A6E",
+          950: "#082F49",
+        },
+        violet: {
+          50: "#F5F3FF",
+          100: "#EDE9FE",
+          200: "#DDD6FE",
+          300: "#C4B5FD",
+          400: "#A78BFA",
+          500: "#8B5CF6",
+          600: "#7C3AED",
+          700: "#6D28D9",
+          800: "#5B21B6",
+          900: "#4C1D95",
+          950: "#2E1065",
+        },
+        rose: {
+          50: "#FFF1F2",
+          100: "#FFE4E6",
+          200: "#FECDD3",
+          300: "#FDA4AF",
+          400: "#FB7185",
+          500: "#F43F5E",
+          600: "#E11D48",
+          700: "#BE123C",
+          800: "#9F1239",
+          900: "#881337",
+          950: "#4C0519",
+        },
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
