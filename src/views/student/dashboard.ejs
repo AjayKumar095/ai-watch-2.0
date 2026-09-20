@@ -8,24 +8,45 @@
 </div>
 
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-  <div class="card">
-    <p class="text-xs font-medium uppercase tracking-wide text-navy-400">Active Assessments</p>
-    <p class="mt-2 text-3xl font-bold text-navy-900"><%= assessments.length %></p>
+  <div class="stat-card">
+    <span class="stat-accent bg-sky-500"></span>
+    <div class="stat-icon bg-sky-50 text-sky-600"><i class="fa-solid fa-clipboard-list"></i></div>
+    <div>
+      <p class="stat-value"><%= assessments.length %></p>
+      <p class="stat-label">Active Assessments</p>
+    </div>
   </div>
-  <div class="card">
-    <p class="text-xs font-medium uppercase tracking-wide text-navy-400">Certificates Earned</p>
-    <p class="mt-2 text-3xl font-bold text-amber-600"><%= certificates.length %></p>
+
+  <div class="stat-card">
+    <span class="stat-accent bg-amber-500"></span>
+    <div class="stat-icon bg-amber-50 text-amber-600"><i class="fa-solid fa-award"></i></div>
+    <div>
+      <p class="stat-value text-amber-600"><%= certificates.length %></p>
+      <p class="stat-label">Certificates Earned</p>
+    </div>
   </div>
-  <div class="card">
-    <p class="text-xs font-medium uppercase tracking-wide text-navy-400">Account Status</p>
-    <p class="mt-2 text-lg font-semibold text-info-600"><%= studentProfile.isVerified ? 'Verified' : 'Pending' %></p>
+
+  <div class="stat-card">
+    <span class="stat-accent <%= studentProfile.isVerified ? 'bg-teal-500' : 'bg-amber-500' %>"></span>
+    <div class="stat-icon <%= studentProfile.isVerified ? 'bg-teal-50 text-teal-600' : 'bg-amber-50 text-amber-600' %>">
+      <i class="fa-solid <%= studentProfile.isVerified ? 'fa-circle-check' : 'fa-hourglass-half' %>"></i>
+    </div>
+    <div>
+      <p class="stat-value <%= studentProfile.isVerified ? 'text-teal-600' : 'text-amber-600' %>"><%= studentProfile.isVerified ? 'Verified' : 'Pending' %></p>
+      <p class="stat-label">Account Status</p>
+    </div>
   </div>
 </div>
 
 <div class="card mt-6">
   <h2 class="mb-4 text-lg font-semibold text-navy-900">My Assessments</h2>
   <% if (!assessments.length) { %>
-    <p class="text-sm text-navy-400">No assessments assigned yet.</p>
+    <div class="flex flex-col items-center justify-center gap-2 py-10 text-center">
+      <div class="flex h-11 w-11 items-center justify-center rounded-full bg-navy-50 text-navy-400">
+        <i class="fa-solid fa-clipboard-list"></i>
+      </div>
+      <p class="text-sm text-navy-400">No assessments assigned yet.</p>
+    </div>
   <% } else { %>
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-navy-100 text-sm">
@@ -40,18 +61,18 @@
         </thead>
         <tbody class="divide-y divide-navy-50">
           <% assessments.forEach(function(a) { const sub = submissionByAssessment[a.id]; %>
-            <tr>
-              <td class="py-2 pr-3 font-medium text-navy-800"><%= a.SubjectOffering.SubjectPool.name %></td>
-              <td class="py-2 pr-3 text-navy-600">
+            <tr class="transition-colors hover:bg-navy-50/60">
+              <td class="py-2.5 pr-3 font-medium text-navy-800"><%= a.SubjectOffering.SubjectPool.name %></td>
+              <td class="py-2.5 pr-3 text-navy-600">
                 <a href="/student/assessments/<%= a.id %>" class="font-medium text-info-600 hover:underline"><%= a.title %></a>
               </td>
-              <td class="py-2 pr-3 text-navy-500"><%= new Date(a.endAt).toLocaleDateString() %></td>
-              <td class="py-2 pr-3">
+              <td class="py-2.5 pr-3 text-navy-500"><%= new Date(a.endAt).toLocaleDateString() %></td>
+              <td class="py-2.5 pr-3">
                 <% if (!sub) { %><span class="badge-amber">Not submitted</span>
                 <% } else if (sub.status === 'EVALUATED') { %><span class="badge-info">Evaluated · <%= sub.marksObtained %>/<%= a.maxMarks %></span>
                 <% } else { %><span class="badge-navy">Submitted</span><% } %>
               </td>
-              <td class="py-2 pr-3">
+              <td class="py-2.5 pr-3">
                 <a href="/student/assessments/<%= a.id %>" class="btn-secondary !px-3 !py-1.5 text-xs"><%= sub ? 'View / Update' : 'View & Submit' %></a>
               </td>
             </tr>
@@ -61,3 +82,64 @@
     </div>
   <% } %>
 </div>
+
+<style>
+  .stat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 9.5rem;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid rgb(241 245 249);
+    background: #fff;
+    padding: 1.1rem 1.1rem 1rem;
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  }
+  .stat-card:hover {
+    box-shadow: 0 12px 24px -8px rgba(32, 58, 99, 0.16);
+    border-color: rgb(226 232 240);
+    transform: translateY(-2px);
+  }
+  .stat-card:hover .stat-icon {
+    transform: scale(1.06);
+  }
+  .stat-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+  }
+  .stat-icon {
+    display: inline-flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    font-size: 1.05rem;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    transition: transform 0.18s ease;
+  }
+  .stat-value {
+    font-size: 1.75rem;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: #203A63;
+  }
+  .stat-label {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #94A3B8;
+  }
+</style>
