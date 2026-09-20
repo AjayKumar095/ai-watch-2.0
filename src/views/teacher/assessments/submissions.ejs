@@ -1,6 +1,6 @@
 <div class="mb-4">
   <h1 class="text-2xl font-bold text-navy-900"><%= assessment.title %></h1>
-  <p class="text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= assessment.maxMarks %></p>
+  <p class="text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= parseFloat(assessment.maxMarks).toFixed(1) %></p>
   <% if (descriptionHtml) { %>
     <div class="prose-content mt-3 rounded-lg border border-navy-100 bg-navy-50 p-3"><%- descriptionHtml %></div>
   <% } %>
@@ -57,12 +57,12 @@
       </thead>
       <tbody class="divide-y divide-navy-50">
         <% submissions.forEach(function(s) { %>
-          <tr>
+          <tr data-submission-id="<%= s.id %>">
             <td class="py-2 pr-3"><input form="bulk-evaluate-form" class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
             <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
             <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
             <td class="py-2 pr-3">
-              <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= s.marksObtained %>/<%= assessment.maxMarks %></span>
+              <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= parseFloat(s.marksObtained).toFixed(1) %>/<%= parseFloat(assessment.maxMarks).toFixed(1) %></span>
               <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
             </td>
             <td class="py-2 pr-3 text-navy-500">
@@ -108,8 +108,8 @@
             <td class="py-2 pr-3">
               <!-- A real, standalone form — no longer inside the bulk form above. -->
               <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
-                <input class="form-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained || '' %>" />
-                <input class="form-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
+                <input class="form-input row-mark-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained != null ? parseFloat(s.marksObtained).toFixed(1) : '' %>" />
+                <input class="form-input row-remarks-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
                 <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Save</button>
               </form>
             </td>
@@ -119,3 +119,73 @@
     </table>
   </div>
 </div>
+
+<div class="mt-4 flex items-center justify-between">
+  <p id="save-all-status" class="text-xs text-navy-400"></p>
+  <button type="button" id="save-all-btn" class="btn-primary !px-6 text-sm">Save All Changes</button>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('save-all-btn');
+    var statusEl = document.getElementById('save-all-status');
+
+    btn.addEventListener('click', function () {
+      var rows = [];
+
+      // Reads each row's CURRENT input values directly from the DOM,
+      // regardless of checkbox state (that's bulk-evaluate's concern, not
+      // this one) — every row with a mark and/or remark filled in gets
+      // saved, empty rows are silently skipped. This can't be a normal
+      // form submit: each row's inputs already belong to their own
+      // per-row <form> (for the individual Save button) AND are linked to
+      // the bulk-evaluate form via the form= attribute — an <input> can
+      // only belong to one form at a time, so a THIRD form can't also
+      // claim them. Reading live values via JS sidesteps that entirely.
+      document.querySelectorAll('tr[data-submission-id]').forEach(function (tr) {
+        var markInput = tr.querySelector('.row-mark-input');
+        var remarksInput = tr.querySelector('.row-remarks-input');
+        var marksObtained = markInput ? markInput.value.trim() : '';
+        var remarks = remarksInput ? remarksInput.value.trim() : '';
+        if (marksObtained === '' && remarks === '') return; // skip — nothing entered on this row
+        rows.push({ submissionId: tr.dataset.submissionId, marksObtained: marksObtained, remarks: remarks });
+      });
+
+      statusEl.classList.remove('text-amber-600', 'text-teal-600');
+
+      if (!rows.length) {
+        statusEl.textContent = 'Nothing to save — fill in a mark or remark for at least one row first.';
+        statusEl.classList.add('text-amber-600');
+        return;
+      }
+
+      var originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      statusEl.textContent = '';
+
+      fetch(window.location.pathname + '/save-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: rows }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var msg = data.saved + ' saved';
+          if (data.skipped) msg += ', ' + data.skipped + ' skipped (empty)';
+          if (data.errors && data.errors.length) msg += ', ' + data.errors.length + ' failed (invalid marks)';
+          statusEl.textContent = msg;
+          statusEl.classList.add(data.errors && data.errors.length ? 'text-amber-600' : 'text-teal-600');
+          // Reload so status badges / preserved marks reflect what was
+          // actually saved, instead of duplicating that rendering in JS.
+          setTimeout(function () { window.location.reload(); }, 700);
+        })
+        .catch(function () {
+          statusEl.textContent = 'Something went wrong — please try again.';
+          statusEl.classList.add('text-amber-600');
+          btn.disabled = false;
+          btn.textContent = originalText;
+        });
+    });
+  })();
+</script>
