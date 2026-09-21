@@ -24,6 +24,7 @@ router.post("/assessments/new", assessmentController.create);
 router.post("/assessments/upload-image", uploadImage.single("image"), assessmentController.uploadImage);
 router.get("/assessments/:id/submissions", evaluationController.showSubmissions);
 router.post("/assessments/:id/submissions/bulk-evaluate", evaluationController.bulkEvaluate);
+router.post("/assessments/:id/submissions/save-all", evaluationController.saveAll);
 router.post("/submissions/:submissionId/evaluate", evaluationController.evaluateOne);
 router.get("/assessments/:id/override", assessmentController.showOverride);
 router.post("/assessments/:id/override", assessmentController.applyOverride);
