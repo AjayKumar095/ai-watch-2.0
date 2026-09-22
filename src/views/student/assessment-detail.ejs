@@ -100,7 +100,7 @@
               type="file"
               name="attachments"
               multiple
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.md"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.md,.csv,.png,.jpg,.jpeg,.webp,.xlsx"
             />
             <p id="attachments-hint" class="mt-1 text-xs text-navy-400">Uploading new files replaces any currently attached ones.</p>
           </div>
@@ -116,7 +116,7 @@
         var hint = document.getElementById('attachments-hint');
         var submitBtn = document.getElementById('submit-btn');
         var MAX_TOTAL_BYTES = 5 * 1024 * 1024;
-        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md'];
+        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md', ".csv", ".png", '.jpg', 'jpeg', '.webp', '.xlsx'];
         var hasExistingSubmission = <%- JSON.stringify(!!existingSubmission) %>;
         var wasEvaluated = <%- JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
 
