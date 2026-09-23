@@ -44,13 +44,23 @@
       }
     }
 
+    @media (max-width: 767.98px) {
+      table:not(.prose-content table) {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+      }
+    }
+
     body {
 
       /* 1. The container/overall scrollbar area */
       ::-webkit-scrollbar {
         width: 0px;
         /* Width of vertical scrollbar */
-        height:0px;
+        height: 0px;
         /* Height of horizontal scrollbar */
       }
 
@@ -181,7 +191,7 @@
           </main>
       </div>
       <% } %>
-  <script src="/js/searchable-select.js"></script>
+        <script src="/js/searchable-select.js"></script>
 </body>
 
 </html>
