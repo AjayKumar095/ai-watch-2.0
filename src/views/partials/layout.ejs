@@ -15,6 +15,35 @@
   <link rel="stylesheet" href="/css/output.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   <style>
+    /* Mobile browsers (iOS Safari/Chrome) compute 100vh using the
+       viewport size with the address bar hidden, which is taller than
+       what's actually visible when the bar is showing. Every h-screen
+       box (body, aside#sidebar, the right column, the logged-out
+       wrapper) ends up slightly taller than the real screen, so their
+       last few pixels — sidebar logout section, bottom of main
+       content — sit below the visible fold with no way to reach them,
+       since these are fixed-height flex boxes, not page-level scroll.
+       100dvh tracks the actual visible viewport, so this override
+       fixes all of them at once wherever the browser supports it. */
+    /* #sidebar sits at z-10 normally so it never outranks floating
+       toolbars/popups from in-page editors (e.g. a block editor's
+       slash-menu or table tools) on laptop/desktop widths, where the
+       sidebar is static and the overlay below is never shown anyway
+       (md:hidden). Below the md breakpoint the sidebar becomes a
+       slide-in drawer over #sidebar-overlay (z-30), so it needs to
+       win there — this media query raises it only in that range. */
+    @media (max-width: 767.98px) {
+      #sidebar {
+        z-index: 40;
+      }
+    }
+
+    @supports (height: 100dvh) {
+      .h-screen {
+        height: 100dvh;
+      }
+    }
+
     body {
 
       /* 1. The container/overall scrollbar area */
