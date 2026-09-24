@@ -6,6 +6,16 @@
       (e.g. missed deadline, documented extension).
     </p>
 
+    <% if (typeof success !== 'undefined' && success === 'override_applied') { %>
+      <div id="overrideSuccessBanner" class="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Override applied.</div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error === 'override_failed') { %>
+      <div class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Couldn't apply the override — please try again.</div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error === 'no_students_selected') { %>
+      <div class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Select at least one student before applying.</div>
+    <% } %>
+
     <form action="/teacher/assessments/<%= assessment.id %>/override" method="POST" class="mt-6 space-y-4">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
@@ -19,11 +29,17 @@
       </div>
 
       <div>
-        <label class="form-label">Students</label>
+        <div class="flex items-center justify-between">
+          <label class="form-label">Students</label>
+          <label class="flex items-center gap-2 text-xs font-medium text-info-600 hover:underline cursor-pointer">
+            <input type="checkbox" id="selectAllStudents" />
+            Select all
+          </label>
+        </div>
         <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-navy-100 p-3">
           <% enrollments.forEach(function(e) { %>
             <label class="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-navy-50">
-              <input type="checkbox" name="studentIds" value="<%= e.StudentProfile.id %>" />
+              <input type="checkbox" class="student-checkbox" name="studentIds" value="<%= e.StudentProfile.id %>" />
               <%= e.StudentProfile.User.firstName %> <%= e.StudentProfile.User.lastName %> (<%= e.StudentProfile.rollNo %>)
             </label>
           <% }) %>
@@ -34,3 +50,39 @@
     </form>
   </div>
 </div>
+
+<script>
+  (function () {
+    var successBanner = document.getElementById("overrideSuccessBanner");
+    if (successBanner) {
+      setTimeout(function () {
+        successBanner.style.transition = "opacity 0.3s ease";
+        successBanner.style.opacity = "0";
+        setTimeout(function () {
+          successBanner.remove();
+        }, 300); // let the fade finish before removing from the DOM
+      }, 2000);
+    }
+
+    var selectAll = document.getElementById("selectAllStudents");
+    var checkboxes = document.querySelectorAll(".student-checkbox");
+
+    if (!selectAll || !checkboxes.length) return;
+
+    selectAll.addEventListener("change", function () {
+      checkboxes.forEach(function (cb) {
+        cb.checked = selectAll.checked;
+      });
+    });
+
+    // Keep "Select all" in sync if the teacher checks/unchecks rows individually.
+    checkboxes.forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        var allChecked = Array.prototype.every.call(checkboxes, function (c) { return c.checked; });
+        var noneChecked = Array.prototype.every.call(checkboxes, function (c) { return !c.checked; });
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = !allChecked && !noneChecked;
+      });
+    });
+  })();
+</script>

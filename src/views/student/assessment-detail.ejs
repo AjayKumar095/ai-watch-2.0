@@ -39,11 +39,17 @@
           </div>
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Opens</dt>
-            <dd class="text-right font-medium text-navy-800"><%= new Date(assessment.startAt).toLocaleString() %></dd>
+            <dd class="text-right font-medium text-navy-800">
+              <%= new Date(override && override.startAt ? override.startAt : assessment.startAt).toLocaleString() %>
+              <% if (override && override.startAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
+            </dd>
           </div>
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Closes</dt>
-            <dd class="text-right font-medium text-navy-800"><%= new Date(assessment.endAt).toLocaleString() %></dd>
+            <dd class="text-right font-medium text-navy-800">
+              <%= new Date(override && override.endAt ? override.endAt : assessment.endAt).toLocaleString() %>
+              <% if (override && override.endAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
+            </dd>
           </div>
           <% if (assessment.attachmentUrl) { %>
             <div class="flex items-center justify-between">
@@ -77,6 +83,15 @@
           </div>
         <% } %>
 
+        <% if (submissionClosed) { %>
+          <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            The submission window for this assessment has closed. If you need to submit late, ask your teacher to open an exception for you.
+          </div>
+        <% } else if (submissionNotYetOpen) { %>
+          <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
+            This assessment isn't open for submissions yet.
+          </div>
+        <% } else { %>
         <form
           id="submission-form"
           action="/student/assessments/<%= assessment.id %>/submit"
@@ -106,12 +121,15 @@
           </div>
           <button type="submit" id="submit-btn" class="btn-primary w-full"><%= existingSubmission ? 'Update submission' : 'Submit' %></button>
         </form>
+        <% } %>
       </div>
     </div>
 
     <script>
       (function () {
         var form = document.getElementById('submission-form');
+        if (!form) return; // window closed/not open — no form was rendered
+
         var fileInput = document.getElementById('submission-attachments');
         var hint = document.getElementById('attachments-hint');
         var submitBtn = document.getElementById('submit-btn');

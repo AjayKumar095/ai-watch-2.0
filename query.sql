@@ -1,2 +1,2 @@
-DELETE FROM SequelizeMeta
-WHERE name = '20260909104251-create-teacher-subject-mapping-specializations.js';
+     SELECT * FROM assessment_student_overrides
+     WHERE assessment_id = '<the assessment id>' AND student_id = '<the student's StudentProfile id>';

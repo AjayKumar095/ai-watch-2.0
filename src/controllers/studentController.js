@@ -164,6 +164,17 @@ exports.dashboard = async (req, res) => {
   const submissions = await Submission.findAll({ where: { studentId: studentProfile.id } });
   const submissionByAssessment = Object.fromEntries(submissions.map((s) => [s.assessmentId, s]));
 
+  // Per-student overrides for this student, keyed by assessmentId — same
+  // lookup showAssessment/submitAssessment already do, but this list view
+  // never did it, so an overridden student's "Due" date here always showed
+  // the assessment's base endAt regardless of any override on file.
+  const overrides = assessments.length
+    ? await AssessmentStudentOverride.findAll({
+        where: { studentId: studentProfile.id, assessmentId: assessments.map((a) => a.id) },
+      })
+    : [];
+  const overrideByAssessment = Object.fromEntries(overrides.map((o) => [o.assessmentId, o]));
+
   const certificates = await SemesterCertificate.findAll({ where: { studentId: studentProfile.id } });
 
   res.render("student/dashboard", {
@@ -171,6 +182,7 @@ exports.dashboard = async (req, res) => {
     studentProfile,
     assessments,
     submissionByAssessment,
+    overrideByAssessment,
     certificates,
     breadcrumbs: [{ label: "Dashboard" }],
   });
@@ -300,9 +312,30 @@ exports.showAssessment = async (req, res) => {
   const existingSubmission = await Submission.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
   const override = await AssessmentStudentOverride.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
 
+  // Same window logic submitAssessment enforces server-side — computed
+  // here too so the page itself can hide/disable the submission form
+  // once the window is genuinely closed, instead of only finding out
+  // after a POST comes back with a 403.
+  const windowStart = override && override.startAt ? new Date(override.startAt) : new Date(assessment.startAt);
+  const windowEnd = override && override.endAt ? new Date(override.endAt) : new Date(assessment.endAt);
+  const now = new Date();
+  const submissionNotYetOpen = now < windowStart;
+  const submissionClosed = now > windowEnd;
+
   const descriptionHtml = Array.isArray(assessment.description) ? renderBlocks(assessment.description) : "";
 
-  res.render("student/assessment-detail", { title: assessment.title, assessment, descriptionHtml, enrollment, existingSubmission, override, error: req.query.error || null, breadcrumbs: [ROOT, { label: assessment.title }] });
+  res.render("student/assessment-detail", {
+    title: assessment.title,
+    assessment,
+    descriptionHtml,
+    enrollment,
+    existingSubmission,
+    override,
+    submissionNotYetOpen,
+    submissionClosed,
+    error: req.query.error || null,
+    breadcrumbs: [ROOT, { label: assessment.title }],
+  });
 };
 
 exports.submitAssessment = async (req, res) => {

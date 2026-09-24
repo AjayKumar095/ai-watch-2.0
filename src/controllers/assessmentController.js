@@ -337,7 +337,14 @@ exports.showOverride = async (req, res) => {
   // their actual mapped scope.
   const enrollments = await enrollmentsForAssessmentSections(assessment.subjectOfferingId, assessment.AssessmentSections);
 
-  res.render("teacher/assessments/override", { title: "Open Submission Window", assessment, enrollments, breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Open Submission Window" }] });
+  res.render("teacher/assessments/override", {
+    title: "Open Submission Window",
+    assessment,
+    enrollments,
+    success: req.query.success || null,
+    error: req.query.error || null,
+    breadcrumbs: [ROOT, ASSESSMENTS, { label: assessment.title }, { label: "Open Submission Window" }],
+  });
 };
 
 exports.applyOverride = async (req, res) => {
@@ -346,20 +353,49 @@ exports.applyOverride = async (req, res) => {
 
   let studentIds = req.body.studentIds || [];
   if (!Array.isArray(studentIds)) studentIds = [studentIds];
+
+  // Previously an empty selection fell straight through to the success
+  // redirect below — the for-loop just ran zero times, nothing threw, so
+  // "Override applied" showed even though nothing was written. Guard it
+  // explicitly so a genuinely empty submission is reported as an error
+  // instead of a false success.
+  if (!studentIds.length) {
+    return res.redirect(`/teacher/assessments/${assessment.id}/override?error=no_students_selected`);
+  }
+
   const { startAt, endAt } = req.body;
   const overrideStartAt = toInstitutionUtc(startAt);
   const overrideEndAt = toInstitutionUtc(endAt);
 
-  for (const studentId of studentIds) {
-    await AssessmentStudentOverride.upsert({
-      assessmentId: assessment.id,
-      studentId,
-      startAt: overrideStartAt,
-      endAt: overrideEndAt,
-    });
+  // Was AssessmentStudentOverride.upsert({...}) — but this model's primary
+  // key (id) uses a client-generated DataTypes.UUIDV4 default, so Sequelize
+  // always has an `id` value ready before the query runs and targets
+  // ON CONFLICT (id) instead of the real unique index on
+  // (assessment_id, student_id). First write for a student succeeds as a
+  // plain insert; re-applying an override for the SAME student generates a
+  // new random id, misses the id conflict target, and hits the composite
+  // unique constraint instead — an uncaught 23505 duplicate key error that
+  // left the request hanging with no response. find-or-create against the
+  // real composite key, then save(), sidesteps the conflict-target guessing
+  // entirely, and the try/catch turns any future failure into a visible
+  // ?error= instead of a silent hang.
+  try {
+    for (const studentId of studentIds) {
+      const [override] = await AssessmentStudentOverride.findOrCreate({
+        where: { assessmentId: assessment.id, studentId },
+        defaults: { startAt: overrideStartAt, endAt: overrideEndAt },
+      });
+      override.startAt = overrideStartAt;
+      override.endAt = overrideEndAt;
+      await override.save();
+      console.log("OVERRIDE WRITTEN:", assessment.id, studentIds);
+    }
+    
+    res.redirect(`/teacher/assessments/${assessment.id}/override?success=override_applied`);
+  } catch (err) {
+    console.error("applyOverride failed:", err);
+    res.redirect(`/teacher/assessments/${assessment.id}/override?error=override_failed`);
   }
-
-  res.redirect(`/teacher/assessments`);
 };
 
 // ---------------------------------------------------------------------------
