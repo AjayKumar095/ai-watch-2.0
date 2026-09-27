@@ -19,7 +19,7 @@
     <table class="min-w-full divide-y divide-navy-100 text-sm">
       <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
         <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.subject-check').forEach(c=>c.checked=this.checked)" /></th>
-        <th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Category</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"></th>
+        <th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Category</th><th class="py-2 pr-3">Level</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"></th>
       </tr></thead>
       <tbody class="divide-y divide-navy-50">
         <% subjects.forEach(function(s) { %>
@@ -28,6 +28,7 @@
             <td class="py-2 pr-3 font-medium text-navy-800"><%= s.name %></td>
             <td class="py-2 pr-3 text-navy-500"><%= s.code %></td>
             <td class="py-2 pr-3"><span class="<%= s.category === 'UNIVERSITY_WIDE' ? 'badge-info' : 'badge-navy' %>"><%= s.category %></span></td>
+            <td class="py-2 pr-3 text-navy-500"><%= s.level || '—' %></td>
             <td class="py-2 pr-3"><span class="<%= s.isActive ? 'badge-info' : 'badge-amber' %>"><%= s.isActive ? 'Active' : 'Inactive' %></span></td>
             <td class="py-2 pr-3">
               <div class="flex gap-2">
@@ -37,7 +38,7 @@
             </td>
           </tr>
         <% }) %>
-        <% if (!subjects.length) { %><tr><td colspan="6" class="py-4 text-navy-400">No subjects yet.</td></tr><% } %>
+        <% if (!subjects.length) { %><tr><td colspan="7" class="py-4 text-navy-400">No subjects yet.</td></tr><% } %>
       </tbody>
     </table>
   </form>

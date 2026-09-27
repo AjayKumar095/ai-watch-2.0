@@ -1,9 +1,21 @@
 const { parse } = require("csv-parse/sync");
 const { SubjectPool, SubjectOffering, Program, AuditLog } = require("../models");
 const { safeDestroy, tryDestroy } = require("../utils/deleteHelpers");
+const { LEVEL_PATTERNS } = require("../utils/courseLevel");
 
 const ROOT = { label: "Dashboard", url: "/admin/dashboard" };
 const SUBJECTS = { label: "Subject Pool", url: "/admin/subjects" };
+const LEVEL_OPTIONS = LEVEL_PATTERNS.map((p) => p.label);
+
+// Case-insensitive match against the allowed level set; anything that
+// doesn't match (blank, typo, unrecognized word) is treated as "no level"
+// rather than rejecting the whole subject/row — level is optional.
+function normalizeLevel(raw) {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  const match = LEVEL_OPTIONS.find((l) => l.toLowerCase() === trimmed.toLowerCase());
+  return match || null;
+}
 
 exports.list = async (req, res) => {
   const subjects = await SubjectPool.findAll({ order: [["name", "ASC"]] });
@@ -11,13 +23,17 @@ exports.list = async (req, res) => {
 };
 
 exports.showCreate = (req, res) => {
-  res.render("admin/subjects/new", { title: "Add Subject", error: null, formData: {}, breadcrumbs: [ROOT, SUBJECTS, { label: "Add Subject" }] });
+  res.render("admin/subjects/new", {
+    title: "Add Subject", error: null, formData: {}, levelOptions: LEVEL_OPTIONS,
+    breadcrumbs: [ROOT, SUBJECTS, { label: "Add Subject" }],
+  });
 };
 
 exports.create = async (req, res) => {
-  const { name, code, category } = req.body;
+  const { name, code, category, level } = req.body;
   const breadcrumbs = [ROOT, SUBJECTS, { label: "Add Subject" }];
-  const rerender = (error) => res.status(400).render("admin/subjects/new", { title: "Add Subject", error, formData: req.body, breadcrumbs });
+  const rerender = (error) =>
+    res.status(400).render("admin/subjects/new", { title: "Add Subject", error, formData: req.body, levelOptions: LEVEL_OPTIONS, breadcrumbs });
 
   if (!name || !code) return rerender("Name and code are required.");
   const existing = await SubjectPool.findOne({ where: { code } });
@@ -27,6 +43,7 @@ exports.create = async (req, res) => {
     name,
     code,
     category: category === "PROGRAM_SPECIFIC" ? "PROGRAM_SPECIFIC" : "UNIVERSITY_WIDE",
+    level: normalizeLevel(level),
     isActive: true,
   });
   await AuditLog.create({ userId: req.currentUser.id, action: "CREATE_SUBJECT", entityType: "SubjectPool", entityId: subject.id, metadata: { name, code } });
@@ -36,24 +53,28 @@ exports.create = async (req, res) => {
 exports.showEdit = async (req, res) => {
   const subject = await SubjectPool.findByPk(req.params.id);
   if (!subject) return res.redirect("/admin/subjects");
-  res.render("admin/subjects/edit", { title: "Edit Subject", subject, error: null, breadcrumbs: [ROOT, SUBJECTS, { label: subject.name }] });
+  res.render("admin/subjects/edit", {
+    title: "Edit Subject", subject, error: null, levelOptions: LEVEL_OPTIONS,
+    breadcrumbs: [ROOT, SUBJECTS, { label: subject.name }],
+  });
 };
 
 exports.edit = async (req, res) => {
   const subject = await SubjectPool.findByPk(req.params.id);
   if (!subject) return res.redirect("/admin/subjects");
-  const { name, code, category } = req.body;
+  const { name, code, category, level } = req.body;
   const breadcrumbs = [ROOT, SUBJECTS, { label: subject.name }];
   if (!name || !code) {
-    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Name and code are required.", breadcrumbs });
+    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Name and code are required.", levelOptions: LEVEL_OPTIONS, breadcrumbs });
   }
   const existing = await SubjectPool.findOne({ where: { code } });
   if (existing && existing.id !== subject.id) {
-    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Another subject already uses this code.", breadcrumbs });
+    return res.status(400).render("admin/subjects/edit", { title: "Edit Subject", subject, error: "Another subject already uses this code.", levelOptions: LEVEL_OPTIONS, breadcrumbs });
   }
   subject.name = name;
   subject.code = code;
   subject.category = category === "PROGRAM_SPECIFIC" ? "PROGRAM_SPECIFIC" : "UNIVERSITY_WIDE";
+  subject.level = normalizeLevel(level);
   await subject.save();
   await AuditLog.create({ userId: req.currentUser.id, action: "UPDATE_SUBJECT", entityType: "SubjectPool", entityId: subject.id, metadata: {} });
   res.redirect("/admin/subjects");
@@ -157,8 +178,8 @@ function parseRows(csvContent) {
     const lines = csvContent.trim().split("\n").map((l) => l.trim()).filter(Boolean);
     const dataLines = lines[0] && lines[0].toLowerCase().startsWith("name") ? lines.slice(1) : lines;
     records = dataLines.map((line) => {
-      const [name, code, category] = line.split(",").map((s) => (s || "").trim());
-      return { name, code, category };
+      const [name, code, category, level] = line.split(",").map((s) => (s || "").trim());
+      return { name, code, category, level };
     });
   }
   return records;
@@ -171,6 +192,7 @@ async function processRows(records, userId) {
     const name = (row.name || "").trim();
     const code = (row.code || "").trim();
     const category = (row.category || "").trim().toUpperCase();
+    const level = normalizeLevel(row.level);
     if (!name || !code) {
       skipped.push({ line: JSON.stringify(row), reason: "missing name or code" });
       continue;
@@ -184,6 +206,7 @@ async function processRows(records, userId) {
       name,
       code,
       category: category === "PROGRAM_SPECIFIC" ? "PROGRAM_SPECIFIC" : "UNIVERSITY_WIDE",
+      level,
       isActive: true,
     });
     created.push(subject);

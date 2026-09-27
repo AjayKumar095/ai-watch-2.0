@@ -8,8 +8,17 @@
       <div>
         <label class="form-label">Category</label>
         <select class="form-input" name="category">
-          <option value="UNIVERSITY_WIDE">University-Wide (e.g. "AI for All")</option>
-          <option value="PROGRAM_SPECIFIC">Program-Specific</option>
+          <option value="UNIVERSITY_WIDE" <%= (formData.category || 'UNIVERSITY_WIDE') === 'UNIVERSITY_WIDE' ? 'selected' : '' %>>University-Wide (e.g. "AI for All")</option>
+          <option value="PROGRAM_SPECIFIC" <%= formData.category === 'PROGRAM_SPECIFIC' ? 'selected' : '' %>>Program-Specific</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Level (optional)</label>
+        <select class="form-input" name="level">
+          <option value="">— None —</option>
+          <% levelOptions.forEach(function(l) { %>
+            <option value="<%= l %>" <%= formData.level === l ? 'selected' : '' %>><%= l %></option>
+          <% }) %>
         </select>
       </div>
       <button type="submit" class="btn-primary w-full">Add subject</button>

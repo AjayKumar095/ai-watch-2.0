@@ -1,0 +1,57 @@
+<div class="mb-6 flex items-center gap-3">
+  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+    <i class="fa-solid fa-award text-lg"></i>
+  </div>
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">My Certificates</h1>
+    <p class="mt-1 text-sm text-navy-500">
+      One certificate per semester — unlocked once every assessment is submitted, evaluated, and your teacher has finalized that semester.
+    </p>
+  </div>
+</div>
+
+<% if (!rows.length) { %>
+  <div class="card px-6 py-14 text-center">
+    <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-navy-50">
+      <i class="fa-solid fa-medal text-2xl text-navy-300"></i>
+    </div>
+    <p class="text-sm font-semibold text-navy-600">No semesters found</p>
+    <p class="mx-auto mt-1 max-w-xs text-xs text-navy-400">Your semester certificates will appear here once available.</p>
+  </div>
+<% } else { %>
+  <div class="card !p-0 overflow-hidden">
+    <div class="divide-y divide-navy-50">
+      <% rows.forEach(function(r) { %>
+        <div class="flex flex-wrap items-center justify-between gap-3 p-4 transition hover:bg-navy-50/50">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
+              <%= r.status === 'issued' ? 'bg-teal-50 text-teal-600' : r.status === 'eligible' ? 'bg-amber-50 text-amber-600' : 'bg-navy-50 text-navy-300' %>">
+              <i class="fa-solid <%= r.status === 'issued' ? 'fa-circle-check' : r.status === 'eligible' ? 'fa-hourglass-half' : 'fa-lock' %>"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="font-medium text-navy-800">Semester <%= r.semesterNumber %></p>
+              <% if (r.status === 'issued') { %>
+                <p class="truncate text-xs text-navy-400">
+                  <%= r.aiLevel ? r.aiLevel + ' · ' : '' %>Issued <%= new Date(r.issuedAt).toLocaleDateString() %> · Code <span class="font-mono"><%= r.verificationCode %></span>
+                </p>
+              <% } else if (r.status === 'eligible') { %>
+                <p class="text-xs font-medium text-teal-600">Ready — all assessments submitted, evaluated, and finalized.</p>
+              <% } else { %>
+                <p class="text-xs text-navy-400"><%= r.reason %></p>
+              <% } %>
+            </div>
+          </div>
+
+          <% if (r.status === 'issued' || r.status === 'eligible') { %>
+            <a href="/student/certificates/<%= r.semesterNumber %>/download" class="btn-primary !px-4 !py-1.5 text-xs">
+              <i class="fa-solid <%= r.status === 'issued' ? 'fa-download' : 'fa-wand-magic-sparkles' %> mr-1.5"></i>
+              <%= r.status === 'issued' ? 'Download' : 'Generate & Download' %>
+            </a>
+          <% } else { %>
+            <span class="badge-navy"><i class="fa-solid fa-lock mr-1 text-[10px]"></i>Not yet</span>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+<% } %>

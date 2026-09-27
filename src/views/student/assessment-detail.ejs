@@ -40,14 +40,14 @@
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Opens</dt>
             <dd class="text-right font-medium text-navy-800">
-              <%= new Date(override && override.startAt ? override.startAt : assessment.startAt).toLocaleString() %>
+              <%= new Date(override && override.startAt ? override.startAt : assessment.startAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) %>
               <% if (override && override.startAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
             </dd>
           </div>
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Closes</dt>
             <dd class="text-right font-medium text-navy-800">
-              <%= new Date(override && override.endAt ? override.endAt : assessment.endAt).toLocaleString() %>
+              <%= new Date(override && override.endAt ? override.endAt : assessment.endAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) %>
               <% if (override && override.endAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
             </dd>
           </div>
@@ -101,11 +101,11 @@
         >
           <div>
             <label class="form-label">Submission link (Drive/GitHub/etc.)</label>
-            <input class="form-input" name="url" value="<%= existingSubmission ? existingSubmission.url || '' : '' %>" placeholder="https://..." />
+            <input class="form-input" type="url" name="url" value="<%= existingSubmission ? existingSubmission.url || '' : '' %>" placeholder="https://..." />
           </div>
           <div>
-            <label class="form-label">Notes</label>
-            <textarea class="form-input" name="description" rows="4" required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
+            <label class="form-label">Notes (Max 500 characters):</label>
+            <textarea class="form-input" name="description" maxlength="500" rows="5" required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
           </div>
           <div>
             <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>

@@ -131,6 +131,8 @@ router.get("/certificates", certificateController.list);
 router.get("/certificates/new", certificateController.showGenerate);
 router.post("/certificates/check", certificateController.checkAndPreview);
 router.post("/certificates/generate", certificateController.generate);
+router.post("/certificates/issue", certificateController.issue);
+router.get("/certificates/:id/download", certificateController.download);
 
 // Audit Log
 router.get("/audit-log", auditLogController.list);

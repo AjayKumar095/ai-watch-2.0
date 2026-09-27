@@ -2,10 +2,82 @@
   <h1 class="text-2xl font-bold text-navy-900">Certificates</h1>
   <a href="/admin/certificates/new" class="btn-primary">+ Generate Certificate</a>
 </div>
+
+<% if (typeof status !== 'undefined' && status) { %>
+  <div class="mb-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800"><%= status %></div>
+<% } %>
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
+<% } %>
+
+<!-- Eligible, not yet issued -->
+<div class="card mb-6">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-navy-800">
+      Eligible for Certificate <span class="font-normal text-navy-400">(<%= eligibleUncertified.length %>)</span>
+    </h2>
+    <% if (eligibleUncertified.length) { %>
+      <button type="submit" form="bulk-issue-form" class="btn-primary text-xs">Issue Selected</button>
+    <% } %>
+  </div>
+
+  <% if (!eligibleUncertified.length) { %>
+    <p class="text-sm text-navy-400">No students are currently eligible and un-certified.</p>
+  <% } else { %>
+    <!-- Hidden, independent form for the per-row single-issue button below —
+         kept separate from bulk-issue-form so clicking "Issue" on one row
+         never also submits whatever other rows happen to be checked. -->
+    <form id="single-issue-form" action="/admin/certificates/issue" method="POST" class="hidden">
+      <input type="hidden" name="selections" id="single-issue-input" />
+    </form>
+
+    <form id="bulk-issue-form" action="/admin/certificates/issue" method="POST">
+      <table class="min-w-full divide-y divide-navy-100 text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
+            <th class="py-2 pr-3">
+              <input type="checkbox"
+                     onclick="var ch=this.checked; document.querySelectorAll('.elig-checkbox').forEach(function(c){ c.checked = ch; });" />
+            </th>
+            <th class="py-2 pr-3">Student</th>
+            <th class="py-2 pr-3">Program</th>
+            <th class="py-2 pr-3">Semester</th>
+            <th class="py-2 pr-3">Admission Year</th>
+            <th class="py-2 pr-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-navy-50">
+          <% eligibleUncertified.forEach(function(s) {
+               var key = s.studentId + ':' + s.programId + ':' + s.semesterNumber + ':' + s.admissionYear;
+          %>
+            <tr>
+              <td class="py-2 pr-3"><input type="checkbox" class="elig-checkbox" name="selections" value="<%= key %>" /></td>
+              <td class="py-2 pr-3 font-medium text-navy-800">
+                <%= s.studentName %><% if (s.rollNo) { %> <span class="text-navy-400">(<%= s.rollNo %>)</span><% } %>
+              </td>
+              <td class="py-2 pr-3 text-navy-500"><%= s.programName %></td>
+              <td class="py-2 pr-3 text-navy-500">Sem <%= s.semesterNumber %></td>
+              <td class="py-2 pr-3 text-navy-500"><%= s.admissionYear %></td>
+              <td class="py-2 pr-3 text-right">
+                <button type="button" class="btn-secondary text-xs"
+                        onclick="document.getElementById('single-issue-input').value='<%= key %>'; document.getElementById('single-issue-form').submit();">
+                  Issue
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </form>
+  <% } %>
+</div>
+
+<!-- Already issued -->
 <div class="card">
+  <h2 class="mb-3 text-sm font-semibold text-navy-800">Issued Certificates</h2>
   <table class="min-w-full divide-y divide-navy-100 text-sm">
     <thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-      <th class="py-2 pr-3">Student</th><th class="py-2 pr-3">Program</th><th class="py-2 pr-3">Semester</th><th class="py-2 pr-3">Admission Year</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Issued</th>
+      <th class="py-2 pr-3">Student</th><th class="py-2 pr-3">Program</th><th class="py-2 pr-3">Semester</th><th class="py-2 pr-3">Admission Year</th><th class="py-2 pr-3">Level</th><th class="py-2 pr-3">Code</th><th class="py-2 pr-3">Issued</th><th class="py-2 pr-3"></th>
     </tr></thead>
     <tbody class="divide-y divide-navy-50">
       <% certificates.forEach(function(c) { %>
@@ -14,11 +86,17 @@
           <td class="py-2 pr-3 text-navy-500"><%= c.Program.name %></td>
           <td class="py-2 pr-3 text-navy-500"><%= c.semesterNumber %></td>
           <td class="py-2 pr-3 text-navy-500"><%= c.admissionYear %></td>
+          <td class="py-2 pr-3 text-navy-500"><%= c.levelDisplay || '—' %></td>
           <td class="py-2 pr-3 font-mono text-xs text-navy-500"><%= c.verificationCode %></td>
           <td class="py-2 pr-3 text-navy-400"><%= new Date(c.issuedAt).toLocaleDateString() %></td>
+          <td class="py-2 pr-3 text-right">
+            <a href="/admin/certificates/<%= c.id %>/download" target="_blank" class="btn-secondary text-xs">
+              <i class="fa-solid fa-download mr-1"></i>Download
+            </a>
+          </td>
         </tr>
       <% }) %>
-      <% if (!certificates.length) { %><tr><td colspan="6" class="py-4 text-navy-400">No certificates issued yet.</td></tr><% } %>
+      <% if (!certificates.length) { %><tr><td colspan="8" class="py-4 text-navy-400">No certificates issued yet.</td></tr><% } %>
     </tbody>
   </table>
 </div>

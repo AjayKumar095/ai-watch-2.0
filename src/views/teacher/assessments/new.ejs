@@ -82,12 +82,13 @@
       <% } %>
       <div id="target-options-list" class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-navy-100 p-3 sm:grid-cols-2">
         <% targetOptions.forEach(function(opt) { %>
-          <label class="flex items-start gap-2 rounded-lg border border-transparent px-3 py-2 text-sm hover:border-navy-100 hover:bg-navy-50">
+          <label class="flex items-start gap-2 rounded-lg border px-3 py-2 text-sm <%= opt.isLocked ? 'cursor-not-allowed border-navy-100 bg-navy-50 opacity-60' : 'border-transparent hover:border-navy-100 hover:bg-navy-50' %>">
             <input
               type="checkbox"
               class="target-checkbox mt-0.5"
               name="targets"
               value="<%= opt.subjectOfferingId %>:<%= opt.section.id %>:<%= opt.specSignature %>"
+              <%= opt.isLocked ? 'disabled title="This section is locked — unlock it from Assessment Locks to target it."' : '' %>
             />
             <span>
               <span class="block font-medium text-navy-800">
@@ -97,10 +98,13 @@
               <span class="text-xs text-navy-400">
                 <%= opt.subjectOffering.Program.name %> · Sem <%= opt.subjectOffering.semesterNumber %> · <%= opt.sectionLabel %>
               </span>
-              <span class="mt-0.5 block text-xs">
+              <span class="mt-0.5 flex flex-wrap items-center gap-1 text-xs">
                 <span class="<%= opt.specializationNames.length ? 'badge-navy' : 'badge-info' %>">
                   <%= opt.specializationNames.length ? opt.specializationNames.join(', ') : 'All specializations' %>
                 </span>
+                <% if (opt.isLocked) { %>
+                  <span class="badge-navy"><i class="fa-solid fa-lock mr-1"></i>Locked</span>
+                <% } %>
               </span>
             </span>
           </label>
@@ -156,7 +160,7 @@
     labels.forEach(function(l) {
       if (l.classList.contains('hidden')) return;
       var checkbox = l.querySelector('.target-checkbox');
-      if (checkbox) checkbox.checked = checked;
+      if (checkbox && !checkbox.disabled) checkbox.checked = checked;
     });
   }
 </script>

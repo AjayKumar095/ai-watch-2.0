@@ -4,6 +4,8 @@ const teacherController = require("../controllers/teacherController");
 const assessmentController = require("../controllers/assessmentController");
 const evaluationController = require("../controllers/evaluationController");
 const enrollStudentController = require("../controllers/enrollStudentController");
+const assessmentLockController = require("../controllers/assessmentLockController");
+const requireAssessmentUnlocked = require("../middleware/requireAssessmentUnlocked");
 const uploadImage = require("../middleware/uploadImage");
 const upload = require("../middleware/upload");
 
@@ -20,7 +22,11 @@ router.post("/approvals/bulk-approve", teacherController.bulkApprove);
 
 router.get("/assessments", assessmentController.list);
 router.get("/assessments/new", assessmentController.showCreate);
-router.post("/assessments/new", assessmentController.create);
+// requireAssessmentUnlocked runs before create — blocks the write if the
+// target subjectOfferingId+sectionId is already locked. Assessment
+// editing/deleting below is intentionally left ungated: locking only
+// stops *new* assessments, per the "doesn't affect existing rows" rule.
+router.post("/assessments/new", requireAssessmentUnlocked, assessmentController.create);
 router.post("/assessments/upload-image", uploadImage.single("image"), assessmentController.uploadImage);
 router.get("/assessments/:id/submissions", evaluationController.showSubmissions);
 router.post("/assessments/:id/submissions/bulk-evaluate", evaluationController.bulkEvaluate);
@@ -32,5 +38,10 @@ router.post("/assessments/:id/override", assessmentController.applyOverride);
 router.get("/assessments/:id/edit", assessmentController.showEdit);
 router.post("/assessments/:id/edit", assessmentController.edit);
 router.post("/assessments/:id/delete", assessmentController.delete);
+
+// Assessment locking — sidebar "Lock Assessments" tab.
+router.get("/assessments/locks", assessmentLockController.showLocks);
+router.post("/assessments/locks/lock", assessmentLockController.lock);
+router.post("/assessments/locks/unlock", assessmentLockController.unlock);
 
 module.exports = router;

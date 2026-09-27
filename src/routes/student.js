@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const studentController = require("../controllers/studentController");
+const studentCertificateController = require("../controllers/studentCertificateController");
 const { submissionUpload, MAX_FILES } = require("../middleware/submissionUpload");
 
 router.use(requireAuth, requireRole("STUDENT"));
@@ -29,5 +30,8 @@ router.post("/profile/group", studentController.updateSubGroup);
 
 router.get("/confirm-section", studentController.showConfirmSection);
 router.post("/confirm-section", studentController.confirmSection);
+
+router.get("/certificates", studentCertificateController.list);
+router.get("/certificates/:certificateId/download", studentCertificateController.download);
 
 module.exports = router;

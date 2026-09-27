@@ -34,13 +34,16 @@
         { href: '/teacher/roster', icon: 'fa-users', label: 'My Roster' },
         { href: '/teacher/enroll', icon: 'fa-user-plus', label: 'Enroll Students' },
         { href: '/teacher/assessments', icon: 'fa-file-lines', label: 'Assessments' },
+        { href: '/teacher/assessments/locks', icon: 'fa-lock', label: 'Assessment Locks' },
       ]},
     ];
   } else if (currentUser.role === 'STUDENT') {
     navGroups = [
       { section: null, items: [
         { href: '/student/dashboard', icon: 'fa-gauge', label: 'Dashboard' },
+        { href: '/student/certificates', icon: 'fa-award', label: 'My Certificate' },
         { href: '/student/profile', icon: 'fa-id-card', label: 'My Profile' },
+        
       ]},
     ];
   }
@@ -54,8 +57,23 @@
     <% navGroups.forEach(function(group) { %>
       <div>
         <% if (group.section) { %><p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-navy-500"><%= group.section %></p><% } %>
+        <%
+          // Longest-matching href in this group wins, so a parent route
+          // (e.g. /teacher/assessments) doesn't also light up alongside a
+          // more specific child route (e.g. /teacher/assessments/locks)
+          // just because the child path starts with the parent's href.
+          let bestLen = -1;
+          if (typeof currentPath !== 'undefined' && currentPath) {
+            group.items.forEach(function(it) {
+              const matches = currentPath === it.href || currentPath.startsWith(it.href + '/');
+              if (matches && it.href.length > bestLen) bestLen = it.href.length;
+            });
+          }
+        %>
         <% group.items.forEach(function(item) {
-             const isActive = typeof currentPath !== 'undefined' && currentPath && currentPath.startsWith(item.href);
+             const matches = typeof currentPath !== 'undefined' && currentPath &&
+               (currentPath === item.href || currentPath.startsWith(item.href + '/'));
+             const isActive = matches && item.href.length === bestLen;
         %>
           <a href="<%= item.href %>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium <%= isActive ? 'bg-amber-500 text-navy-900' : 'text-navy-100 hover:bg-navy-800' %>">
             <i class="fa-solid <%= item.icon %> w-4 text-center"></i>

@@ -68,7 +68,7 @@
               </td>
               <td class="py-2.5 pr-3 text-navy-500">
                 <% const dOverride = overrideByAssessment[a.id]; %>
-                <%= new Date(dOverride && dOverride.endAt ? dOverride.endAt : a.endAt).toLocaleDateString() %>
+                <%= new Date(dOverride && dOverride.endAt ? dOverride.endAt : a.endAt).toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata' }) %>
                 <% if (dOverride && dOverride.endAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
               </td>
               <td class="py-2.5 pr-3">

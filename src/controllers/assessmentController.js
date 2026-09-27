@@ -66,6 +66,7 @@ const {
   specializationIdsForMapping,
   enrollmentsForAssessmentSections,
 } = require("../services/sectionScope");
+const { lockedKeysForPairs } = require("../services/assessmentLockService");
 
 // Builds the list of "subjectOffering + concrete section + specialization
 // scope" combos a teacher can target. A mapping scoped to a specific
@@ -156,6 +157,18 @@ async function buildTargetOptions(teacherProfile) {
       }
     }
   }
+
+  // Flag which options are currently locked, in one bulk query, so the
+  // create form can disable them outright — the teacher never has to
+  // remember which sections were locked, and never loses a filled-in form
+  // to a late "this section is locked" rejection on submit.
+  const lockedKeys = await lockedKeysForPairs(
+    options.filter((o) => o.section).map((o) => ({ subjectOfferingId: o.subjectOfferingId, sectionId: o.section.id }))
+  );
+  options.forEach((o) => {
+    o.isLocked = !!(o.section && lockedKeys.has(`${o.subjectOfferingId}:${o.section.id}`));
+  });
+
   return options;
 }
 
@@ -191,8 +204,13 @@ exports.showCreate = async (req, res) => {
     }
   }
 
+  const error =
+    req.query.error === "locked"
+      ? "One of the sections you selected is locked for new assessments — unlock it from Assessment Locks first."
+      : null;
+
   res.render("teacher/assessments/new", {
-    title: "Create Assessment", targetOptions, error: null, formData: prefill,
+    title: "Create Assessment", targetOptions, error, formData: prefill,
     // Passed to the client as the BlockNote editor's initialContent — null means "start blank."
     initialDescriptionJson: JSON.stringify(initialDescription),
     breadcrumbs: [ROOT, ASSESSMENTS, { label: "Create Assessment" }],
