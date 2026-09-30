@@ -70,7 +70,18 @@ async function commitPromotion({ programId, fromSemesterNumber, admissionYear, s
       } else {
         student.currentSemesterNumber = toSemesterNumber;
         // admissionYear intentionally left unchanged — see note above.
-        student.currentSectionId = null; // admin re-assigns section for the new term
+        // specializationId intentionally left unchanged too — it doesn't
+        // change on promotion, only the section/sub-group does.
+        student.currentSectionId = null;
+        // Re-arms the same one-time "confirm your section" gate used at
+        // initial approval (see StudentProfile.js) — a promoted student is,
+        // for section-assignment purposes, right back in that same
+        // unconfirmed state for the new semester, and must pick their
+        // section/sub-group again before the dashboard unlocks. Sections
+        // are scoped per (program, semester, admissionYear), so last
+        // semester's section choice has no valid equivalent to carry
+        // forward automatically anyway.
+        student.sectionConfirmed = false;
         await student.save({ transaction: t });
         await PromotionRecord.create(
           { promotionBatchId: batch.id, studentId: student.id, fromSemester: fromSemesterNumber, toSemester: toSemesterNumber, result: "PROMOTED" },

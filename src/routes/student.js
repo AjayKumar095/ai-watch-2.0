@@ -3,15 +3,20 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const studentController = require("../controllers/studentController");
 const studentCertificateController = require("../controllers/studentCertificateController");
 const { submissionUpload, MAX_FILES } = require("../middleware/submissionUpload");
+const requireSectionSetup = require("../middleware/requireSectionSetup");
 
 router.use(requireAuth, requireRole("STUDENT"));
 
-router.get("/dashboard", studentController.dashboard);
+// Promoted students must pick their new semester's section before the
+// dashboard/assessment routes unlock (profile, certificates, and
+// confirm-section stay open — see requireSectionSetup).
+router.get("/dashboard", requireSectionSetup, studentController.dashboard);
 router.get("/profile", studentController.showProfile);
 router.post("/profile/section", studentController.chooseSection);
-router.get("/assessments/:id", studentController.showAssessment);
+router.get("/assessments/:id", requireSectionSetup, studentController.showAssessment);
 router.post(
   "/assessments/:id/submit",
+  requireSectionSetup,
   (req, res, next) => {
     submissionUpload.array("attachments", MAX_FILES)(req, res, (err) => {
       if (err) {

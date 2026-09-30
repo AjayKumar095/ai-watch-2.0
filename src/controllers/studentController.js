@@ -17,6 +17,8 @@ const {
 const { visibleSectionIdsForStudent, specializationMatches } = require("../services/sectionScope");
 const { sectionsFor } = require("../services/sectionLookupService");
 const { enrollStudentInOfferings } = require("../services/enrollmentService");
+const { isPromotedWithoutSection } = require("../middleware/requireSectionSetup");
+const logger = require("../utils/logger");
 const renderBlocks = require("../utils/renderBlocks");
 const fs = require("fs");
 const path = require("path");
@@ -37,11 +39,37 @@ const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 // broke assessment visibility for any student who set/changed their
 // section after their first enrollment. Call this after every
 // currentSectionId change so enrollments stay in sync.
+//
+// Scoped to the student's CURRENT semester's enrollments only. It used to
+// update every enrollment the student had ever had — harmless before
+// promotion existed, but once a promoted student picks their new Semester 2
+// section, that would rewrite every Semester 1 enrollment's sectionId to the
+// Semester 2 section too, corrupting the historical record (Sem 1
+// assessment visibility resolves from the enrollment's sectionId).
 async function syncEnrollmentSectionIds(studentProfile) {
   if (!studentProfile.currentSectionId) return;
+
+  const currentEnrollments = await SubjectEnrollment.findAll({
+    where: { studentId: studentProfile.id },
+    attributes: ["id"],
+    include: [
+      {
+        model: SubjectOffering,
+        attributes: [],
+        required: true,
+        where: {
+          programId: studentProfile.programId,
+          semesterNumber: studentProfile.currentSemesterNumber,
+          admissionYear: studentProfile.admissionYear,
+        },
+      },
+    ],
+  });
+  if (!currentEnrollments.length) return;
+
   await SubjectEnrollment.update(
     { sectionId: studentProfile.currentSectionId },
-    { where: { studentId: studentProfile.id } }
+    { where: { id: currentEnrollments.map((e) => e.id) } }
   );
 }
 
@@ -458,12 +486,21 @@ exports.showProfile = async (req, res) => {
 
   const { subGroups } = await getTopLevelSectionAndSubGroups(studentProfile);
 
+  // Promoted students land here from the requireSectionSetup gate. Reuses
+  // the page's existing `error` banner slot so no view change is needed.
+  let setupMessage = null;
+  if (isPromotedWithoutSection(studentProfile)) {
+    setupMessage = availableSections.length
+      ? `You've moved to Semester ${studentProfile.currentSemesterNumber}. Please select your section and group below to continue to your dashboard.`
+      : `You've moved to Semester ${studentProfile.currentSemesterNumber}, but its sections haven't been set up yet. Please check back shortly or contact your admin.`;
+  }
+
   res.render("student/profile", {
     title: "My Profile",
     studentProfile,
     availableSections,
     subGroups,
-    error: null,
+    error: setupMessage,
     breadcrumbs: [ROOT, { label: "My Profile" }],
   });
 };
@@ -507,21 +544,32 @@ exports.chooseSection = async (req, res) => {
     return rerender("That sub-group doesn't belong to the selected section.");
   }
 
+  const wasInSetup = isPromotedWithoutSection(studentProfile);
+
   studentProfile.currentSectionId = subGroupId || sectionId;
   studentProfile.sectionConfirmed = true;
   await studentProfile.save();
   await syncEnrollmentSectionIds(studentProfile);
 
-  // If the student is already verified, auto-enroll them in active offerings now that section is set
+  // If the student is already verified, auto-enroll them in active offerings now that section is set.
+  // For a promoted student this is the step that creates their new
+  // semester's SubjectEnrollment rows — nothing else does after promotion,
+  // so a silent failure here would leave them with no subjects at all.
   if (studentProfile.isVerified) {
     try {
       await enrollStudentInOfferings(studentProfile);
     } catch (err) {
-      // Log and continue
+      logger.error("Failed to auto-enroll student after section selection", {
+        studentId: studentProfile.id,
+        semesterNumber: studentProfile.currentSemesterNumber,
+        error: err.message,
+      });
     }
   }
 
-  res.redirect("/student/profile");
+  // A promoted student has just cleared the gate — take them straight to
+  // the dashboard rather than back to the profile page.
+  res.redirect(wasInSetup ? "/student/dashboard" : "/student/profile");
 };
 
 // --- Set/change group from the profile page (persistent, not one-time) --

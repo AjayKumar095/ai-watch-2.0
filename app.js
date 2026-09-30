@@ -1,6 +1,9 @@
 // app.js
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
+
+process.env.TZ = process.env.TZ || "Asia/Kolkata";
+
 const validateEnv = require("./src/config/validateEnv");
 validateEnv();
 
