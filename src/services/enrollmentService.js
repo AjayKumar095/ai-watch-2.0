@@ -48,9 +48,14 @@ async function enrollStudentInOfferings(studentOrId) {
       },
     });
 
-    // If enrollment existed but section was missing or outdated, sync section
-    if (!created && enrollment.sectionId !== student.currentSectionId) {
+    // If enrollment existed but section was missing or outdated, sync section.
+    // An enrollment that was ENDED earlier (the student moved away and has now come
+    // back to this placement) is switched back on instead of creating a duplicate —
+    // the (offering, student) pair is unique.
+    if (!created && (enrollment.sectionId !== student.currentSectionId || !enrollment.isActive)) {
       enrollment.sectionId = student.currentSectionId;
+      enrollment.isActive = true;
+      enrollment.endedAt = null;
       await enrollment.save();
     }
 
@@ -92,12 +97,22 @@ async function autoEnrollOffering(subjectOfferingId) {
   let skipped = 0;
 
   for (const student of matchingStudents) {
-    const [, wasCreated] = await SubjectEnrollment.findOrCreate({
+    const [existing, wasCreated] = await SubjectEnrollment.findOrCreate({
       where: { subjectOfferingId: offering.id, studentId: student.id },
       defaults: { sectionId: student.currentSectionId },
     });
     if (wasCreated) created++;
-    else skipped++;
+    else {
+      // Same rule as above: an enrollment ended earlier is revived for a student who is
+      // back in this placement.
+      if (!existing.isActive) {
+        existing.isActive = true;
+        existing.endedAt = null;
+        existing.sectionId = student.currentSectionId;
+        await existing.save();
+      }
+      skipped++;
+    }
   }
 
   return { created, skipped, total: matchingStudents.length };

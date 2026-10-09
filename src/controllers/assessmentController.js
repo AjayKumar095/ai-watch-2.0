@@ -172,10 +172,87 @@ async function buildTargetOptions(teacherProfile) {
   return options;
 }
 
+// Builds the cascade-filter tree for the My Assessments page:
+//   Subject -> Program/Semester (a SubjectOffering) -> Section -> Sub-group
+// It is derived from the teacher's OWN subject mappings (same source as the
+// create form's target list), plus any section an existing assessment
+// already targets, so an assessment can never become un-filterable just
+// because a mapping was later changed.
+async function buildFilterTree(teacherProfile, assessments) {
+  const offerings = new Map(); // subjectOfferingId -> node
+
+  function offeringNode(so) {
+    if (!offerings.has(so.id)) {
+      offerings.set(so.id, {
+        id: so.id,
+        subjectId: so.SubjectPool ? so.SubjectPool.id : String(so.id),
+        subjectName: so.SubjectPool ? so.SubjectPool.name : "Subject",
+        label: `${so.Program ? so.Program.name : "Program"} · Sem ${so.semesterNumber}`,
+        semesterNumber: so.semesterNumber,
+        sections: new Map(), // top-level sectionId -> { id, label, children: Map }
+      });
+    }
+    return offerings.get(so.id);
+  }
+
+  function addSection(node, section) {
+    if (!section) return;
+    const parent = section.parentSection || null;
+    const top = parent || section;
+    if (!node.sections.has(top.id)) {
+      node.sections.set(top.id, { id: top.id, label: `Section ${top.name}`, children: new Map() });
+    }
+    if (parent) {
+      node.sections.get(top.id).children.set(section.id, { id: section.id, label: section.name });
+    }
+  }
+
+  const options = await buildTargetOptions(teacherProfile);
+  for (const o of options) {
+    addSection(offeringNode(o.subjectOffering), o.section);
+  }
+
+  // Sub-groups of every top-level section we know about (an "all sections" or
+  // whole-section mapping covers its sub-groups, which options don't list).
+  const topIds = [];
+  offerings.forEach((n) => n.sections.forEach((s) => topIds.push(s.id)));
+  if (topIds.length) {
+    const subs = await Section.findAll({ where: { parentSectionId: { [Op.in]: topIds } }, order: [["name", "ASC"]] });
+    offerings.forEach((n) =>
+      subs.forEach((sg) => {
+        if (n.sections.has(sg.parentSectionId)) n.sections.get(sg.parentSectionId).children.set(sg.id, { id: sg.id, label: sg.name });
+      })
+    );
+  }
+
+  // Anything an existing assessment targets.
+  for (const a of assessments) {
+    const node = offeringNode(a.SubjectOffering);
+    for (const as of a.AssessmentSections) addSection(node, as.Section);
+  }
+
+  const byName = (x, y) => String(x.label).localeCompare(String(y.label), undefined, { numeric: true });
+  return Array.from(offerings.values())
+    .map((n) => ({
+      id: n.id,
+      subjectId: n.subjectId,
+      subjectName: n.subjectName,
+      label: n.label,
+      semesterNumber: n.semesterNumber,
+      sections: Array.from(n.sections.values())
+        .map((s) => ({ id: s.id, label: s.label, children: Array.from(s.children.values()).sort(byName) }))
+        .sort(byName),
+    }))
+    .sort((a, b) => a.subjectName.localeCompare(b.subjectName) || a.semesterNumber - b.semesterNumber);
+}
+
 exports.list = async (req, res) => {
   const assessments = await Assessment.findAll({
     where: { createdById: req.currentUser.id },
-    include: [{ model: SubjectOffering, include: [SubjectPool, Program] }, AssessmentSection],
+    include: [
+      { model: SubjectOffering, include: [SubjectPool, Program] },
+      { model: AssessmentSection, include: [{ model: Section, include: [{ model: Section, as: "parentSection" }] }] },
+    ],
     order: [["createdAt", "DESC"]],
   });
 
@@ -187,7 +264,31 @@ exports.list = async (req, res) => {
     };
   }
 
-  res.render("teacher/assessments/index", { title: "My Assessments", assessments, counts, breadcrumbs: [ROOT, { label: "Assessments" }] });
+  // Compact per-assessment filter metadata. sectionIds holds every targeted
+  // section AND its parent: targeting a whole Section covers its sub-groups,
+  // so filtering on a sub-group must still find it.
+  const meta = {};
+  for (const a of assessments) {
+    const ids = new Set();
+    const labels = [];
+    for (const as of a.AssessmentSections) {
+      if (!as.Section) continue;
+      ids.add(as.Section.id);
+      if (as.Section.parentSection) ids.add(as.Section.parentSection.id);
+      labels.push(as.Section.parentSection ? `${as.Section.parentSection.name} - ${as.Section.name}` : `${as.Section.name}`);
+    }
+    meta[a.id] = { subjectId: a.SubjectOffering.SubjectPool ? a.SubjectOffering.SubjectPool.id : "", offeringId: a.SubjectOffering.id, sectionIds: Array.from(ids), sectionLabels: labels };
+  }
+
+  let filterTree = [];
+  try {
+    const teacherProfile = await loadTeacherProfile(req);
+    if (teacherProfile) filterTree = await buildFilterTree(teacherProfile, assessments);
+  } catch (e) {
+    console.error("assessment filter tree failed:", e);
+  }
+
+  res.render("teacher/assessments/index", { title: "My Assessments", assessments, counts, meta, filterTree, breadcrumbs: [ROOT, { label: "Assessments" }] });
 };
 
 exports.showCreate = async (req, res) => {

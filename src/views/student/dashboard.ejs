@@ -1,3 +1,4 @@
+<% var historyList = (typeof historyIds !== 'undefined' && historyIds) ? historyIds : []; %>
 <div class="mb-6">
   <h1 class="text-2xl font-bold text-navy-900">Welcome, <%= currentUser.firstName %></h1>
   <p class="text-sm text-navy-500">
@@ -12,7 +13,7 @@
     <span class="stat-accent bg-sky-500"></span>
     <div class="stat-icon bg-sky-50 text-sky-600"><i class="fa-solid fa-clipboard-list"></i></div>
     <div>
-      <p class="stat-value"><%= assessments.length %></p>
+      <p class="stat-value"><%= assessments.length - historyList.length %></p>
       <p class="stat-label">Active Assessments</p>
     </div>
   </div>
@@ -60,11 +61,12 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-navy-50">
-          <% assessments.forEach(function(a) { const sub = submissionByAssessment[a.id]; %>
+          <% assessments.forEach(function(a) { const sub = submissionByAssessment[a.id]; const isHistory = historyList.indexOf(a.id) !== -1; %>
             <tr class="transition-colors hover:bg-navy-50/60">
               <td class="py-2.5 pr-3 font-medium text-navy-800"><%= a.SubjectOffering.SubjectPool.name %></td>
               <td class="py-2.5 pr-3 text-navy-600">
                 <a href="/student/assessments/<%= a.id %>" class="font-medium text-info-600 hover:underline"><%= a.title %></a>
+                <% if (isHistory) { %><span class="badge-navy ml-1" title="Given to your previous section or semester — view only">Previous class</span><% } %>
               </td>
               <td class="py-2.5 pr-3 text-navy-500">
                 <% const dOverride = overrideByAssessment[a.id]; %>
@@ -77,7 +79,7 @@
                 <% } else { %><span class="badge-navy">Submitted</span><% } %>
               </td>
               <td class="py-2.5 pr-3">
-                <a href="/student/assessments/<%= a.id %>" class="btn-secondary !px-3 !py-1.5 text-xs"><%= sub ? 'View / Update' : 'View & Submit' %></a>
+                <a href="/student/assessments/<%= a.id %>" class="btn-secondary !px-3 !py-1.5 text-xs"><%= isHistory ? 'View' : (sub ? 'View / Update' : 'View & Submit') %></a>
               </td>
             </tr>
           <% }) %>

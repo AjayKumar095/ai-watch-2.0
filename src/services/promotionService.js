@@ -13,7 +13,26 @@
 // real-world calendar year. There's no separate "which year did this
 // promotion run in" field — PromotionBatch.executedAt already records
 // that precisely, so admissionYear here always means the cohort.
-const { StudentProfile, Program, PromotionBatch, PromotionRecord, User } = require("../models");
+const { StudentProfile, Program, PromotionBatch, PromotionRecord, User, SubjectEnrollment, SubjectOffering } = require("../models");
+
+// When a student leaves a semester (promoted or graduated), their enrollments in THAT
+// semester's subjects are ended — kept as history, never deleted — so the old teacher's
+// live roster and the old class's new assessments no longer include them. Past
+// submissions and results are untouched (they hang off the assessment, not the enrollment).
+async function endSemesterEnrollments({ studentIds, programId, fromSemesterNumber, admissionYear, transaction }) {
+  if (!studentIds.length) return;
+  const rows = await SubjectEnrollment.findAll({
+    where: { studentId: studentIds, isActive: true },
+    include: [{ model: SubjectOffering, required: true, attributes: [], where: { programId, semesterNumber: fromSemesterNumber, admissionYear } }],
+    attributes: ["id"],
+    transaction,
+  });
+  if (!rows.length) return;
+  await SubjectEnrollment.update(
+    { isActive: false, endedAt: new Date() },
+    { where: { id: rows.map((r) => r.id) }, transaction }
+  );
+}
 
 async function previewPromotion({ programId, fromSemesterNumber, admissionYear }) {
   const program = await Program.findByPk(programId);
@@ -90,6 +109,10 @@ async function commitPromotion({ programId, fromSemesterNumber, admissionYear, s
         promotedCount++;
       }
     }
+
+    await endSemesterEnrollments({
+      studentIds: students.map((s) => s.id), programId, fromSemesterNumber, admissionYear, transaction: t,
+    });
 
     return { batch, promotedCount, graduatedCount };
   });

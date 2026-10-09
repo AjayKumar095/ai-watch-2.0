@@ -30,6 +30,26 @@
 -->
 <form id="bulk-evaluate-form" action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST"></form>
 
+<div class="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+  <div class="col-span-2">
+    <label class="form-label !mb-0.5 text-xs" for="sub-search">Search student</label>
+    <input id="sub-search" type="search" class="form-input !py-1.5 text-sm w-full" placeholder="Name…" autocomplete="off" />
+  </div>
+  <div>
+    <label class="form-label !mb-0.5 text-xs" for="sub-status">Status</label>
+    <select id="sub-status" class="form-input !py-1.5 text-sm w-full">
+      <option value="">All</option><option value="pending">Pending</option><option value="late">Late</option><option value="evaluated">Evaluated</option>
+    </select>
+  </div>
+  <div>
+    <label class="form-label !mb-0.5 text-xs" for="sub-sort">Sort by</label>
+    <select id="sub-sort" class="form-input !py-1.5 text-sm w-full">
+      <option value="default">Default order</option><option value="name">Name A–Z</option><option value="section">Section</option><option value="status">Pending first</option><option value="marks">Marks high→low</option>
+    </select>
+  </div>
+</div>
+<p id="sub-count" class="mb-2 text-xs text-navy-400"></p>
+
 <div class="card">
   <div class="mb-3 flex flex-wrap items-end gap-3 rounded-lg bg-navy-50 p-3">
     <div>
@@ -47,7 +67,7 @@
     <table class="min-w-full divide-y divide-navy-100 text-sm">
       <thead>
         <tr class="text-left text-xs font-medium uppercase tracking-wide text-navy-400">
-          <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('.sub-check').forEach(c=>c.checked=this.checked)" /></th>
+          <th class="py-2 pr-3"><input type="checkbox" onclick="document.querySelectorAll('tr[data-submission-id]').forEach(r=>{if(r.style.display!=='none'){var c=r.querySelector('.sub-check');if(c)c.checked=this.checked}})" /></th>
           <th class="py-2 pr-3">Student</th>
           <th class="py-2 pr-3">Section</th>
           <th class="py-2 pr-3">Status</th>
@@ -57,7 +77,11 @@
       </thead>
       <tbody class="divide-y divide-navy-50">
         <% submissions.forEach(function(s) { %>
-          <tr data-submission-id="<%= s.id %>">
+          <tr data-submission-id="<%= s.id %>"
+              data-name="<%= (s.StudentProfile.User.firstName + ' ' + s.StudentProfile.User.lastName).toLowerCase() %>"
+              data-section="<%= s.Section.name %>"
+              data-status="<%= s.status === 'EVALUATED' ? 'evaluated' : (s.isLate ? 'late' : 'pending') %>"
+              data-marks="<%= s.status === 'EVALUATED' ? parseFloat(s.marksObtained) : -1 %>">
             <td class="py-2 pr-3"><input form="bulk-evaluate-form" class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
             <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
             <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
@@ -187,5 +211,34 @@
           btn.textContent = originalText;
         });
     });
+  })();
+</script>
+
+<script>
+  (function () {
+    var tbody = document.querySelector('tbody[class*="divide-y"]');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-submission-id]'));
+    rows.forEach(function (r, i) { r.dataset.idx = i; });
+    var q = document.getElementById('sub-search'), st = document.getElementById('sub-status'),
+        so = document.getElementById('sub-sort'), ct = document.getElementById('sub-count');
+    var cmp = {
+      'default': function (a, b) { return 0; },
+      name: function (a, b) { return a.dataset.name.localeCompare(b.dataset.name); },
+      section: function (a, b) { return a.dataset.section.localeCompare(b.dataset.section, undefined, { numeric: true }); },
+      status: function (a, b) { return (a.dataset.status === 'evaluated') - (b.dataset.status === 'evaluated'); },
+      marks: function (a, b) { return b.dataset.marks - a.dataset.marks; }
+    };
+    function apply() {
+      var needle = q.value.trim().toLowerCase(), shown = 0;
+      rows.slice().sort(function (a, b) { return cmp[so.value](a, b) || a.dataset.idx - b.dataset.idx; }).forEach(function (r) {
+        var ok = (!needle || r.dataset.name.indexOf(needle) !== -1) && (!st.value || r.dataset.status === st.value);
+        r.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+        tbody.appendChild(r);
+      });
+      ct.textContent = shown === rows.length ? rows.length + ' submission(s)' : shown + ' of ' + rows.length + ' submission(s)';
+    }
+    q.addEventListener('input', apply); st.addEventListener('change', apply); so.addEventListener('change', apply);
+    apply();
   })();
 </script>

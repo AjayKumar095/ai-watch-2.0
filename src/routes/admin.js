@@ -31,6 +31,10 @@ router.post("/teachers/:id/edit", teacherAccountController.edit);
 router.post("/teachers/:id/delete", teacherAccountController.delete);
 router.get("/students", studentAdminController.list);
 
+router.get("/students/form-options", studentAdminController.formOptions);
+router.get("/students/:id/edit", studentAdminController.editForm);
+router.post("/students/:id/edit", studentAdminController.update);
+
 router.get("/users", userAdminController.list);
 router.get("/users/:id/edit", userAdminController.showEdit);
 router.post("/users/:id/edit", userAdminController.edit);

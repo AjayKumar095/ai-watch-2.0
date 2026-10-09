@@ -50,7 +50,8 @@ async function syncEnrollmentSectionIds(studentProfile) {
   if (!studentProfile.currentSectionId) return;
 
   const currentEnrollments = await SubjectEnrollment.findAll({
-    where: { studentId: studentProfile.id },
+    // Active only: an ended enrollment is history and keeps the section it had.
+    where: { studentId: studentProfile.id, isActive: true },
     attributes: ["id"],
     include: [
       {
@@ -146,8 +147,10 @@ exports.dashboard = async (req, res) => {
     return res.redirect("/student/confirm-section");
   }
 
+  // Only CURRENT enrollments decide which assessments the student receives. Enrollments
+  // ended by a semester/program change stay as history and must not hand out new work.
   const enrollments = await SubjectEnrollment.findAll({
-    where: { studentId: studentProfile.id },
+    where: { studentId: studentProfile.id, isActive: true },
     include: [{ model: SubjectOffering, include: [SubjectPool] }],
   });
 
@@ -192,6 +195,26 @@ exports.dashboard = async (req, res) => {
   const submissions = await Submission.findAll({ where: { studentId: studentProfile.id } });
   const submissionByAssessment = Object.fromEntries(submissions.map((s) => [s.assessmentId, s]));
 
+  // History is never lost: anything the student has already submitted stays listed (with
+  // its marks and remarks) even after they moved to another section or semester, and
+  // whoever the evaluating teacher was. Those extra entries are view-only — new work only
+  // comes from the CURRENT enrollments and section above.
+  const listedIds = new Set(assessments.map((a) => a.id));
+  const historyCandidateIds = submissions.map((s) => s.assessmentId).filter((id) => !listedIds.has(id));
+  let historyIds = []; // handed to the view so these rows are labelled "previous class", view-only
+  if (historyCandidateIds.length) {
+    const history = await Assessment.findAll({
+      where: { id: historyCandidateIds, isActive: true },
+      include: [
+        { model: SubjectOffering, include: [SubjectPool] },
+        { model: AssessmentSection, required: false, include: [{ model: AssessmentSectionSpecialization, as: "sectionSpecializations" }] },
+      ],
+      order: [["endAt", "ASC"]],
+    });
+    historyIds = history.map((a) => a.id);
+    assessments.push(...history);
+  }
+
   // Per-student overrides for this student, keyed by assessmentId — same
   // lookup showAssessment/submitAssessment already do, but this list view
   // never did it, so an overridden student's "Due" date here always showed
@@ -209,6 +232,7 @@ exports.dashboard = async (req, res) => {
     title: "Student Dashboard",
     studentProfile,
     assessments,
+    historyIds,
     submissionByAssessment,
     overrideByAssessment,
     certificates,
@@ -328,16 +352,23 @@ exports.showAssessment = async (req, res) => {
   });
   if (!assessment) return res.status(404).render("error", { title: "Not found", message: "Assessment not found." });
 
+  // Not filtered by isActive: a student must still be able to OPEN work they submitted
+  // under an earlier section / semester (read-only below).
   const enrollment = await SubjectEnrollment.findOne({
     where: { subjectOfferingId: assessment.subjectOfferingId, studentId: studentProfile.id },
   });
-  if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
+  const existingSubmission = await Submission.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
 
-  if (!(await assertVisible(assessment, enrollment, studentProfile))) {
-    return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
+  // History: they already submitted, but it is no longer theirs to hand in — they moved
+  // section/semester, so this enrollment is ended or the assessment targets another section.
+  const isCurrent = Boolean(enrollment && enrollment.isActive) && (await assertVisible(assessment, enrollment, studentProfile));
+  const historyOnly = Boolean(existingSubmission) && !isCurrent;
+
+  if (!historyOnly) {
+    if (!enrollment || !enrollment.isActive) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
+    if (!isCurrent) return res.status(403).render("error", { title: "Forbidden", message: "This assessment isn't assigned to your section." });
   }
 
-  const existingSubmission = await Submission.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
   const override = await AssessmentStudentOverride.findOne({ where: { assessmentId: assessment.id, studentId: studentProfile.id } });
 
   // Same window logic submitAssessment enforces server-side — computed
@@ -347,8 +378,9 @@ exports.showAssessment = async (req, res) => {
   const windowStart = override && override.startAt ? new Date(override.startAt) : new Date(assessment.startAt);
   const windowEnd = override && override.endAt ? new Date(override.endAt) : new Date(assessment.endAt);
   const now = new Date();
-  const submissionNotYetOpen = now < windowStart;
-  const submissionClosed = now > windowEnd;
+  const submissionNotYetOpen = !historyOnly && now < windowStart;
+  // A history-only view never offers the submit form, regardless of the dates.
+  const submissionClosed = historyOnly || now > windowEnd;
 
   const descriptionHtml = Array.isArray(assessment.description) ? renderBlocks(assessment.description) : "";
 
@@ -359,6 +391,7 @@ exports.showAssessment = async (req, res) => {
     enrollment,
     existingSubmission,
     override,
+    historyOnly,
     submissionNotYetOpen,
     submissionClosed,
     error: req.query.error || null,
@@ -371,8 +404,10 @@ exports.submitAssessment = async (req, res) => {
   const assessment = await Assessment.findByPk(req.params.id);
   if (!assessment) return res.redirect("/student/dashboard");
 
+  // Submitting needs a CURRENT enrollment: after a semester/program move the old one is
+  // ended, and after a section move the assessment no longer targets the student.
   const enrollment = await SubjectEnrollment.findOne({
-    where: { subjectOfferingId: assessment.subjectOfferingId, studentId: studentProfile.id },
+    where: { subjectOfferingId: assessment.subjectOfferingId, studentId: studentProfile.id, isActive: true },
   });
   if (!enrollment) return res.status(403).render("error", { title: "Forbidden", message: "You are not enrolled in this subject." });
 

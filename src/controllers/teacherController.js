@@ -75,7 +75,9 @@ exports.roster = async (req, res) => {
 
   const offeringIds = mappings.map((m) => m.subjectOfferingId);
   const enrollments = await SubjectEnrollment.findAll({
-    where: { subjectOfferingId: offeringIds },
+    // Only students who are in the class NOW — enrollments ended by a semester/program
+    // change stay in the database as history but no longer belong on a live roster.
+    where: { subjectOfferingId: offeringIds, isActive: true },
     include: [{ model: StudentProfile, include: [User] }, Section],
   });
 

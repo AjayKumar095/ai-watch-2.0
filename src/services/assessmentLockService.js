@@ -56,9 +56,15 @@ async function lockSection({ teacherId, subjectOfferingId, sectionId }) {
 }
 
 async function unlockSection({ teacherId, subjectOfferingId, sectionId }) {
-  await assertTeacherOwnsOffering({ teacherId, subjectOfferingId });
-
   const lock = await getLock({ subjectOfferingId, sectionId });
+
+  // The teacher who placed a lock can always release it, even after deleting every
+  // assessment under it. Requiring ownership here used to trap the lock: with no
+  // assessments left the teacher failed the ownership check, so a lock they set
+  // could never be removed, and the section stayed greyed out on "Create Assessment".
+  const placedByThisTeacher = Boolean(lock && lock.lockedById && String(lock.lockedById) === String(teacherId));
+  if (!placedByThisTeacher) await assertTeacherOwnsOffering({ teacherId, subjectOfferingId });
+
   if (!lock || !lock.isLocked) return lock; // already unlocked / never locked, nothing to do
 
   lock.isLocked = false;
@@ -107,8 +113,12 @@ async function listLockableScopesForTeacher(teacherId) {
     attributes: ["id", "subjectOfferingId"],
   });
 
-  if (!assessments.length) return [];
-  const offeringIds = [...new Set(assessments.map((a) => a.subjectOfferingId))];
+  // Locks this teacher placed stay listed even when no assessment is left under
+  // them (e.g. after deleting them all), so a lock can never become invisible
+  // and impossible to release from the Lock Assessments screen.
+  const heldLocks = await AssessmentLock.findAll({ where: { lockedById: teacherId, isLocked: true } });
+
+  if (!assessments.length && !heldLocks.length) return [];
 
   // Every section an assessment actually targets, straight from
   // AssessmentSection — this is set the moment an assessment is created
@@ -127,7 +137,14 @@ async function listLockableScopesForTeacher(teacherId) {
       pairs.push({ subjectOfferingId: a.subjectOfferingId, sectionId: as.sectionId });
     }
   }
+  for (const l of heldLocks) {
+    const key = `${l.subjectOfferingId}:${l.sectionId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({ subjectOfferingId: l.subjectOfferingId, sectionId: l.sectionId });
+  }
   if (!pairs.length) return [];
+  const offeringIds = [...new Set(pairs.map((p) => p.subjectOfferingId))];
 
   const locks = await AssessmentLock.findAll({
     where: { subjectOfferingId: offeringIds },

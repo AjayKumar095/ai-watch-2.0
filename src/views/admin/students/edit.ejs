@@ -1,0 +1,205 @@
+<%
+  var v = function(name, fallback) { return form && form[name] !== undefined ? form[name] : fallback; };
+  var sel = selected;
+  var curStatus = v('status', student.status);
+  var curVerified = form ? (form.isVerified === 'on') : student.isVerified;
+%>
+<div class="mb-6 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-navy-900">Edit student</h1>
+  <a href="/admin/students" class="text-sm text-info-600 hover:underline">&larr; Back to students</a>
+</div>
+
+<% if (errors && errors.length) { %>
+  <div class="card mb-4 border border-red-200 bg-red-50">
+    <p class="mb-1 text-sm font-semibold text-red-700">Please fix the following:</p>
+    <ul class="list-disc pl-5 text-sm text-red-700">
+      <% errors.forEach(function(e) { %><li><%= e %></li><% }) %>
+    </ul>
+  </div>
+<% } %>
+<% if (notices && notices.length) { %>
+  <div class="card mb-4 border border-amber-200 bg-amber-50">
+    <ul class="list-disc pl-5 text-sm text-amber-800">
+      <% notices.forEach(function(n) { %><li><%= n %></li><% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<form action="/admin/students/<%= student.id %>/edit" method="POST" id="studentEditForm" class="card grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
+  <input type="hidden" name="version" value="<%= version %>" />
+
+  <div>
+    <label class="form-label">First name</label>
+    <input class="form-input" type="text" name="firstName" required value="<%= v('firstName', student.User.firstName) %>" />
+  </div>
+  <div>
+    <label class="form-label">Last name</label>
+    <input class="form-input" type="text" name="lastName" value="<%= v('lastName', student.User.lastName) %>" />
+  </div>
+  <div>
+    <label class="form-label">Email</label>
+    <input class="form-input" type="email" name="email" required value="<%= v('email', student.User.email) %>" />
+  </div>
+
+  <div>
+    <label class="form-label">Roll no</label>
+    <input class="form-input font-mono" type="text" name="rollNo" required value="<%= v('rollNo', student.rollNo) %>" />
+  </div>
+  <div>
+    <label class="form-label">Status</label>
+    <select class="form-input" name="status">
+      <% statuses.forEach(function(st) { %><option value="<%= st %>" <%= curStatus === st ? 'selected' : '' %>><%= st === 'ON_HOLD' ? 'On hold' : st.charAt(0) + st.slice(1).toLowerCase() %></option><% }) %>
+    </select>
+  </div>
+  <div class="flex items-end">
+    <label class="flex items-center gap-2 text-sm text-navy-700">
+      <input type="checkbox" name="isVerified" <%= curVerified ? 'checked' : '' %> /> Verified
+    </label>
+  </div>
+
+  <%# Academic placement. Each list is filtered by the ones before it:
+      Program -> Specialization
+      Program + Admission year -> Semester (only active offerings) -> Section -> Sub-group %>
+  <div>
+    <label class="form-label">Program</label>
+    <select class="form-input" name="programId" id="programId" required>
+      <option value="">Select program</option>
+      <% programs.forEach(function(p) { %><option value="<%= p.id %>" <%= String(sel.programId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="form-label">Admission year</label>
+    <select class="form-input" name="admissionYear" id="admissionYear" required>
+      <option value="">Select year</option>
+      <% admissionYears.forEach(function(y) { %><option value="<%= y.value %>" <%= String(sel.admissionYear) === String(y.value) ? 'selected' : '' %>><%= y.label %></option><% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="form-label">Specialization</label>
+    <select class="form-input" name="specializationId" id="specializationId">
+      <option value="">None</option>
+      <% specializations.forEach(function(s) { %><option value="<%= s.id %>" <%= String(sel.specializationId) === String(s.id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+    </select>
+  </div>
+
+  <div>
+    <label class="form-label">Semester</label>
+    <select class="form-input" name="semesterNumber" id="semesterNumber" required>
+      <option value="">Select semester</option>
+      <% semesters.forEach(function(n) { %><option value="<%= n %>" <%= String(sel.semesterNumber) === String(n) ? 'selected' : '' %>>Semester <%= n %></option><% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="form-label">Section</label>
+    <select class="form-input" name="sectionId" id="sectionId">
+      <option value="">None</option>
+      <% sections.forEach(function(s) { %><option value="<%= s.id %>" <%= String(sel.sectionId) === String(s.id) ? 'selected' : '' %>>Section <%= s.name %></option><% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="form-label">Sub-group</label>
+    <select class="form-input" name="subGroupId" id="subGroupId">
+      <option value="">None</option>
+      <% subGroups.forEach(function(g) { %><option value="<%= g.id %>" <%= String(sel.subGroupId) === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %>
+    </select>
+  </div>
+
+  <% if (impact && impact.length) { %>
+    <div class="col-span-full rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <p class="mb-2 text-sm font-semibold text-amber-800">This change moves the student to a different program, year, specialization or semester, and they have linked records:</p>
+      <ul class="mb-3 list-disc pl-5 text-sm text-amber-800">
+        <% impact.forEach(function(i) { %><li><%= i.name %>: <%= i.count %></li><% }) %>
+      </ul>
+      <p class="mb-3 text-xs text-amber-700">Nothing is deleted. Enrollments from the old placement are ended and kept as history (past submissions and results stay with the student), and the student is enrolled in the new placement's subjects.</p>
+      <label class="flex items-center gap-2 text-sm text-amber-900">
+        <input type="checkbox" name="confirmImpact" required /> I understand, apply this change
+      </label>
+    </div>
+  <% } %>
+
+  <div class="col-span-full mt-2 flex items-center gap-3">
+    <button type="submit" class="btn-primary">Save changes</button>
+    <a href="/admin/students" class="btn-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+  (function () {
+    var el = {
+      program: document.getElementById('programId'),
+      year: document.getElementById('admissionYear'),
+      spec: document.getElementById('specializationId'),
+      sem: document.getElementById('semesterNumber'),
+      section: document.getElementById('sectionId'),
+      sub: document.getElementById('subGroupId')
+    };
+    var busy = false;
+
+    // Repopulates a <select>, keeping the current pick only if it is still offered.
+    // Returns true when a previous pick had to be dropped.
+    function fill(select, items, placeholder, labelFn) {
+      var keep = select.value;
+      select.innerHTML = '';
+      var ph = document.createElement('option');
+      ph.value = ''; ph.textContent = placeholder;
+      select.appendChild(ph);
+      var stillValid = false;
+      items.forEach(function (it) {
+        var o = document.createElement('option');
+        var val = (typeof it === 'object') ? it.id : it;
+        o.value = val;
+        o.textContent = labelFn(it);
+        if (String(val) === String(keep)) { o.selected = true; stillValid = true; }
+        select.appendChild(o);
+      });
+      if (!stillValid) select.value = '';
+      return keep !== '' && !stillValid;
+    }
+
+    function query() {
+      var p = new URLSearchParams();
+      p.set('programId', el.program.value);
+      if (el.year.value) p.set('admissionYear', el.year.value);
+      if (el.sem.value) p.set('semesterNumber', el.sem.value);
+      if (el.section.value) p.set('sectionId', el.section.value);
+      return p.toString();
+    }
+
+    async function refresh() {
+      if (busy) return;
+      busy = true;
+      [el.spec, el.sem, el.section, el.sub].forEach(function (s) { s.disabled = true; });
+      try {
+        if (!el.program.value) {
+          fill(el.spec, [], 'None', String); fill(el.sem, [], 'Select semester', String);
+          fill(el.section, [], 'None', String); fill(el.sub, [], 'None', String);
+          return;
+        }
+        for (var i = 0; i < 4; i++) {
+          var res = await fetch('/admin/students/form-options?' + query(), { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) break;
+          var d = await res.json();
+          var dropped = false;
+          dropped = fill(el.spec, d.specializations, 'None', function (s) { return s.name; }) || dropped;
+          dropped = fill(el.sem, d.semesters, 'Select semester', function (n) { return 'Semester ' + n; }) || dropped;
+          dropped = fill(el.section, d.sections, 'None', function (s) { return 'Section ' + s.name; }) || dropped;
+          fill(el.sub, d.subGroups, 'None', function (g) { return g.name; });
+          if (!dropped) break;
+        }
+      } finally {
+        [el.spec, el.sem, el.section].forEach(function (s) { s.disabled = false; });
+        el.sub.disabled = !el.section.value || el.sub.options.length <= 1;
+        busy = false;
+      }
+    }
+
+    // Changing a parent clears everything that depends on it, then the lists reload.
+    el.program.addEventListener('change', function () { el.spec.value = ''; el.sem.value = ''; el.section.value = ''; el.sub.value = ''; refresh(); });
+    el.year.addEventListener('change', function () { el.sem.value = ''; el.section.value = ''; el.sub.value = ''; refresh(); });
+    el.sem.addEventListener('change', function () { el.section.value = ''; el.sub.value = ''; refresh(); });
+    el.section.addEventListener('change', function () { el.sub.value = ''; refresh(); });
+
+    el.sub.disabled = !el.section.value || el.sub.options.length <= 1;
+  })();
+</script>

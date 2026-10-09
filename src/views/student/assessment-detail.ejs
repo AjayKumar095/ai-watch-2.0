@@ -83,7 +83,11 @@
           </div>
         <% } %>
 
-        <% if (submissionClosed) { %>
+        <% if (typeof historyOnly !== 'undefined' && historyOnly) { %>
+          <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
+            This assessment was given to your previous section or semester. You can still see your submission and your results here, but it is no longer open for changes.
+          </div>
+        <% } else if (submissionClosed) { %>
           <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             The submission window for this assessment has closed. If you need to submit late, ask your teacher to open an exception for you.
           </div>

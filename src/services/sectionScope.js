@@ -80,7 +80,9 @@ async function enrollmentsForAssessmentSections(subjectOfferingId, assessmentSec
     const specializationIds = (as.sectionSpecializations || []).map((s) => s.specializationId);
 
     const enrollments = await SubjectEnrollment.findAll({
-      where: { subjectOfferingId, sectionId: allSectionIds },
+      // Current students only — a student who moved to another section/semester
+      // (enrollment ended) must not be notified of, or listed for, new assessments.
+      where: { subjectOfferingId, sectionId: allSectionIds, isActive: true },
       include: [{ model: StudentProfile, include: [User] }],
     });
 

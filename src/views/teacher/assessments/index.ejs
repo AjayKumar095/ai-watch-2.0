@@ -1,5 +1,35 @@
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-2xl font-bold text-navy-900">My Assessments</h1>
+<%
+  function esc(v) { return String(v == null ? '' : v); }
+  var nowMs = Date.now();
+  function dueState(a) {
+    var s = new Date(a.startAt).getTime(), e = new Date(a.endAt).getTime();
+    if (nowMs < s) return 'upcoming';
+    if (nowMs > e) return 'closed';
+    return 'open';
+  }
+  var safeJson = function (o) { return JSON.stringify(o).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026'); };
+%>
+<style>
+  /* Grid sizes itself from the space the page content actually has (not the
+     window), so a sidebar can't squeeze cards. Min card ~250px, max 5 columns. */
+  .assess-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(max(250px, calc((100% - 4rem) / 5)), 1fr)); }
+  .assess-filters { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .assess-filters .span-all { grid-column: 1 / -1; }
+  @media (min-width: 1100px) { .assess-filters .span-all { grid-column: span 2; } }
+  .assess-card { display: flex; flex-direction: column; min-width: 0; }
+  .assess-card[hidden] { display: none; }
+  .assess-card .ac-body { flex: 1 1 auto; }
+  .assess-card .ac-track { height: 6px; border-radius: 9999px; overflow: hidden; }
+  .assess-card .ac-fill { display: block; height: 100%; background: currentColor; border-radius: 9999px; }
+  .assess-card .ac-actions form { margin: 0; display: inline-flex; }
+  .assess-filters select:disabled { opacity: .55; cursor: not-allowed; }
+</style>
+
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">My Assessments</h1>
+    <p id="result-count" class="mt-0.5 text-xs text-navy-400"></p>
+  </div>
   <a href="/teacher/assessments/new" class="btn-primary whitespace-nowrap">
     <i class="fa-solid fa-plus mr-1.5"></i>Create Assessment
   </a>
@@ -10,47 +40,153 @@
     <i class="fa-regular fa-folder-open text-3xl text-navy-200"></i>
     No assessments yet.
   </div>
-<% } %>
+<% } else { %>
 
-<div class="space-y-4">
-  <% assessments.forEach(function(a) { const c = counts[a.id]; %>
-    <div class="card transition-shadow hover:shadow-md">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-          <h2 class="truncate font-semibold text-navy-900"><%= a.title %></h2>
-          <p class="mt-0.5 text-xs text-navy-400">
-            <%= a.SubjectOffering.SubjectPool.name %> · <%= a.SubjectOffering.Program.name %> Sem <%= a.SubjectOffering.semesterNumber %>
-            · <%= a.AssessmentSections.length %> section(s) · Due <%= new Date(a.endAt).toLocaleDateString() %>
-          </p>
+<!-- Filters. Subject → Program/Sem → Section → Sub-group cascade is built from
+     your subject mappings; each step only lists what the previous step allows. -->
+<div class="card mb-4 !p-3">
+  <div class="assess-filters">
+    <div class="span-all relative">
+      <label class="form-label !mb-0.5 text-xs" for="f-search">Search</label>
+      <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 bottom-2.5 text-xs text-navy-400"></i>
+      <input id="f-search" type="search" class="form-input !py-1.5 !pl-8 text-sm w-full" placeholder="Title, subject, section…" autocomplete="off" />
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-subject">Subject</label>
+      <select id="f-subject" class="form-input !py-1.5 text-sm w-full"><option value="">All subjects</option></select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-offering">Program · Sem</label>
+      <select id="f-offering" class="form-input !py-1.5 text-sm w-full"><option value="">All programs</option></select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-section">Section</label>
+      <select id="f-section" class="form-input !py-1.5 text-sm w-full"><option value="">All sections</option></select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-subgroup">Sub-group</label>
+      <select id="f-subgroup" class="form-input !py-1.5 text-sm w-full"><option value="">All sub-groups</option></select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-status">Evaluation</label>
+      <select id="f-status" class="form-input !py-1.5 text-sm w-full">
+        <option value="">Any status</option>
+        <option value="pending">Has pending</option>
+        <option value="evaluated">All evaluated</option>
+        <option value="none">No submissions</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-due">Window</label>
+      <select id="f-due" class="form-input !py-1.5 text-sm w-full">
+        <option value="">Any</option>
+        <option value="open">Open now</option>
+        <option value="upcoming">Not started</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label !mb-0.5 text-xs" for="f-sort">Sort by</label>
+      <select id="f-sort" class="form-input !py-1.5 text-sm w-full">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="due-asc">Due soonest</option>
+        <option value="due-desc">Due latest</option>
+        <option value="title">Title A–Z</option>
+        <option value="pending">Most pending</option>
+        <option value="total">Most submissions</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button type="button" id="f-reset" class="btn-secondary !py-1.5 text-xs w-full whitespace-nowrap">
+        <i class="fa-solid fa-rotate-left mr-1"></i>Reset
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="no-match" class="card hidden flex-col items-center gap-2 py-10 text-center text-sm text-navy-400">
+  <i class="fa-solid fa-filter-circle-xmark text-2xl text-navy-200"></i>
+  No assessments match these filters.
+</div>
+
+<div id="assess-grid" class="assess-grid">
+  <% assessments.forEach(function(a, idx) {
+       const c = counts[a.id];
+       const m = meta[a.id] || { subjectId: '', offeringId: '', sectionIds: [], sectionLabels: [] };
+       const so = a.SubjectOffering;
+       const state = dueState(a);
+       const stateText = state === 'open' ? 'Open' : (state === 'upcoming' ? 'Not started' : 'Closed');
+       const stateBadge = state === 'open' ? 'badge-info' : (state === 'upcoming' ? 'badge-amber' : 'badge-navy');
+       const evaluated = c.total - c.pending;
+       const pct = c.total > 0 ? Math.round((evaluated / c.total) * 100) : 0;
+       const secTitle = m.sectionLabels.map(function (l) { return 'Section ' + l; }).join(', ');
+  %>
+    <article class="card assess-card transition-shadow hover:shadow-md"
+         data-idx="<%= idx %>"
+         data-title="<%= esc(a.title).toLowerCase() %>"
+         data-search="<%= (esc(a.title) + ' ' + esc(so.SubjectPool.name) + ' ' + esc(so.Program.name) + ' ' + m.sectionLabels.join(' ')).toLowerCase() %>"
+         data-subject="<%= esc(m.subjectId) %>"
+         data-offering="<%= esc(m.offeringId) %>"
+         data-sections="<%= m.sectionIds.join(',') %>"
+         data-created="<%= new Date(a.createdAt).getTime() %>"
+         data-end="<%= new Date(a.endAt).getTime() %>"
+         data-state="<%= state %>"
+         data-pending="<%= c.pending %>"
+         data-total="<%= c.total %>">
+
+      <div class="ac-body">
+        <div class="flex items-start justify-between gap-2">
+          <h2 class="min-w-0 flex-1 truncate font-semibold text-navy-900" title="<%= a.title %>"><%= a.title %></h2>
+          <span class="<%= stateBadge %> shrink-0 whitespace-nowrap"><%= stateText %></span>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+
+        <p class="mt-1 truncate text-sm font-medium text-navy-600" title="<%= so.SubjectPool.name %>"><%= so.SubjectPool.name %></p>
+        <p class="mt-0.5 truncate text-xs text-navy-400"><%= so.Program.name %> Sem <%= so.semesterNumber %></p>
+
+        <p class="mt-2 truncate text-xs text-navy-500" title="<%= secTitle %>">
+          <i class="fa-solid fa-users-rectangle mr-1 text-navy-300"></i><%= a.AssessmentSections.length %> section(s)<% if (m.sectionLabels.length) { %> · <%= m.sectionLabels.slice(0, 2).join(', ') %><%= m.sectionLabels.length > 2 ? ' +' + (m.sectionLabels.length - 2) : '' %><% } %>
+        </p>
+        <p class="mt-0.5 text-xs text-navy-500">
+          <i class="fa-regular fa-calendar mr-1 text-navy-300"></i>Due <%= new Date(a.endAt).toLocaleDateString() %>
+        </p>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
           <span class="badge-amber whitespace-nowrap"><%= c.pending %> pending</span>
           <span class="badge-info whitespace-nowrap"><%= c.total %> total</span>
         </div>
+
+        <div class="mt-3 text-info-500" title="<%= evaluated %> of <%= c.total %> evaluated">
+          <div class="ac-track border border-navy-100 bg-navy-50"><span class="ac-fill" style="width:<%= pct %>%"></span></div>
+          <p class="mt-1 text-xs text-navy-400"><%= c.total > 0 ? pct + '% evaluated' : 'No submissions yet' %></p>
+        </div>
       </div>
 
-      <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-navy-100 pt-3">
+      <div class="ac-actions mt-3 flex flex-wrap items-center gap-1 border-t border-navy-100 pt-3">
         <a href="/teacher/assessments/<%= a.id %>/submissions" class="btn-secondary !px-3 !py-1.5 text-xs whitespace-nowrap">
-          <i class="fa-solid fa-inbox mr-1"></i>View submissions
+          <i class="fa-solid fa-inbox mr-1"></i>Submissions
         </a>
-        <a href="/teacher/assessments/<%= a.id %>/override" class="btn-ghost text-xs whitespace-nowrap">
-          <i class="fa-solid fa-door-open mr-1"></i>Open for students
+        <a href="/teacher/assessments/<%= a.id %>/override" class="btn-ghost text-xs whitespace-nowrap" title="Open for students" aria-label="Open for students">
+          <i class="fa-solid fa-door-open"></i>
         </a>
-        <a href="/teacher/assessments/<%= a.id %>/edit" class="btn-ghost text-xs whitespace-nowrap">
-          <i class="fa-solid fa-pen mr-1"></i>Edit
+        <a href="/teacher/assessments/<%= a.id %>/edit" class="btn-ghost text-xs whitespace-nowrap" title="Edit" aria-label="Edit">
+          <i class="fa-solid fa-pen"></i>
         </a>
-        <a href="/teacher/assessments/new?duplicateFrom=<%= a.id %>" class="btn-ghost text-xs whitespace-nowrap">
-          <i class="fa-regular fa-copy mr-1"></i>Duplicate
+        <a href="/teacher/assessments/new?duplicateFrom=<%= a.id %>" class="btn-ghost text-xs whitespace-nowrap" title="Duplicate" aria-label="Duplicate">
+          <i class="fa-regular fa-copy"></i>
         </a>
         <form action="/teacher/assessments/<%= a.id %>/delete" method="POST" class="delete-assessment-form ml-auto" data-title="<%= a.title %>" data-total="<%= c.total %>">
-          <button type="submit" class="btn-ghost text-xs !text-amber-700 whitespace-nowrap">
-            <i class="fa-regular fa-trash-can mr-1"></i>Delete
+          <button type="submit" class="btn-ghost text-xs !text-amber-700 whitespace-nowrap" title="Delete" aria-label="Delete">
+            <i class="fa-regular fa-trash-can"></i>
           </button>
         </form>
       </div>
-    </div>
+    </article>
   <% }) %>
 </div>
+
+<script id="filter-tree-data" type="application/json"><%- safeJson(filterTree || []) %></script>
+<% } %>
 
 <script>
   document.querySelectorAll('.delete-assessment-form').forEach(function (form) {
@@ -64,4 +200,124 @@
       }
     });
   });
+
+  (function () {
+    var grid = document.getElementById('assess-grid');
+    if (!grid) return;
+    var tree = [];
+    try { tree = JSON.parse(document.getElementById('filter-tree-data').textContent) || []; } catch (e) { tree = []; }
+
+    var $ = function (id) { return document.getElementById(id); };
+    var el = {
+      search: $('f-search'), subject: $('f-subject'), offering: $('f-offering'), section: $('f-section'),
+      subgroup: $('f-subgroup'), status: $('f-status'), due: $('f-due'), sort: $('f-sort'),
+      reset: $('f-reset'), count: $('result-count'), none: $('no-match')
+    };
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.assess-card'));
+
+    function fill(select, placeholder, items) {
+      var keep = select.value;
+      select.innerHTML = '';
+      var o = document.createElement('option'); o.value = ''; o.textContent = placeholder; select.appendChild(o);
+      items.forEach(function (it) {
+        var op = document.createElement('option'); op.value = String(it.value); op.textContent = it.label; select.appendChild(op);
+      });
+      select.value = items.some(function (it) { return String(it.value) === keep; }) ? keep : '';
+      select.disabled = items.length === 0;
+    }
+
+    function offeringsForSubject() {
+      return tree.filter(function (n) { return !el.subject.value || String(n.subjectId) === el.subject.value; });
+    }
+    function selectedOfferings() {
+      return offeringsForSubject().filter(function (n) { return !el.offering.value || String(n.id) === el.offering.value; });
+    }
+    function sectionsForSelection() {
+      var seen = {}, out = [];
+      selectedOfferings().forEach(function (n) {
+        n.sections.forEach(function (s) { if (!seen[s.id]) { seen[s.id] = 1; out.push(s); } });
+      });
+      return out;
+    }
+    function rebuildCascade() {
+      // Subject: unique subjects across all mapped offerings
+      var seenSub = {}, subs = [];
+      tree.forEach(function (n) { if (!seenSub[n.subjectId]) { seenSub[n.subjectId] = 1; subs.push({ value: n.subjectId, label: n.subjectName }); } });
+      fill(el.subject, 'All subjects', subs);
+      // Program · Sem: only offerings of the chosen subject
+      fill(el.offering, 'All programs', offeringsForSubject().map(function (n) { return { value: n.id, label: n.label }; }));
+      // Section: only sections of the chosen offerings
+      var secs = sectionsForSelection();
+      fill(el.section, 'All sections', secs.map(function (s) { return { value: s.id, label: s.label }; }));
+      // Sub-group: only children of the chosen section; disabled until one is chosen
+      var subgroups = [];
+      if (el.section.value) {
+        secs.forEach(function (s) {
+          if (String(s.id) === el.section.value) s.children.forEach(function (c) { subgroups.push({ value: c.id, label: c.label }); });
+        });
+      }
+      fill(el.subgroup, el.section.value ? (subgroups.length ? 'All sub-groups' : 'No sub-groups') : 'Pick a section first', subgroups);
+    }
+
+    function matches(card) {
+      var q = el.search.value.trim().toLowerCase();
+      if (q && card.dataset.search.indexOf(q) === -1) return false;
+      var subj = el.subject.value, off = el.offering.value;
+      if (subj && card.dataset.subject !== subj) return false;
+      if (off && card.dataset.offering !== off) return false;
+      var secIds = card.dataset.sections ? card.dataset.sections.split(',') : [];
+      // A sub-group choice is the most specific; otherwise the section choice.
+      // (An assessment aimed at a whole section also covers its sub-groups, and
+      // the server already added each target's parent id to data-sections.)
+      var wanted = el.subgroup.value || el.section.value;
+      if (wanted && secIds.indexOf(wanted) === -1) return false;
+      var st = el.status.value, p = +card.dataset.pending, t = +card.dataset.total;
+      if (st === 'pending' && !(p > 0)) return false;
+      if (st === 'evaluated' && !(t > 0 && p === 0)) return false;
+      if (st === 'none' && t !== 0) return false;
+      if (el.due.value && card.dataset.state !== el.due.value) return false;
+      return true;
+    }
+
+    var sorters = {
+      newest: function (a, b) { return b.dataset.created - a.dataset.created; },
+      oldest: function (a, b) { return a.dataset.created - b.dataset.created; },
+      'due-asc': function (a, b) { return a.dataset.end - b.dataset.end; },
+      'due-desc': function (a, b) { return b.dataset.end - a.dataset.end; },
+      title: function (a, b) { return a.dataset.title.localeCompare(b.dataset.title, undefined, { numeric: true }); },
+      pending: function (a, b) { return b.dataset.pending - a.dataset.pending; },
+      total: function (a, b) { return b.dataset.total - a.dataset.total; }
+    };
+
+    function apply() {
+      var shown = 0;
+      cards.slice().sort(function (a, b) {
+        return (sorters[el.sort.value] || sorters.newest)(a, b) || (a.dataset.idx - b.dataset.idx);
+      }).forEach(function (c) {
+        var ok = matches(c);
+        c.hidden = !ok;
+        if (ok) shown++;
+        grid.appendChild(c);
+      });
+      el.count.textContent = shown === cards.length ? cards.length + ' assessment' + (cards.length === 1 ? '' : 's')
+        : shown + ' of ' + cards.length + ' assessments';
+      el.none.classList.toggle('hidden', shown !== 0);
+      el.none.classList.toggle('flex', shown === 0);
+    }
+
+    // Cascade handlers: changing a parent re-derives every child list.
+    el.subject.addEventListener('change', function () { el.offering.value = ''; el.section.value = ''; el.subgroup.value = ''; rebuildCascade(); apply(); });
+    el.offering.addEventListener('change', function () { el.section.value = ''; el.subgroup.value = ''; rebuildCascade(); apply(); });
+    el.section.addEventListener('change', function () { el.subgroup.value = ''; rebuildCascade(); apply(); });
+    [el.subgroup, el.status, el.due, el.sort].forEach(function (s) { s.addEventListener('change', apply); });
+    el.search.addEventListener('input', apply);
+    el.reset.addEventListener('click', function () {
+      el.search.value = ''; el.subject.value = ''; el.offering.value = ''; el.section.value = ''; el.subgroup.value = '';
+      el.status.value = ''; el.due.value = ''; el.sort.value = 'newest';
+      rebuildCascade(); apply();
+    });
+
+    rebuildCascade();
+    apply();
+  })();
 </script>
