@@ -1,0 +1,201 @@
+<!-- Mark Sheet page: /teacher/marksheet -->
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-navy-900">Mark Sheet</h1>
+  <p class="text-sm text-navy-500">Pick a class to see every student's marks across all your assessments, with the total and the marks adjusted to 100.</p>
+</div>
+<style>
+  .ms-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+  .ms-bar .ms-field { flex: 1 1 16rem; min-width: 0; }
+  .ms-bar .ms-field select, .ms-bar .ms-field input { width: 100%; }
+  .ms-bar .ms-btns { display: flex; flex-wrap: wrap; gap: .5rem; }
+  @media (max-width: 480px) { .ms-bar .ms-btns { width: 100%; } .ms-bar .ms-btns > * { flex: 1 1 0; justify-content: center; } }
+  .ms-scroll { margin-top: .75rem; overflow: auto; max-height: 70vh; border: 1px solid rgba(148,163,184,.3); border-radius: .6rem; -webkit-overflow-scrolling: touch; }
+  .ms-scroll .ms-table { display: table; max-width: none; overflow: visible; white-space: nowrap; }
+  .ms-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .8125rem; white-space: nowrap; }
+  .ms-table th, .ms-table td { padding: .5rem .75rem; border-bottom: 1px solid rgba(148,163,184,.2); text-align: left; background: #fff; }
+  .ms-table thead th { position: sticky; top: 0; z-index: 2; background: #f1f5f9; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: #64748b; cursor: pointer; user-select: none; }
+  .ms-table th:first-child, .ms-table td:first-child { position: sticky; left: 0; z-index: 1; box-shadow: 1px 0 0 rgba(148,163,184,.25); }
+  .ms-table thead th:first-child { z-index: 3; }
+  .ms-table .ms-num { text-align: center; font-variant-numeric: tabular-nums; }
+  .ms-table th.ms-asm { max-width: 11rem; white-space: normal; min-width: 6.5rem; }
+  .ms-table .ms-total { font-weight: 700; text-align: center; background: #f8fafc; }
+  .ms-table tbody tr:hover td { background: #f8fafc; }
+  .ms-pending { color: #b45309; font-weight: 600; }
+  .ms-muted { color: #94a3b8; }
+  .ms-multi { margin-top: .75rem; border: 1px solid rgba(148,163,184,.3); border-radius: .6rem; padding: .55rem .75rem; }
+  .ms-multi summary { cursor: pointer; }
+  .ms-multi-body { margin-top: .6rem; }
+  .ms-list { display: grid; gap: .25rem .75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); margin-top: .35rem; max-height: 14rem; overflow: auto; }
+  .ms-check { display: flex; align-items: flex-start; gap: .5rem; font-size: .8125rem; padding: .2rem .25rem; border-radius: .4rem; min-width: 0; cursor: pointer; }
+  .ms-check span { min-width: 0; overflow-wrap: anywhere; }
+  .ms-check:hover { background: #f1f5f9; }
+  .ms-check-all { font-weight: 600; }
+  .ms-multi-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .6rem; }
+  #ms-zip[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+  .ms-msg { margin-top: .75rem; font-size: .8125rem; }
+  @media (max-width: 640px) { .ms-table th, .ms-table td { padding: .4rem .5rem; } .ms-scroll { max-height: 60vh; } }
+</style>
+
+<div class="card" id="ms-root">
+  <div class="mb-3 flex items-center gap-2">
+    <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><i class="fa-solid fa-table-list text-xs"></i></div>
+    <div class="min-w-0">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Class Mark Sheet</h2>
+      <p class="text-xs text-navy-400">Pick a class to see every student's marks across all your assessments.</p>
+    </div>
+  </div>
+
+  <div class="ms-bar">
+    <div class="ms-field">
+      <label class="form-label !mb-0.5 text-xs" for="ms-class">Class</label>
+      <select id="ms-class" class="form-input !py-1.5 text-sm"><option value="">Loading classes…</option></select>
+    </div>
+    <div class="ms-field" style="flex-basis:10rem">
+      <label class="form-label !mb-0.5 text-xs" for="ms-search">Filter students</label>
+      <input id="ms-search" type="search" class="form-input !py-1.5 text-sm" placeholder="Name or roll…" autocomplete="off" disabled />
+    </div>
+    <div class="ms-btns">
+      <button type="button" id="ms-load" class="btn-primary !py-1.5 text-sm" disabled><i class="fa-solid fa-rotate mr-1.5"></i>Fetch</button>
+      <a id="ms-download" class="btn-secondary !py-1.5 text-sm" href="#" style="display:none"><i class="fa-solid fa-file-csv mr-1.5"></i>CSV</a>
+      <a id="ms-master" class="btn-secondary !py-1.5 text-sm" href="/teacher/marksheet/master.csv" title="One CSV with every class you teach"><i class="fa-solid fa-layer-group mr-1.5"></i>Master CSV</a>
+    </div>
+  </div>
+
+  <details class="ms-multi">
+    <summary class="text-sm font-medium text-navy-600"><i class="fa-solid fa-download mr-1.5 text-navy-400"></i>Download several classes at once</summary>
+    <div class="ms-multi-body">
+      <label class="ms-check ms-check-all"><input type="checkbox" id="ms-all" /> <span>Select all</span></label>
+      <div id="ms-list" class="ms-list"></div>
+      <div class="ms-multi-actions">
+        <a id="ms-zip" class="btn-primary !py-1.5 text-sm" href="#" aria-disabled="true"><i class="fa-solid fa-file-zipper mr-1.5"></i>Download selected (ZIP)</a>
+        <span id="ms-zip-count" class="text-xs text-navy-400">None selected</span>
+      </div>
+    </div>
+  </details>
+
+  <p id="ms-msg" class="ms-msg text-navy-400"></p>
+  <p id="ms-title" class="mt-2 text-sm font-semibold text-navy-800"></p>
+  <div id="ms-scroll" class="ms-scroll" style="display:none"><table class="ms-table" id="ms-table"></table></div>
+</div>
+
+<script>
+(function () {
+  var BASE = '/teacher/marksheet';
+  var $ = function (id) { return document.getElementById(id); };
+  var sel = $('ms-class'), load = $('ms-load'), dl = $('ms-download'), msg = $('ms-msg'),
+      search = $('ms-search'), table = $('ms-table'), wrap = $('ms-scroll'), title = $('ms-title');
+  var header = [], records = [], sortCol = -1, sortDir = 1;
+
+  function say(t, warn) { msg.textContent = t || ''; msg.style.color = warn ? '#b45309' : ''; }
+
+  // Minimal RFC-4180 parser (quoted fields, doubled quotes, CRLF).
+  function parseCsv(text) {
+    text = text.replace(/^﻿/, '');
+    var rows = [], row = [], cell = '', q = false, i, ch;
+    for (i = 0; i < text.length; i++) {
+      ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += ch;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(function (r) { return r.length > 1 || r[0] !== ''; });
+  }
+
+  function td(text, cls) { var e = document.createElement('td'); e.textContent = text; if (cls) e.className = cls; return e; }
+
+  function render() {
+    var needle = search.value.trim().toLowerCase();
+    var data = records.filter(function (r) { return !needle || (r[0] + ' ' + r[1]).toLowerCase().indexOf(needle) !== -1; });
+    if (sortCol >= 0) {
+      data = data.slice().sort(function (a, b) {
+        var x = a[sortCol], y = b[sortCol], nx = parseFloat(x), ny = parseFloat(y);
+        var r = (!isNaN(nx) && !isNaN(ny)) ? nx - ny : String(x).localeCompare(String(y), undefined, { numeric: true });
+        return r * sortDir;
+      });
+    }
+    table.innerHTML = '';
+    var thead = document.createElement('thead'), hr = document.createElement('tr');
+    header.forEach(function (h, i) {
+      var th = document.createElement('th');
+      th.textContent = h + (i === sortCol ? (sortDir > 0 ? ' ▲' : ' ▼') : '');
+      if (i >= 2 && i < header.length - 2) th.className = 'ms-asm ms-num';
+      if (i >= header.length - 2) th.className = 'ms-num';
+      th.title = 'Click to sort';
+      th.addEventListener('click', function () { if (sortCol === i) sortDir = -sortDir; else { sortCol = i; sortDir = 1; } render(); });
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr); table.appendChild(thead);
+    var tb = document.createElement('tbody');
+    data.forEach(function (r) {
+      var tr = document.createElement('tr');
+      r.forEach(function (v, i) {
+        if (i < 2) tr.appendChild(td(v));
+        else if (i >= r.length - 2) tr.appendChild(td(v, 'ms-num ms-total'));
+        else tr.appendChild(td(v === '' ? '—' : v, 'ms-num' + (v === 'Pending' ? ' ms-pending' : (v === '' || v === 'N/A' ? ' ms-muted' : ''))));
+      });
+      tb.appendChild(tr);
+    });
+    table.appendChild(tb);
+    say(data.length === records.length ? records.length + ' student(s)' : data.length + ' of ' + records.length + ' student(s)');
+    if (!records.length) say('No students in this class yet.', true);
+  }
+
+  function fetchSheet() {
+    if (!sel.value) return;
+    say('Fetching…'); load.disabled = true;
+    fetch(BASE + '/csv?classId=' + encodeURIComponent(sel.value), { headers: { Accept: 'text/csv' }, credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (text) {
+        var rows = parseCsv(text);
+        header = rows[0] || []; records = rows.slice(1); sortCol = -1; sortDir = 1;
+        title.textContent = sel.options[sel.selectedIndex].text;
+        wrap.style.display = ''; search.disabled = false; search.value = '';
+        dl.href = BASE + '/csv?download=1&classId=' + encodeURIComponent(sel.value); dl.style.display = '';
+        render();
+        if (header.length <= 4) say('No assessments created yet for this class.', true);
+      })
+      .catch(function () { say('Could not load the mark sheet. Please try again.', true); })
+      .then(function () { load.disabled = !sel.value; });
+  }
+
+  // --- multi-class download ---
+  var list = $('ms-list'), allBox = $('ms-all'), zip = $('ms-zip'), zipCount = $('ms-zip-count');
+  function boxes() { return Array.prototype.slice.call(list.querySelectorAll('input[type=checkbox]')); }
+  function syncZip() {
+    var ids = boxes().filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+    allBox.checked = ids.length > 0 && ids.length === boxes().length;
+    allBox.indeterminate = ids.length > 0 && ids.length < boxes().length;
+    zip.setAttribute('aria-disabled', ids.length ? 'false' : 'true');
+    zip.href = ids.length ? BASE + '/zip?classIds=' + encodeURIComponent(ids.join(',')) : '#';
+    zipCount.textContent = ids.length ? ids.length + ' of ' + boxes().length + ' selected' : 'None selected';
+  }
+  allBox.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = allBox.checked; }); syncZip(); });
+  list.addEventListener('change', syncZip);
+  zip.addEventListener('click', function (e) { if (zip.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+
+  fetch(BASE + '/classes', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) {
+      sel.innerHTML = '';
+      var o = document.createElement('option'); o.value = ''; o.textContent = d.classes.length ? 'Select a class…' : 'No classes mapped to you yet'; sel.appendChild(o);
+      d.classes.forEach(function (c) {
+        var op = document.createElement('option'); op.value = c.id; op.textContent = c.label; sel.appendChild(op);
+        var lb = document.createElement('label'); lb.className = 'ms-check';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c.id;
+        var sp = document.createElement('span'); sp.textContent = c.label;
+        lb.appendChild(cb); lb.appendChild(sp); list.appendChild(lb);
+      });
+      if (!d.classes.length) { document.querySelector('.ms-multi').style.display = 'none'; $('ms-master').style.display = 'none'; }
+      syncZip();
+    })
+    .catch(function () { sel.innerHTML = '<option value="">Could not load classes</option>'; });
+
+  sel.addEventListener('change', function () { load.disabled = !sel.value; if (sel.value) fetchSheet(); });
+  load.addEventListener('click', fetchSheet);
+  search.addEventListener('input', render);
+})();
+</script>

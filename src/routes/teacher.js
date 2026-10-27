@@ -8,6 +8,7 @@ const assessmentLockController = require("../controllers/assessmentLockControlle
 const requireAssessmentUnlocked = require("../middleware/requireAssessmentUnlocked");
 const uploadImage = require("../middleware/uploadImage");
 const upload = require("../middleware/upload");
+router.use("/marksheet", require("./markSheet"));
 
 router.use(requireAuth, requireRole("TEACHER"));
 
@@ -19,6 +20,7 @@ router.post("/enroll/bulk", upload.single("csvFile"), enrollStudentController.bu
 router.post("/approvals/:id/approve", teacherController.approveRequest);
 router.post("/approvals/:id/reject", teacherController.rejectRequest);
 router.post("/approvals/bulk-approve", teacherController.bulkApprove);
+router.get("/profile", teacherController.profile);
 
 router.get("/assessments", assessmentController.list);
 router.get("/assessments/new", assessmentController.showCreate);

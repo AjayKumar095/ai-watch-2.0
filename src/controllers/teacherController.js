@@ -276,3 +276,18 @@ exports.bulkApprove = async (req, res) => {
   req.flash("success", `${requests.length} student(s) approved and emailed their login details.` + (requests.length < ids.length ? ` (${ids.length - requests.length} selected request(s) couldn't be approved.)` : ""));
   res.redirect("/teacher/dashboard");
 };
+
+// "My Profile" — the teacher's own details plus the shared change-password form
+// (views/account/change-password.ejs, included by the view).
+exports.profile = async (req, res) => {
+  const teacherProfile = await loadTeacherProfile(req);
+
+  res.render("teacher/profile", {
+    title: "My Profile",
+    teacherProfile,
+    // The included change-password form reads these two; this page only displays it.
+    success: false,
+    error: null,
+    breadcrumbs: [ROOT, { label: "My Profile" }],
+  });
+};

@@ -15,6 +15,11 @@
   .pf-item .pf-ico { flex: 0 0 2rem; }
   .pf-item .pf-txt { min-width: 0; flex: 1; }
   .pf-item dd { overflow-wrap: anywhere; }
+  .pf-col { display: grid; gap: 1rem; min-width: 0; }
+  /* The shared change-password file is a standalone page (centered, mt-8, max-w-md, its own card);
+     inside this page it should just fill its column. */
+  .pf-pw > div { margin-top: 0 !important; max-width: none !important; }
+  .pf-pw .card { box-shadow: none; padding: 0; border: 0; background: transparent; }
   .pf-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
   .pf-hero-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
   .pf-hero-meta { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
@@ -98,13 +103,9 @@
           <div class="pf-txt"><dt class="text-xs text-navy-400">Semester</dt><dd class="font-medium text-navy-800"><%= studentProfile.currentSemesterNumber %></dd></div>
         </div>
       </dl>
-      <div class="mt-4 border-t border-navy-100 pt-3">
-        <a href="/account/change-password" class="btn-secondary !px-3 !py-1.5 text-xs">
-          <i class="fa-solid fa-key mr-1.5"></i>Change password
-        </a>
-      </div>
     </div>
 
+    <div class="pf-col">
     <!-- Section -->
     <div class="card">
       <div class="mb-1 flex items-center gap-2">
@@ -209,5 +210,91 @@
         <% } %>
       <% } %>
     </div>
+
+    <!-- Security: the shared change-password form, included as-is -->
+    <div class="card pf-pw">
+      <div class="mb-2 flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+          <i class="fa-solid fa-key text-xs"></i>
+        </div>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Security</h2>
+      </div>
+      <%- include('../account/change-password', { success: false, error: null }) %>
+    </div>
+    </div><!-- /pf-col -->
   </div>
 </div>
+
+<script>
+  // Change the password without leaving this page: the shared form posts to /account/change-password,
+  // which replies with its own standalone page. Send the same POST in the background, read the reply
+  // for the success / error message, and show it here (auto-hides after 2 seconds).
+  (function () {
+    var form = document.querySelector('.pf-pw form[action="/account/change-password"]');
+    if (!form) return;
+    var pw = document.getElementById('currentPassword');
+
+    // The shared form has `autofocus`, which would scroll this page down and pop the keyboard on phones.
+    if (pw) {
+      pw.removeAttribute('autofocus');
+      var touched = false, tries = 0;
+      ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+        document.addEventListener(ev, function () { touched = true; }, { once: true, capture: true });
+      });
+      var focusTimer = setInterval(function () {
+        if (touched || ++tries > 20) return clearInterval(focusTimer);
+        if (document.activeElement === pw) {
+          pw.blur();
+          var main = document.querySelector('main');
+          if (main) main.scrollTop = 0;
+          window.scrollTo(0, 0);
+        }
+      }, 50);
+    }
+
+    var note = document.createElement('div');
+    note.setAttribute('role', 'status');
+    note.style.display = 'none';
+    form.parentNode.insertBefore(note, form);
+    var hideTimer = null;
+    function show(kind, text) {
+      var good = kind === 'ok';
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () { note.style.display = 'none'; }, 2000);
+      note.className = 'mt-4 rounded-lg border px-3 py-2 text-sm ' + (good ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800');
+      note.textContent = text;
+      note.style.display = '';
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var f = form.elements;
+      if (f.newPassword.value !== f.confirmPassword.value) return show('err', 'New password and confirmation do not match.');
+      var btn = form.querySelector('button[type=submit]');
+      var label = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Updating…';
+      note.style.display = 'none';
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      })
+        .then(function (r) {
+          if (r.redirected && /\/login/.test(r.url)) { window.location.href = r.url; return null; }
+          return r.text();
+        })
+        .then(function (html) {
+          if (html === null) return;
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var ok = doc.querySelector('.border-green-200');
+          var bad = doc.querySelector('main .border-amber-200, .border-amber-200');
+          if (ok) { form.reset(); show('ok', 'Your password has been updated.'); }
+          else if (bad) show('err', bad.textContent.trim());
+          else show('err', 'Could not confirm the change. Please try again.');
+        })
+        .catch(function () { show('err', 'Something went wrong. Please try again.'); })
+        .then(function () { btn.disabled = false; btn.textContent = label; });
+    });
+  })();
+</script>

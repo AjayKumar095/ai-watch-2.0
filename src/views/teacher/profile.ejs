@@ -1,0 +1,183 @@
+<%
+  var fullName = (currentUser.firstName + ' ' + currentUser.lastName).trim();
+  var initials = ((currentUser.firstName || '').charAt(0) + (currentUser.lastName || '').charAt(0)).toUpperCase();
+  // Optional fields: shown only if your User / TeacherProfile happens to have them.
+  var extras = [
+    ['Employee ID', 'fa-hashtag', ['employeeId', 'employeeCode', 'empId']],
+    ['Designation', 'fa-briefcase', ['designation', 'title']],
+    ['Department', 'fa-building-columns', ['department', 'departmentName']],
+    ['Phone', 'fa-phone', ['phone', 'mobile', 'phoneNumber']]
+  ].map(function (x) {
+    var val = null;
+    x[2].forEach(function (k) {
+      if (val) return;
+      if (teacherProfile && teacherProfile[k]) val = teacherProfile[k];
+      else if (currentUser[k]) val = currentUser[k];
+    });
+    return val ? { label: x[0], icon: x[1], value: val } : null;
+  }).filter(Boolean);
+%>
+<style>
+  .tp-wrap { max-width: 64rem; margin: .5rem auto 0; }
+  .tp-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 960px) { .tp-layout { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+  .tp-col { display: grid; gap: 1rem; min-width: 0; }
+  .tp-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+  .tp-hero-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+  .tp-meta { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+  .tp-details { display: grid; gap: .25rem 1.5rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 600px) { .tp-details { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 960px) and (max-width: 1180px) { .tp-details { grid-template-columns: minmax(0, 1fr); } }
+  .tp-item { display: flex; align-items: flex-start; gap: .75rem; min-width: 0; padding: .65rem 0; border-bottom: 1px solid rgba(148,163,184,.18); }
+  .tp-item .tp-ico { flex: 0 0 2rem; }
+  .tp-item .tp-txt { min-width: 0; flex: 1; }
+  .tp-item dd { overflow-wrap: anywhere; margin: 0; }
+  .tp-item dt { margin: 0; }
+  /* The shared change-password partial is a standalone page (centered, mt-8, max-w-md);
+     inside this page it should simply fill its column. */
+  .tp-pw > div { margin-top: 0 !important; max-width: none !important; }
+  .tp-pw .card { box-shadow: none; padding: 0; border: 0; background: transparent; }
+</style>
+
+<div class="tp-wrap">
+
+  <div class="card">
+    <div class="tp-hero">
+      <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xl font-bold text-white"><%= initials %></div>
+      <div class="tp-hero-text">
+        <p class="text-xs font-semibold uppercase tracking-wide text-navy-400">My Profile</p>
+        <h1 class="text-2xl font-bold text-navy-900"><%= fullName %></h1>
+        <p class="text-sm text-navy-500"><%= currentUser.email %></p>
+        <div class="tp-meta">
+          <span class="badge-navy"><i class="fa-solid fa-chalkboard-user mr-1"></i>Teacher</span>
+          <% if (currentUser.isActive !== false) { %><span class="badge-info"><i class="fa-solid fa-circle-check mr-1"></i>Active</span><% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tp-layout mt-4">
+
+    <div class="tp-col">
+      <div class="card">
+        <div class="mb-1 flex items-center gap-2">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><i class="fa-solid fa-id-card text-xs"></i></div>
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Account</h2>
+        </div>
+        <dl class="tp-details mt-2 text-sm">
+          <div class="tp-item">
+            <i class="tp-ico fa-solid fa-user mt-1 text-center text-navy-300"></i>
+            <div class="tp-txt"><dt class="text-xs text-navy-400">Name</dt><dd class="font-medium text-navy-800"><%= fullName %></dd></div>
+          </div>
+          <div class="tp-item">
+            <i class="tp-ico fa-solid fa-envelope mt-1 text-center text-navy-300"></i>
+            <div class="tp-txt"><dt class="text-xs text-navy-400">Email</dt><dd class="font-medium text-navy-800"><%= currentUser.email %></dd></div>
+          </div>
+          <div class="tp-item">
+            <i class="tp-ico fa-solid fa-user-shield mt-1 text-center text-navy-300"></i>
+            <div class="tp-txt"><dt class="text-xs text-navy-400">Role</dt><dd class="font-medium text-navy-800">Teacher</dd></div>
+          </div>
+          <% extras.forEach(function (x) { %>
+            <div class="tp-item">
+              <i class="tp-ico fa-solid <%= x.icon %> mt-1 text-center text-navy-300"></i>
+              <div class="tp-txt"><dt class="text-xs text-navy-400"><%= x.label %></dt><dd class="font-medium text-navy-800"><%= x.value %></dd></div>
+            </div>
+          <% }) %>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Shared change-password form, included as-is. -->
+    <div class="card tp-pw">
+      <div class="mb-2 flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><i class="fa-solid fa-key text-xs"></i></div>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-navy-400">Security</h2>
+      </div>
+      <%- include('../account/change-password', { success: success, error: error }) %>
+    </div>
+  </div>
+</div>
+
+<script>
+  // The shared form has `autofocus` on "Current password" (right for its own page, but here
+  // it would scroll the page down and pop the keyboard on phones). Undo that on this page only.
+  (function () {
+    var pw = document.getElementById('currentPassword');
+    if (!pw) return;
+    pw.removeAttribute('autofocus');
+    var touched = false, tries = 0;
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+      document.addEventListener(ev, function () { touched = true; }, { once: true, capture: true });
+    });
+    // The browser applies autofocus at an unpredictable moment around first render, so check
+    // for a short while and undo it — unless the user has already started interacting.
+    var timer = setInterval(function () {
+      if (touched || ++tries > 20) return clearInterval(timer);
+      if (document.activeElement === pw) {
+        pw.blur();
+        var main = document.querySelector('main');
+        if (main) main.scrollTop = 0;
+        window.scrollTo(0, 0);
+      }
+    }, 50);
+  })();
+</script>
+
+<script>
+  // Change the password without leaving this page. The shared form posts to /account/change-password,
+  // which replies with its own standalone page; we send the same POST in the background, read that
+  // reply for the success / error message, and show it here instead of navigating away.
+  (function () {
+    var form = document.querySelector('.tp-pw form[action="/account/change-password"]');
+    if (!form) return;
+
+    var note = document.createElement('div');
+    note.setAttribute('role', 'status');
+    note.style.display = 'none';
+    form.parentNode.insertBefore(note, form);
+
+    var hideTimer = null;
+    function show(kind, text) {
+      var good = kind === 'ok';
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () { note.style.display = 'none'; }, 2000); // auto-dismiss after 2s
+      note.className = 'mt-4 rounded-lg border px-3 py-2 text-sm ' + (good ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800');
+      note.textContent = text;
+      note.style.display = '';
+    }
+    // Hide the shared form's own server-rendered banners (this page always renders it clean).
+    form.parentNode.querySelectorAll('.border-green-200, .border-amber-200').forEach(function (el) { if (el !== note) el.style.display = 'none'; });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var f = form.elements;
+      if (f.newPassword.value !== f.confirmPassword.value) return show('err', 'New password and confirmation do not match.');
+      var btn = form.querySelector('button[type=submit]');
+      var label = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Updating…';
+      note.style.display = 'none';
+
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      })
+        .then(function (r) {
+          if (r.redirected && /\/login/.test(r.url)) { window.location.href = r.url; return null; } // session ended
+          return r.text();
+        })
+        .then(function (html) {
+          if (html === null) return;
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var ok = doc.querySelector('.border-green-200');
+          var bad = doc.querySelector('main .border-amber-200, .border-amber-200');
+          if (ok) { form.reset(); show('ok', 'Your password has been updated.'); }
+          else if (bad) show('err', bad.textContent.trim());
+          else show('err', 'Could not confirm the change. Please try again.');
+        })
+        .catch(function () { show('err', 'Something went wrong. Please try again.'); })
+        .then(function () { btn.disabled = false; btn.textContent = label; });
+    });
+  })();
+</script>
