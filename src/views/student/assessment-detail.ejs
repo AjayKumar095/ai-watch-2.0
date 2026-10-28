@@ -1,5 +1,6 @@
 <div class="mx-auto mt-4 max-w-5xl">
-  <a href="/student/dashboard" class="mb-4 inline-flex items-center gap-1.5 text-xs text-navy-400 hover:text-info-600 hover:underline">
+  <a href="/student/dashboard"
+    class="mb-4 inline-flex items-center gap-1.5 text-xs text-navy-400 hover:text-info-600 hover:underline">
     <i class="fa-solid fa-arrow-left"></i> Back to dashboard
   </a>
 
@@ -7,24 +8,39 @@
     <!-- Main column: title + full content, given real room to breathe -->
     <div class="space-y-4 lg:col-span-2">
       <div class="card">
-        <h1 class="text-2xl font-bold text-navy-900"><%= assessment.title %></h1>
-        <p class="mt-1 text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %></p>
+        <h1 class="text-2xl font-bold text-navy-900">
+          <%= assessment.title %>
+        </h1>
+        <p class="mt-1 text-sm text-navy-500">
+          <%= assessment.SubjectOffering.SubjectPool.name %>
+        </p>
 
-        <% if (existingSubmission && existingSubmission.status === 'EVALUATED') { %>
+        <% if (existingSubmission && existingSubmission.status==='EVALUATED' ) { %>
           <div class="mt-4 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
-            Evaluated: <strong><%= existingSubmission.marksObtained %>/<%= assessment.maxMarks %></strong>
-            <% if (existingSubmission.remarks) { %> — <%= existingSubmission.remarks %><% } %>
+            Evaluated: <strong>
+              <%= existingSubmission.marksObtained %>/<%= assessment.maxMarks %>
+            </strong>
+            <% if (existingSubmission.remarks) { %> — <%= existingSubmission.remarks %>
+                <% } %>
           </div>
-        <% } %>
+          <% } %>
       </div>
 
       <div class="card">
         <h2 class="mb-4 text-xs font-semibold uppercase tracking-wide text-navy-400">Assessment Content</h2>
         <% if (descriptionHtml) { %>
           <div class="prose-content"><%- descriptionHtml %></div>
-        <% } else { %>
-          <p class="text-sm text-navy-400">No additional content was added for this assessment.</p>
-        <% } %>
+          <% } else { %>
+            <p class="text-sm text-navy-400">No additional content was added for this assessment.</p>
+            <% } %>
+              <% if (assessment.attachmentUrl) { %>
+                <div class="flex items-center justify-between">
+                  <dt class="text-navy-500">Attachment</dt>
+                  <dd><a href="<%= assessment.attachmentUrl %>" target="_blank" rel="noopener"
+                      class="font-medium text-info-600 hover:underline">Open <i
+                        class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a></dd>
+                </div>
+                <% } %>
       </div>
     </div>
 
@@ -35,28 +51,28 @@
         <dl class="space-y-2.5 text-sm">
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Max marks</dt>
-            <dd class="font-medium text-navy-800"><%= assessment.maxMarks %></dd>
+            <dd class="font-medium text-navy-800">
+              <%= assessment.maxMarks %>
+            </dd>
           </div>
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Opens</dt>
             <dd class="text-right font-medium text-navy-800">
-              <%= new Date(override && override.startAt ? override.startAt : assessment.startAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) %>
-              <% if (override && override.startAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
+              <%= new Date(override && override.startAt ? override.startAt : assessment.startAt).toLocaleString('en-US',
+                { timeZone: 'Asia/Kolkata' }) %>
+                <% if (override && override.startAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span>
+                  <% } %>
             </dd>
           </div>
           <div class="flex items-center justify-between">
             <dt class="text-navy-500">Closes</dt>
             <dd class="text-right font-medium text-navy-800">
-              <%= new Date(override && override.endAt ? override.endAt : assessment.endAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) %>
-              <% if (override && override.endAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span><% } %>
+              <%= new Date(override && override.endAt ? override.endAt : assessment.endAt).toLocaleString('en-US', {
+                timeZone: 'Asia/Kolkata' }) %>
+                <% if (override && override.endAt) { %><span class="ml-1 text-xs text-info-600">(extended)</span>
+                  <% } %>
             </dd>
           </div>
-          <% if (assessment.attachmentUrl) { %>
-            <div class="flex items-center justify-between">
-              <dt class="text-navy-500">Attachment</dt>
-              <dd><a href="<%= assessment.attachmentUrl %>" target="_blank" rel="noopener" class="font-medium text-info-600 hover:underline">Open <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a></dd>
-            </div>
-          <% } %>
         </dl>
       </div>
 
@@ -66,66 +82,69 @@
         </h2>
 
         <% if (error) { %>
-          <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><%= error %></div>
-        <% } %>
+          <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <%= error %>
+          </div>
+          <% } %>
 
-        <% if (existingSubmission && Array.isArray(existingSubmission.attachments) && existingSubmission.attachments.length) { %>
-          <div class="mb-3 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
-            <p class="mb-1 text-xs font-medium text-navy-500">Currently attached:</p>
-            <ul class="space-y-0.5 text-xs">
-              <% existingSubmission.attachments.forEach(function(att) { %>
-                <li>
-                  <a href="<%= att.url %>" target="_blank" rel="noopener" class="text-info-600 hover:underline"><%= att.originalName %></a>
-                  <span class="text-navy-400">(<%= (att.size / (1024 * 1024)).toFixed(2) %> MB)</span>
-                </li>
-              <% }) %>
-            </ul>
-          </div>
-        <% } %>
+            <% if (existingSubmission && Array.isArray(existingSubmission.attachments) &&
+              existingSubmission.attachments.length) { %>
+              <div class="mb-3 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
+                <p class="mb-1 text-xs font-medium text-navy-500">Currently attached:</p>
+                <ul class="space-y-0.5 text-xs">
+                  <% existingSubmission.attachments.forEach(function(att) { %>
+                    <li>
+                      <a href="<%= att.url %>" target="_blank" rel="noopener" class="text-info-600 hover:underline">
+                        <%= att.originalName %>
+                      </a>
+                      <span class="text-navy-400">(<%= (att.size / (1024 * 1024)).toFixed(2) %> MB)</span>
+                    </li>
+                    <% }) %>
+                </ul>
+              </div>
+              <% } %>
 
-        <% if (typeof historyOnly !== 'undefined' && historyOnly) { %>
-          <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
-            This assessment was given to your previous section or semester. You can still see your submission and your results here, but it is no longer open for changes.
-          </div>
-        <% } else if (submissionClosed) { %>
-          <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            The submission window for this assessment has closed. If you need to submit late, ask your teacher to open an exception for you.
-          </div>
-        <% } else if (submissionNotYetOpen) { %>
-          <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
-            This assessment isn't open for submissions yet.
-          </div>
-        <% } else { %>
-        <form
-          id="submission-form"
-          action="/student/assessments/<%= assessment.id %>/submit"
-          method="POST"
-          enctype="multipart/form-data"
-          class="space-y-4"
-        >
-          <div>
-            <label class="form-label">Submission link (Drive/GitHub/etc.)</label>
-            <input class="form-input" type="url" name="url" value="<%= existingSubmission ? existingSubmission.url || '' : '' %>" placeholder="https://..." />
-          </div>
-          <div>
-            <label class="form-label">Notes (Max 500 characters):</label>
-            <textarea class="form-input" name="description" maxlength="500" rows="5" required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
-          </div>
-          <div>
-            <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>
-            <input
-              id="submission-attachments"
-              class="form-input !py-2 text-sm"
-              type="file"
-              name="attachments"
-               
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.md,.csv,.png,.jpg,.jpeg,.webp,.xlsx"
-            />
-            <p id="attachments-hint" class="mt-1 text-xs text-navy-400">Uploading new files replaces any currently attached ones.</p>
-          </div>
-          <button type="submit" id="submit-btn" class="btn-primary w-full"><%= existingSubmission ? 'Update submission' : 'Submit' %></button>
-        </form>
-        <% } %>
+                <% if (typeof historyOnly !=='undefined' && historyOnly) { %>
+                  <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
+                    This assessment was given to your previous section or semester. You can still see your submission
+                    and your results here, but it is no longer open for changes.
+                  </div>
+                  <% } else if (submissionClosed) { %>
+                    <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      The submission window for this assessment has closed. If you need to submit late, ask your teacher
+                      to open an exception for you.
+                    </div>
+                    <% } else if (submissionNotYetOpen) { %>
+                      <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
+                        This assessment isn't open for submissions yet.
+                      </div>
+                      <% } else { %>
+                        <form id="submission-form" action="/student/assessments/<%= assessment.id %>/submit"
+                          method="POST" enctype="multipart/form-data" class="space-y-4">
+                          <div>
+                            <label class="form-label">Submission link (Drive/GitHub/etc.)</label>
+                            <input class="form-input" type="url" name="url"
+                              value="<%= existingSubmission ? existingSubmission.url || '' : '' %>"
+                              placeholder="https://..." />
+                          </div>
+                          <div>
+                            <label class="form-label">Notes (Max 500 characters):</label>
+                            <textarea class="form-input" name="description" maxlength="500" rows="5"
+                              required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
+                          </div>
+                          <div>
+                            <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>
+                            <input id="submission-attachments" class="form-input !py-2 text-sm" type="file"
+                              name="attachments"
+                              accept=".pdf,.doc,.docx,.ppt,.pptx,.md,.csv,.png,.jpg,.jpeg,.webp,.xlsx" />
+                            <p id="attachments-hint" class="mt-1 text-xs text-navy-400">Uploading new files replaces any
+                              currently attached ones.</p>
+                          </div>
+                          <button type="submit" id="submit-btn" class="btn-primary w-full">
+                            <%= existingSubmission ? 'Update submission' : 'Submit' %>
+                          </button>
+                        </form>
+                        <% } %>
       </div>
     </div>
 
@@ -139,8 +158,8 @@
         var submitBtn = document.getElementById('submit-btn');
         var MAX_TOTAL_BYTES = 5 * 1024 * 1024;
         var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md', ".csv", ".png", '.jpg', 'jpeg', '.webp', '.xlsx'];
-        var hasExistingSubmission = <%- JSON.stringify(!!existingSubmission) %>;
-        var wasEvaluated = <%- JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
+        var hasExistingSubmission = <% - JSON.stringify(!!existingSubmission) %>;
+        var wasEvaluated = <% - JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
 
         function extOf(name) {
           var i = name.lastIndexOf('.');
@@ -207,24 +226,62 @@
     color: var(--color-navy-700, #33415c);
     word-break: break-word;
   }
-  .prose-content > *:first-child { margin-top: 0; }
-  .prose-content h1, .prose-content h2, .prose-content h3,
-  .prose-content h4, .prose-content h5, .prose-content h6 {
+
+  .prose-content>*:first-child {
+    margin-top: 0;
+  }
+
+  .prose-content h1,
+  .prose-content h2,
+  .prose-content h3,
+  .prose-content h4,
+  .prose-content h5,
+  .prose-content h6 {
     font-weight: 700;
     color: var(--color-navy-900, #0f1729);
     margin-top: 1.5em;
     margin-bottom: 0.5em;
     line-height: 1.3;
   }
-  .prose-content h1 { font-size: 1.5rem; }
-  .prose-content h2 { font-size: 1.25rem; }
-  .prose-content h3 { font-size: 1.1rem; }
-  .prose-content p { margin: 0 0 1em; }
-  .prose-content ul, .prose-content ol { margin: 0 0 1em 1.25rem; }
-  .prose-content ul { list-style: disc; }
-  .prose-content ol { list-style: decimal; }
-  .prose-content li { margin-bottom: 0.4em; }
-  .prose-content a { color: var(--color-info-600, #0284c7); text-decoration: underline; }
+
+  .prose-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .prose-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .prose-content h3 {
+    font-size: 1.1rem;
+  }
+
+  .prose-content p {
+    margin: 0 0 1em;
+  }
+
+  .prose-content ul,
+  .prose-content ol {
+    margin: 0 0 1em 1.25rem;
+  }
+
+  .prose-content ul {
+    list-style: disc;
+  }
+
+  .prose-content ol {
+    list-style: decimal;
+  }
+
+  .prose-content li {
+    margin-bottom: 0.4em;
+  }
+
+  .prose-content a {
+    color: var(--color-info-600, #0284c7);
+    text-decoration: underline;
+  }
+
   .prose-content img {
     max-width: 100%;
     height: auto;
@@ -232,13 +289,18 @@
     margin: 1em auto;
     display: block;
   }
-  .prose-content figure { margin: 1.25em 0; }
+
+  .prose-content figure {
+    margin: 1.25em 0;
+  }
+
   .prose-content figcaption {
     font-size: 0.8rem;
     color: var(--color-navy-400, #94a3b8);
     text-align: center;
     margin-top: 0.4rem;
   }
+
   .prose-content pre {
     background: var(--color-navy-900, #0f1729);
     color: #e2e8f0;
@@ -248,14 +310,21 @@
     margin: 1em 0;
     font-size: 0.85rem;
   }
-  .prose-content pre code { background: none; padding: 0; color: inherit; }
-  .prose-content :not(pre) > code {
+
+  .prose-content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+
+  .prose-content :not(pre)>code {
     background: var(--color-navy-50, #f1f4f9);
     padding: 0.15em 0.4em;
     border-radius: 0.25rem;
     font-size: 0.85em;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
+
   .prose-content blockquote {
     border-left: 3px solid var(--color-teal, #0f9e8f);
     padding-left: 1rem;
@@ -263,6 +332,7 @@
     margin: 1em 0;
     font-style: italic;
   }
+
   .prose-content table {
     width: 100%;
     border-collapse: collapse;
@@ -271,21 +341,29 @@
     display: block;
     overflow-x: auto;
   }
-  .prose-content td, .prose-content th {
+
+  .prose-content td,
+  .prose-content th {
     border: 1px solid var(--color-navy-100, #e2e8f0);
     padding: 0.5rem 0.75rem;
     text-align: left;
   }
+
   .prose-content hr.rule {
     border: none;
     border-top: 1px solid var(--color-navy-100, #e2e8f0);
     margin: 2rem 0;
   }
+
   .prose-content details {
     border: 1px solid var(--color-navy-100, #e2e8f0);
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
     margin: 1em 0;
   }
-  .prose-content summary { font-weight: 600; cursor: pointer; }
+
+  .prose-content summary {
+    font-weight: 600;
+    cursor: pointer;
+  }
 </style>
