@@ -14,7 +14,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 // extensions — restricting to only the legacy ones would block the vast
 // majority of students, who save in the modern format by default. Adjust
 // this list if you specifically want to exclude .docx/.pptx.
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".md", ".csv", ".png", '.jpg', 'jpeg', '.webp', '.xlsx'];
+const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".md", ".csv", ".png", ".jpg", ".jpeg", ".webp", '.xlsx'];
 
 const MAX_TOTAL_BYTES = 5 * 1024 * 1024; // 5MB, combined across all files
 const MAX_FILES = 5;
@@ -32,7 +32,7 @@ function fileFilter(req, file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return cb(
-      new Error(`"${file.originalname}" isn't an allowed file type. Only PDF, Word, and PowerPoint files are accepted.`)
+      new Error(`"${file.originalname}" isn't an allowed file type. Allowed types: PDF, Word, PowerPoint, Excel, CSV, Markdown and images (PNG, JPG, WEBP).`)
     );
   }
   cb(null, true);

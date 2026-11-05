@@ -22,7 +22,7 @@ const logger = require("../utils/logger");
 const renderBlocks = require("../utils/renderBlocks");
 const fs = require("fs");
 const path = require("path");
-const { UPLOAD_DIR, MAX_TOTAL_BYTES } = require("../middleware/submissionUpload");
+const { UPLOAD_DIR, MAX_TOTAL_BYTES, MAX_FILES } = require("../middleware/submissionUpload");
 
 const ROOT = { label: "Dashboard", url: "/student/dashboard" };
 
@@ -395,6 +395,7 @@ exports.showAssessment = async (req, res) => {
     submissionNotYetOpen,
     submissionClosed,
     error: req.query.error || null,
+    notice: req.query.notice === "no_changes" ? "Nothing was changed, so your submission (and any marks already given) stays as it was." : null,
     breadcrumbs: [ROOT, { label: assessment.title }],
   });
 };
@@ -444,58 +445,102 @@ exports.submitAssessment = async (req, res) => {
   // deadline for everyone.
   const isLate = now > new Date(assessment.endAt);
 
-  const { url, description } = req.body;
+  // ---- What the student sent --------------------------------------------------------
+  // A resubmission now changes ONLY what the student actually changed:
+  //   * link / notes  -> a field that was not sent is kept; one that was sent replaces the old value
+  //                      (an empty link means "remove my link on purpose")
+  //   * files         -> existing files are kept unless the student ticked "Remove" on them;
+  //                      newly uploaded files are ADDED to the ones that stay
+  // Nothing is deleted from disk until the new submission has been saved.
   const uploadedFiles = req.files || [];
+  const dropUploads = () => uploadedFiles.forEach((f) => fs.unlink(f.path, () => {})); // temp files multer already wrote
+  const back = (message) =>
+    res.redirect(`/student/assessments/${assessment.id}?error=` + encodeURIComponent(message));
 
-  // Multer only enforces a PER-FILE size cap — the "5MB single or
-  // combined" requirement needs this explicit combined check.
-  const totalBytes = uploadedFiles.reduce((sum, f) => sum + f.size, 0);
-  if (totalBytes > MAX_TOTAL_BYTES) {
-    uploadedFiles.forEach((f) => fs.unlink(f.path, () => {})); // clean up what multer already wrote to disk
-    return res.redirect(
-      `/student/assessments/${assessment.id}?error=` +
-        encodeURIComponent(`Attached files total ${(totalBytes / (1024 * 1024)).toFixed(1)}MB — the combined limit is 5MB.`)
-    );
-  }
-
-  // Resubmitting REPLACES the whole submission, not merges with it: any
-  // previously attached files are superseded, so delete them from disk.
-  // Also explicitly clear marksObtained/remarks/evaluatedById — previously
-  // these were left STALE after a resubmission (status reset to PENDING,
-  // but Sequelize's upsert() only touches the columns you pass it, so old
-  // marks/remarks from a prior evaluation silently stuck around on a
-  // "pending" submission). The actual warning about losing the previous
-  // file/grade is a client-side confirm() in assessment-detail.ejs, shown
-  // before this request is ever sent.
   const existingSubmission = await Submission.findOne({
     where: { assessmentId: assessment.id, studentId: studentProfile.id },
   });
-  if (existingSubmission && Array.isArray(existingSubmission.attachments)) {
-    existingSubmission.attachments.forEach((att) => {
-      const filePath = path.join(UPLOAD_DIR, path.basename(att.url));
-      fs.unlink(filePath, () => {}); // best-effort — a missing file shouldn't block resubmission
-    });
+  const oldAttachments = existingSubmission && Array.isArray(existingSubmission.attachments) ? existingSubmission.attachments : [];
+
+  const has = (v) => typeof v === "string";
+  let url = existingSubmission ? existingSubmission.url : null;
+  if (has(req.body.url)) url = req.body.url.trim() || null;
+  let description = existingSubmission ? existingSubmission.description : null;
+  if (has(req.body.description)) description = req.body.description.trim() || null;
+
+  // Only web links: the link is shown to teachers as a clickable address, so "javascript:" and
+  // similar must never be stored.
+  if (url && (url.length > 2048 || !/^https?:\/\/\S+$/i.test(url))) {
+    dropUploads();
+    return back("Please enter a valid link starting with http:// or https://");
+  }
+  if (description && description.length > 500) {
+    dropUploads();
+    return back("Notes can be at most 500 characters.");
   }
 
-  const attachments = uploadedFiles.map((f) => ({
+  // Which existing files does the student want gone? Match against what is STORED (never trust a
+  // posted path), and only ever delete the stored file's own name inside UPLOAD_DIR.
+  let removeUrls = req.body.removeAttachments || [];
+  if (!Array.isArray(removeUrls)) removeUrls = [removeUrls];
+  const removeSet = new Set(removeUrls.filter(has));
+  const removedAttachments = oldAttachments.filter((att) => removeSet.has(att.url));
+  const keptAttachments = oldAttachments.filter((att) => !removeSet.has(att.url));
+
+  const newAttachments = uploadedFiles.map((f) => ({
     url: `/uploads/submissions/${f.filename}`,
     originalName: f.originalname,
     size: f.size,
   }));
+  const finalAttachments = [...keptAttachments, ...newAttachments];
 
+  // Limits apply to the files the submission will END UP with. Multer only enforces a per-file cap,
+  // so the count and the "5MB combined" rule are checked here.
+  const totalBytes = finalAttachments.reduce((sum, f) => sum + (Number(f.size) || 0), 0);
+  if (finalAttachments.length > MAX_FILES) {
+    dropUploads();
+    return back(`A submission can have at most ${MAX_FILES} files. Remove one of the current files first, or attach fewer.`);
+  }
+  if (totalBytes > MAX_TOTAL_BYTES) {
+    dropUploads();
+    return back(`Attached files total ${(totalBytes / (1024 * 1024)).toFixed(1)}MB — the combined limit is 5MB. Remove a current file or attach smaller ones.`);
+  }
+
+  if (!url && !description && !finalAttachments.length) {
+    dropUploads();
+    return back("Please add a link, some notes, or at least one file.");
+  }
+
+  // Pressing "Update" without changing anything must not wipe an evaluation.
+  if (existingSubmission) {
+    const sameFiles =
+      !uploadedFiles.length && !removedAttachments.length;
+    if (sameFiles && (url || null) === (existingSubmission.url || null) && (description || null) === (existingSubmission.description || null)) {
+      return res.redirect(`/student/assessments/${assessment.id}?notice=no_changes`);
+    }
+  }
+
+  // Resubmitting resets the evaluation: status back to PENDING and any earlier marks / remarks cleared
+  // (the confirm() in assessment-detail.ejs warns the student first). Without explicitly nulling them,
+  // upsert() would leave stale marks on a "pending" row.
   await Submission.upsert({
     assessmentId: assessment.id,
     studentId: studentProfile.id,
     sectionId: enrollment.sectionId,
-    url: url || null,
-    description: description || null,
-    attachments: attachments.length ? attachments : null,
+    url,
+    description,
+    attachments: finalAttachments.length ? finalAttachments : null,
     status: "PENDING",
     marksObtained: null,
     remarks: null,
     evaluatedById: null,
     submittedAt: now,
     isLate,
+  });
+
+  // Saved — only now remove the files the student asked to drop.
+  removedAttachments.forEach((att) => {
+    fs.unlink(path.join(UPLOAD_DIR, path.basename(att.url)), () => {}); // best-effort
   });
 
   res.redirect("/student/dashboard");

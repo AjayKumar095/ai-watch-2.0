@@ -86,23 +86,69 @@
             <%= error %>
           </div>
           <% } %>
+        <% if (typeof notice !== 'undefined' && notice) { %>
+          <div class="mb-3 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-sm text-info-800">
+            <%= notice %>
+          </div>
+        <% } %>
 
-            <% if (existingSubmission && Array.isArray(existingSubmission.attachments) &&
-              existingSubmission.attachments.length) { %>
-              <div class="mb-3 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
-                <p class="mb-1 text-xs font-medium text-navy-500">Currently attached:</p>
-                <ul class="space-y-0.5 text-xs">
-                  <% existingSubmission.attachments.forEach(function(att) { %>
-                    <li>
-                      <a href="<%= att.url %>" target="_blank" rel="noopener" class="text-info-600 hover:underline">
-                        <%= att.originalName %>
-                      </a>
-                      <span class="text-navy-400">(<%= (att.size / (1024 * 1024)).toFixed(2) %> MB)</span>
-                    </li>
-                    <% }) %>
-                </ul>
+            <% if (existingSubmission) {
+                 var subFiles = Array.isArray(existingSubmission.attachments) ? existingSubmission.attachments : [];
+                 var subUrl = existingSubmission.url || '';
+                 var subUrlOk = /^https?:\/\//i.test(subUrl);
+                 var subWhen = existingSubmission.submittedAt
+                   ? new Date(existingSubmission.submittedAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : null;
+            %>
+              <div class="mb-4 rounded-lg border border-navy-100 bg-navy-50 p-3" id="submission-summary">
+                <div class="flex flex-wrap items-center gap-2">
+                  <% if (existingSubmission.status === 'EVALUATED') { %><span class="badge-info">Evaluated</span>
+                  <% } else { %><span class="badge-amber">Awaiting evaluation</span><% } %>
+                  <% if (existingSubmission.isLate) { %><span class="badge-navy">Late</span><% } %>
+                  <% if (subWhen) { %><span class="text-xs text-navy-400">Submitted <%= subWhen %></span><% } %>
+                </div>
+
+                <dl class="mt-3 space-y-3 text-sm">
+                  <div>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-navy-400">Link</dt>
+                    <dd class="mt-0.5 break-all">
+                      <% if (!subUrl) { %><span class="text-navy-400">No link added</span>
+                      <% } else if (subUrlOk) { %>
+                        <a href="<%= subUrl %>" target="_blank" rel="noopener noreferrer" class="font-medium text-info-600 hover:underline">
+                          <i class="fa-solid fa-link mr-1 text-xs"></i><%= subUrl %>
+                        </a>
+                      <% } else { %><span class="text-navy-700"><%= subUrl %></span><% } %>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-navy-400">Your notes</dt>
+                    <dd class="mt-0.5">
+                      <% if (existingSubmission.description) { %>
+                        <p class="whitespace-pre-wrap break-words rounded-md border border-navy-100 bg-white px-2.5 py-2 text-navy-700"><%= existingSubmission.description %></p>
+                      <% } else { %><span class="text-navy-400">No notes added</span><% } %>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-navy-400">Files</dt>
+                    <dd class="mt-0.5">
+                      <% if (!subFiles.length) { %><span class="text-navy-400">No files attached</span>
+                      <% } else { %>
+                        <ul class="space-y-1">
+                          <% subFiles.forEach(function(att) { %>
+                            <li class="flex items-start gap-1.5">
+                              <i class="fa-solid fa-paperclip mt-1 text-xs text-navy-300"></i>
+                              <span class="min-w-0">
+                                <a href="<%= att.url %>" target="_blank" rel="noopener" class="break-all font-medium text-info-600 hover:underline"><%= att.originalName || 'File' %></a>
+                                <span class="text-xs text-navy-400">(<%= ((Number(att.size) || 0) / (1024 * 1024)).toFixed(2) %> MB)</span>
+                              </span>
+                            </li>
+                          <% }) %>
+                        </ul>
+                      <% } %>
+                    </dd>
+                  </div>
+                </dl>
               </div>
-              <% } %>
+            <% } %>
 
                 <% if (typeof historyOnly !=='undefined' && historyOnly) { %>
                   <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-600">
@@ -133,12 +179,30 @@
                               required><%= existingSubmission ? existingSubmission.description || '' : '' %></textarea>
                           </div>
                           <div>
-                            <label class="form-label">Attach files (PDF, Word, PowerPoint — 5MB combined max)</label>
+                            <% var curFiles = existingSubmission && Array.isArray(existingSubmission.attachments) ? existingSubmission.attachments : []; %>
+                            <% if (curFiles.length) { %>
+                              <p class="form-label">Current files</p>
+                              <ul class="mb-3 space-y-1 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm">
+                                <% curFiles.forEach(function(att) { %>
+                                  <li>
+                                    <label class="flex cursor-pointer items-start gap-2">
+                                      <input type="checkbox" class="remove-att mt-1" name="removeAttachments" value="<%= att.url %>" />
+                                      <span class="min-w-0 break-all text-navy-700"><%= att.originalName || 'File' %>
+                                        <span class="text-xs text-navy-400">(<%= ((Number(att.size) || 0) / (1024 * 1024)).toFixed(2) %> MB)</span>
+                                        <span class="ml-1 text-xs text-amber-700">tick to remove</span>
+                                      </span>
+                                    </label>
+                                  </li>
+                                <% }) %>
+                              </ul>
+                            <% } %>
+                            <label class="form-label"><%= curFiles.length ? 'Add more files' : 'Attach files' %> (PDF, Word, PowerPoint, Excel, CSV, images — 5MB combined max, up to 5 files)</label>
                             <input id="submission-attachments" class="form-input !py-2 text-sm" type="file"
-                              name="attachments"
+                              name="attachments" multiple
                               accept=".pdf,.doc,.docx,.ppt,.pptx,.md,.csv,.png,.jpg,.jpeg,.webp,.xlsx" />
-                            <p id="attachments-hint" class="mt-1 text-xs text-navy-400">Uploading new files replaces any
-                              currently attached ones.</p>
+                            <p id="attachments-hint" class="mt-1 text-xs text-navy-400"><%= existingSubmission
+                              ? 'Your current files stay as they are. New files are added to them; tick "tick to remove" on a file to delete it.'
+                              : 'You can attach up to 5 files.' %></p>
                           </div>
                           <button type="submit" id="submit-btn" class="btn-primary w-full">
                             <%= existingSubmission ? 'Update submission' : 'Submit' %>
@@ -156,29 +220,53 @@
         var fileInput = document.getElementById('submission-attachments');
         var hint = document.getElementById('attachments-hint');
         var submitBtn = document.getElementById('submit-btn');
+        var urlInput = form.elements.url;
+        var notesInput = form.elements.description;
         var MAX_TOTAL_BYTES = 5 * 1024 * 1024;
-        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md', ".csv", ".png", '.jpg', 'jpeg', '.webp', '.xlsx'];
-        var hasExistingSubmission = <% - JSON.stringify(!!existingSubmission) %>;
-        var wasEvaluated = <% - JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
+        var MAX_FILES = 5;
+        var ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.md', '.csv', '.png', '.jpg', '.jpeg', '.webp', '.xlsx'];
+        // NOTE: the three values below are printed with the unescaped output tag. A space between the percent sign and the dash silently prints nothing and breaks this whole script.
+        var hasExistingSubmission = <%- JSON.stringify(!!existingSubmission) %>;
+        var wasEvaluated = <%- JSON.stringify(!!(existingSubmission && existingSubmission.status === 'EVALUATED')) %>;
+        var currentFiles = <%- JSON.stringify((existingSubmission && Array.isArray(existingSubmission.attachments) ? existingSubmission.attachments : []).map(function (a) { return { url: a.url, size: Number(a.size) || 0 }; })) %>;
+        var originalUrl = urlInput ? urlInput.value : '';
+        var originalNotes = notesInput ? notesInput.value : '';
+        var baseHint = hint.textContent;
 
         function extOf(name) {
           var i = name.lastIndexOf('.');
           return i === -1 ? '' : name.slice(i).toLowerCase();
         }
+        function removedUrls() {
+          return Array.prototype.slice.call(form.querySelectorAll('.remove-att:checked')).map(function (c) { return c.value; });
+        }
+        function keptFiles() {
+          var gone = removedUrls();
+          return currentFiles.filter(function (f) { return gone.indexOf(f.url) === -1; });
+        }
 
         // Client-side validation is instant feedback only — the server
         // (middleware/submissionUpload.js + studentController.submitAssessment)
-        // re-validates both the extension allow-list and the combined 5MB
-        // limit regardless of what happens here.
-        fileInput.addEventListener('change', function () {
-          var files = Array.prototype.slice.call(fileInput.files);
-          var total = files.reduce(function (sum, f) { return sum + f.size; }, 0);
-          var badFile = files.find(function (f) { return ALLOWED_EXTENSIONS.indexOf(extOf(f.name)) === -1; });
+        // re-validates the extension allow-list, the file count and the combined
+        // 5MB limit regardless of what happens here. The limits apply to the files
+        // the submission will END UP with (kept + newly added).
+        function validateFiles() {
+          var added = Array.prototype.slice.call(fileInput.files);
+          var kept = keptFiles();
+          var total = added.reduce(function (sum, f) { return sum + f.size; }, 0) + kept.reduce(function (sum, f) { return sum + f.size; }, 0);
+          var badFile = added.find(function (f) { return ALLOWED_EXTENSIONS.indexOf(extOf(f.name)) === -1; });
+          hint.classList.remove('text-amber-600');
 
           if (badFile) {
-            hint.textContent = '"' + badFile.name + '" isn\'t an allowed type — only PDF, Word, and PowerPoint files are accepted.';
+            hint.textContent = '"' + badFile.name + '" isn\'t an allowed type.';
             hint.classList.add('text-amber-600');
             fileInput.setCustomValidity('Remove or replace the disallowed file.');
+            return;
+          }
+          if (kept.length + added.length > MAX_FILES) {
+            hint.textContent = 'At most ' + MAX_FILES + ' files per submission — remove a current file or add fewer.';
+            hint.classList.add('text-amber-600');
+            fileInput.setCustomValidity('Too many files.');
             return;
           }
           if (total > MAX_TOTAL_BYTES) {
@@ -187,19 +275,29 @@
             fileInput.setCustomValidity('Files exceed the 5MB combined limit.');
             return;
           }
-
           fileInput.setCustomValidity('');
-          hint.classList.remove('text-amber-600');
-          hint.textContent = files.length
-            ? files.length + ' file(s) selected, ' + (total / (1024 * 1024)).toFixed(2) + 'MB total.'
-            : 'Uploading new files replaces any currently attached ones.';
-        });
+          hint.textContent = added.length
+            ? added.length + ' new file(s) selected, ' + (total / (1024 * 1024)).toFixed(2) + 'MB in total with the files you keep.'
+            : baseHint;
+        }
+        fileInput.addEventListener('change', validateFiles);
+        form.addEventListener('change', function (e) { if (e.target && e.target.classList && e.target.classList.contains('remove-att')) validateFiles(); });
 
         form.addEventListener('submit', function (e) {
           if (hasExistingSubmission) {
+            var unchanged =
+              (urlInput ? urlInput.value : '') === originalUrl &&
+              (notesInput ? notesInput.value : '') === originalNotes &&
+              !fileInput.files.length && !removedUrls().length;
+            if (unchanged) {
+              e.preventDefault();
+              hint.textContent = 'You haven\'t changed anything, so there is nothing to update.';
+              hint.classList.add('text-amber-600');
+              return;
+            }
             var message = wasEvaluated
-              ? 'Resubmitting will delete your previous submission and its file(s), AND clear the marks/remarks already given for it. Continue?'
-              : 'Resubmitting will replace your previous submission and its file(s). Continue?';
+              ? 'Updating will send your submission for evaluation again and CLEAR the marks/remarks already given for it. Only the parts you changed are replaced. Continue?'
+              : 'Only the parts you changed will be replaced. Continue?';
             if (!confirm(message)) {
               e.preventDefault();
               return;
