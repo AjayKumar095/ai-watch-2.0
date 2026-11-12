@@ -5,12 +5,15 @@ const {
   Program,
   SemesterCertificate,
   Assessment,
+  AssessmentSection,
+  AssessmentSectionSpecialization,
   Submission,
   SubjectEnrollment,
   SubjectOffering,
   SubjectPool,
 } = require("../models");
 const { isLocked } = require("./assessmentLockService");
+const { visibleSectionIdsForStudent, specializationMatches } = require("./sectionScope");
 const { extractLevel, formatAiLevel } = require("../utils/courseLevel");
 const { generateCertificate: renderCertificatePdf } = require("../utils/certificateGenerator");
 
@@ -57,6 +60,60 @@ function levelFromEnrollments(enrollments) {
 }
 
 /**
+ * The assessments that actually "belong" to this student for the given
+ * enrollments — the SAME rule the student dashboard uses:
+ *   - active assessments of the enrolled subject offering that target the
+ *     student's own section (or its parent "whole section"), AND whose
+ *     specialization scope covers the student; plus
+ *   - anything the student has already submitted to in those offerings
+ *     (history is never dropped, same as the dashboard).
+ * Counting every assessment of the offering (the old behaviour) also counted
+ * work aimed at other sections / other PG groups, so the certificate page
+ * showed e.g. "2 / 7" while the dashboard showed 3.
+ */
+async function assessmentsForStudent(studentProfile, enrollments) {
+  const byId = new Map();
+
+  for (const e of enrollments) {
+    const visibleSectionIds = await visibleSectionIdsForStudent(e.sectionId);
+    if (!visibleSectionIds.length) continue;
+    const candidates = await Assessment.findAll({
+      where: { subjectOfferingId: e.subjectOfferingId, isActive: true },
+      include: [
+        {
+          model: AssessmentSection,
+          where: { sectionId: visibleSectionIds },
+          required: true,
+          include: [{ model: AssessmentSectionSpecialization, as: "sectionSpecializations" }],
+        },
+      ],
+    });
+    for (const a of candidates) {
+      const covers = a.AssessmentSections.some((as) =>
+        specializationMatches(studentProfile.specializationId, (as.sectionSpecializations || []).map((x) => x.specializationId))
+      );
+      if (covers) byId.set(a.id, a);
+    }
+  }
+
+  const offeringIds = [...new Set(enrollments.map((e) => e.subjectOfferingId))];
+  if (offeringIds.length) {
+    const inOfferings = await Assessment.findAll({
+      where: { subjectOfferingId: offeringIds, isActive: true },
+      attributes: ["id", "title", "subjectOfferingId"],
+    });
+    const mine = await Submission.findAll({
+      where: { studentId: studentProfile.id, assessmentId: inOfferings.map((a) => a.id) },
+      attributes: ["assessmentId"],
+    });
+    const submittedIds = new Set(mine.map((s) => s.assessmentId));
+    for (const a of inOfferings) if (submittedIds.has(a.id)) byId.set(a.id, a);
+  }
+
+  return [...byId.values()];
+}
+
+/**
  * Eligibility, in order:
  *   1. Student is enrolled in every subject offering for this
  *      program+semester+admissionYear.
@@ -84,8 +141,13 @@ async function checkEligibility({ studentId, programId, semesterNumber, admissio
     return { eligible: false, reason: "No subject enrollments found for this program/semester/admission year." };
   }
 
-  const offeringIds = enrollments.map((e) => e.subjectOfferingId);
-  const assessments = await Assessment.findAll({ where: { subjectOfferingId: offeringIds } });
+  const studentProfile = await StudentProfile.findByPk(studentId);
+  if (!studentProfile) return { eligible: false, reason: "Student profile not found." };
+
+  const assessments = await assessmentsForStudent(studentProfile, enrollments);
+  if (!assessments.length) {
+    return { eligible: false, reason: "No assessments have been assigned to you yet for this semester." };
+  }
   const submissions = await Submission.findAll({
     where: { studentId, assessmentId: assessments.map((a) => a.id) },
   });
@@ -247,8 +309,8 @@ async function getProgressOverview(studentId) {
     // Re-derive raw counts for a progress bar (X of Y evaluated), separate
     // from the pass/fail eligibility.reason string.
     const enrollmentsForScope = enrollments.filter((e) => e.SubjectOffering && scopeKey(e.SubjectOffering) === scopeKey(scope));
-    const offeringIds = enrollmentsForScope.map((e) => e.subjectOfferingId);
-    const assessments = await Assessment.findAll({ where: { subjectOfferingId: offeringIds } });
+    const studentProfile = await StudentProfile.findByPk(studentId);
+    const assessments = studentProfile ? await assessmentsForStudent(studentProfile, enrollmentsForScope) : [];
     const submissions = await Submission.findAll({
       where: { studentId, assessmentId: assessments.map((a) => a.id) },
     });

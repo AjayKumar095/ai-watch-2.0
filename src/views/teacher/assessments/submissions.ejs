@@ -1,3 +1,4 @@
+<% function fmtMark(v) { var n = parseFloat(v); if (isNaN(n)) return ''; n = Math.round(n * 100) / 100; return (Math.round(n * 100) % 10 === 0) ? n.toFixed(1) : n.toFixed(2); } %>
 <div class="mb-4">
   <h1 class="text-2xl font-bold text-navy-900"><%= assessment.title %></h1>
   <p class="text-sm text-navy-500"><%= assessment.SubjectOffering.SubjectPool.name %> · Max marks <%= parseFloat(assessment.maxMarks).toFixed(1) %></p>
@@ -5,6 +6,17 @@
     <div class="prose-content mt-3 rounded-lg border border-navy-100 bg-navy-50 p-3"><%- descriptionHtml %></div>
   <% } %>
 </div>
+
+<style>
+  /* Own classes (not Tailwind utilities) so these always work, whatever the Tailwind build includes. */
+  tr.row-dirty > td { background: #fffbeb; }
+  .mark-invalid { border-color: #dc2626 !important; box-shadow: 0 0 0 1px #fca5a5; }
+  .field-error { color: #b91c1c; font-size: 11px; line-height: 1.3; margin-top: 2px; width: 100%; display: none; }
+  .row-save-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .row-eval-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+  #draft-banner { display: none; }
+</style>
+<div id="marks-config" hidden data-assessment-id="<%= assessment.id %>" data-max="<%= parseFloat(assessment.maxMarks) %>"></div>
 
 <div class="mb-4 flex flex-wrap gap-2">
   <a href="/teacher/assessments/<%= assessment.id %>/submissions" class="btn-<%= !activeSectionId ? 'primary' : 'secondary' %> !px-3 !py-1.5 text-xs">All sections</a>
@@ -28,7 +40,7 @@
   /teacher/submissions/:id/evaluate as intended. Keeping the bulk form
   separate and non-wrapping avoids the nesting entirely.
 -->
-<form id="bulk-evaluate-form" action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST"></form>
+<form id="bulk-evaluate-form" action="/teacher/assessments/<%= assessment.id %>/submissions/bulk-evaluate" method="POST" novalidate></form>
 
 <div class="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
   <div class="col-span-2">
@@ -50,15 +62,23 @@
 </div>
 <p id="sub-count" class="mb-2 text-xs text-navy-400"></p>
 
+<div id="server-notice" class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" style="display:none"></div>
+
+<div id="draft-banner" class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+  <span id="draft-banner-text"></span>
+  <button type="button" id="draft-discard" class="underline">Discard these</button>
+</div>
+
 <div class="card">
   <div class="mb-3 flex flex-wrap items-end gap-3 rounded-lg bg-navy-50 p-3">
     <div>
       <label class="form-label !mb-0.5 text-xs">Bulk marks</label>
-      <input form="bulk-evaluate-form" class="form-input !py-1.5" type="number" step="0.5" name="marksObtained" placeholder="e.g. 8" />
+      <input id="bulk-marks" form="bulk-evaluate-form" class="form-input !py-1.5" type="number" step="0.5" min="0" max="<%= parseFloat(assessment.maxMarks) %>" inputmode="decimal" name="marksObtained" title="Up to 2 decimals" placeholder="0 – <%= parseFloat(assessment.maxMarks) %>" />
+      <p id="bulk-error" class="field-error"></p>
     </div>
     <div class="flex-1">
       <label class="form-label !mb-0.5 text-xs">Bulk remarks</label>
-      <input form="bulk-evaluate-form" class="form-input !py-1.5" name="remarks" placeholder="Applied to all checked rows" />
+      <input id="bulk-remarks" form="bulk-evaluate-form" class="form-input !py-1.5" name="remarks" placeholder="Applied to all checked rows" />
     </div>
     <button form="bulk-evaluate-form" type="submit" class="btn-primary !py-2 text-sm">Apply to selected</button>
   </div>
@@ -85,8 +105,8 @@
             <td class="py-2 pr-3"><input form="bulk-evaluate-form" class="sub-check" type="checkbox" name="submissionIds" value="<%= s.id %>" /></td>
             <td class="py-2 pr-3 font-medium text-navy-800"><%= s.StudentProfile.User.firstName %> <%= s.StudentProfile.User.lastName %></td>
             <td class="py-2 pr-3 text-navy-500">Section <%= s.Section.name %></td>
-            <td class="py-2 pr-3">
-              <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= parseFloat(s.marksObtained).toFixed(1) %>/<%= parseFloat(assessment.maxMarks).toFixed(1) %></span>
+            <td class="py-2 pr-3 sub-status-cell">
+              <% if (s.status === 'EVALUATED') { %><span class="badge-info"><%= fmtMark(s.marksObtained) %>/<%= fmtMark(assessment.maxMarks) %></span>
               <% } else { %><span class="badge-amber"><%= s.isLate ? 'Late' : 'Pending' %></span><% } %>
             </td>
             <td class="py-2 pr-3 text-navy-500">
@@ -101,8 +121,8 @@
                   <% s.attachments.forEach(function(att, i) { %>
                     <div class="flex items-center gap-1.5">
                       <i class="fa-solid fa-paperclip text-navy-400"></i>
-                      <a href="<%= att.url %>" target="_blank" rel="noopener noreferrer" class="text-xs text-navy-600 hover:underline" title="<%= att.name || ('Attachment ' + (i + 1)) %>">
-                        <%= att.name || ('File ' + (i + 1)) %>
+                      <a href="<%= att.url %>" target="_blank" rel="noopener noreferrer" class="text-xs text-navy-600 hover:underline" title="<%= att.originalName || att.name || ('Attachment ' + (i + 1)) %>">
+                        <%= att.originalName || att.name || ('File ' + (i + 1)) %>
                       </a>
                     </div>
                   <% }) %>
@@ -131,10 +151,13 @@
             </td>
             <td class="py-2 pr-3">
               <!-- A real, standalone form — no longer inside the bulk form above. -->
-              <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="flex items-center gap-1">
-                <input class="form-input row-mark-input !w-20 !py-1" type="number" step="0.5" name="marksObtained" value="<%= s.marksObtained != null ? parseFloat(s.marksObtained).toFixed(1) : '' %>" />
-                <input class="form-input row-remarks-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" placeholder="remarks" />
-                <button type="submit" class="btn-secondary !px-2 !py-1 text-xs">Save</button>
+              <form action="/teacher/submissions/<%= s.id %>/evaluate" method="POST" class="row-eval-form" novalidate>
+                <input class="form-input row-mark-input !w-20 !py-1" type="number" step="0.5" min="0" max="<%= parseFloat(assessment.maxMarks) %>" inputmode="decimal" name="marksObtained" aria-label="Marks" placeholder="0–<%= parseFloat(assessment.maxMarks) %>"
+                       value="<%= s.marksObtained != null ? fmtMark(s.marksObtained) : '' %>"
+                       data-saved="<%= s.marksObtained != null ? fmtMark(s.marksObtained) : '' %>" />
+                <input class="form-input row-remarks-input !w-28 !py-1" name="remarks" value="<%= s.remarks || '' %>" data-saved="<%= s.remarks || '' %>" placeholder="remarks" />
+                <button type="submit" class="btn-secondary row-save-btn !px-2 !py-1 text-xs">Save</button>
+                <p class="field-error row-error" role="alert"></p>
               </form>
             </td>
           </tr>
@@ -145,76 +168,17 @@
 </div>
 
 <div class="mt-4 flex items-center justify-between">
-  <p id="save-all-status" class="text-xs text-navy-400"></p>
+  <div>
+    <p id="dirty-count" class="text-xs font-medium text-amber-700"></p>
+    <p id="save-all-status" class="text-xs text-navy-400"></p>
+  </div>
   <button type="button" id="save-all-btn" class="btn-primary !px-6 text-sm">Save All Changes</button>
 </div>
 
-<script>
-  (function () {
-    var btn = document.getElementById('save-all-btn');
-    var statusEl = document.getElementById('save-all-status');
-
-    btn.addEventListener('click', function () {
-      var rows = [];
-
-      // Reads each row's CURRENT input values directly from the DOM,
-      // regardless of checkbox state (that's bulk-evaluate's concern, not
-      // this one) — every row with a mark and/or remark filled in gets
-      // saved, empty rows are silently skipped. This can't be a normal
-      // form submit: each row's inputs already belong to their own
-      // per-row <form> (for the individual Save button) AND are linked to
-      // the bulk-evaluate form via the form= attribute — an <input> can
-      // only belong to one form at a time, so a THIRD form can't also
-      // claim them. Reading live values via JS sidesteps that entirely.
-      document.querySelectorAll('tr[data-submission-id]').forEach(function (tr) {
-        var markInput = tr.querySelector('.row-mark-input');
-        var remarksInput = tr.querySelector('.row-remarks-input');
-        var marksObtained = markInput ? markInput.value.trim() : '';
-        var remarks = remarksInput ? remarksInput.value.trim() : '';
-        if (marksObtained === '' && remarks === '') return; // skip — nothing entered on this row
-        rows.push({ submissionId: tr.dataset.submissionId, marksObtained: marksObtained, remarks: remarks });
-      });
-
-      statusEl.classList.remove('text-amber-600', 'text-teal-600');
-
-      if (!rows.length) {
-        statusEl.textContent = 'Nothing to save — fill in a mark or remark for at least one row first.';
-        statusEl.classList.add('text-amber-600');
-        return;
-      }
-
-      var originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Saving…';
-      statusEl.textContent = '';
-
-      fetch(window.location.pathname + '/save-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rows }),
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          var msg = data.saved + ' saved';
-          if (data.skipped) msg += ', ' + data.skipped + ' skipped (empty)';
-          if (data.errors && data.errors.length) msg += ', ' + data.errors.length + ' failed (invalid marks)';
-          statusEl.textContent = msg;
-          statusEl.classList.add(data.errors && data.errors.length ? 'text-amber-600' : 'text-teal-600');
-          // Reload so status badges / preserved marks reflect what was
-          // actually saved, instead of duplicating that rendering in JS.
-          setTimeout(function () { window.location.reload(); }, 700);
-        })
-        .catch(function () {
-          statusEl.textContent = 'Something went wrong — please try again.';
-          statusEl.classList.add('text-amber-600');
-          btn.disabled = false;
-          btn.textContent = originalText;
-        });
-    });
-  })();
-</script>
 
 <script>
+  // Search / status filter / sort (unchanged behaviour). Exposes window.__subApply
+  // so the marks script below can re-run the filter after a row is saved in place.
   (function () {
     var tbody = document.querySelector('tbody[class*="divide-y"]');
     var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-submission-id]'));
@@ -238,7 +202,305 @@
       });
       ct.textContent = shown === rows.length ? rows.length + ' submission(s)' : shown + ' of ' + rows.length + ' submission(s)';
     }
+    window.__subApply = apply;
     q.addEventListener('input', apply); st.addEventListener('change', apply); so.addEventListener('change', apply);
     apply();
+  })();
+</script>
+
+<script>
+  // Marks entry: validation, in-place saving, and unsaved-work protection.
+  //  - Marks must be a number from 0 to the assessment's max, in steps of 0.5.
+  //    Anything else shows an inline error and cannot be saved.
+  //  - Single-row Save and Save All send the rows in the background; the page
+  //    does NOT reload, so everything else typed stays exactly where it is.
+  //  - Unsaved entries are also kept in this browser (localStorage), so an
+  //    accidental refresh / closed tab restores them.
+  (function () {
+    var cfg = document.getElementById('marks-config');
+    var MAX = parseFloat(cfg.dataset.max);
+    var KEY = 'aiw:marks-draft:' + cfg.dataset.assessmentId;
+    var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-submission-id]'));
+    var statusEl = document.getElementById('save-all-status');
+    var dirtyEl = document.getElementById('dirty-count');
+    var saveAllBtn = document.getElementById('save-all-btn');
+    var banner = document.getElementById('draft-banner');
+    var leaving = false, busy = false, keptOldRemark = false;
+
+    // Same display rule as the server-rendered page: 1 decimal, or 2 when needed (7.25).
+    function fmt(n) { n = Math.round(n * 100) / 100; return (Math.round(n * 100) % 10 === 0) ? n.toFixed(1) : n.toFixed(2); }
+    function maxLabel() { return (MAX % 1 === 0) ? String(MAX) : MAX.toFixed(1); }
+
+    // ---- storage (may be unavailable: private mode, blocked site data) ----
+    var storageOK = false;
+    try { window.localStorage.setItem('__t', '1'); window.localStorage.removeItem('__t'); storageOK = true; } catch (e) {}
+    function readDraft() {
+      if (!storageOK) return {};
+      try { return JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function writeDraft(d) {
+      if (!storageOK) return;
+      try {
+        if (Object.keys(d).length) window.localStorage.setItem(KEY, JSON.stringify(d));
+        else window.localStorage.removeItem(KEY);
+      } catch (e) {}
+    }
+
+    // ---- helpers ----
+    function parts(tr) {
+      return {
+        m: tr.querySelector('.row-mark-input'),
+        r: tr.querySelector('.row-remarks-input'),
+        btn: tr.querySelector('.row-save-btn'),
+        err: tr.querySelector('.row-error'),
+        form: tr.querySelector('form.row-eval-form')
+      };
+    }
+    // '' = fine, otherwise the message to show. Empty is allowed (remarks-only rows).
+    function validateMark(raw) {
+      raw = (raw || '').trim();
+      if (raw === '') return '';
+      if (!/^\d+(\.\d+)?$/.test(raw)) return 'Enter a number (0 – ' + maxLabel() + ').';
+      var n = parseFloat(raw);
+      if (n > MAX) return 'Cannot be more than ' + maxLabel() + '.';
+      if (!/^\d+(\.\d{1,2})?$/.test(raw)) return 'Use at most 2 decimal places.';   // stored as DECIMAL(5,2)
+      return '';
+    }
+    function sameMark(a, b) {
+      a = (a || '').trim(); b = (b || '').trim();
+      if (a === '' || b === '') return a === b;
+      return parseFloat(a) === parseFloat(b);
+    }
+    function isDirty(tr) {
+      var p = parts(tr);
+      return !sameMark(p.m.value, p.m.dataset.saved) || p.r.value.trim() !== (p.r.dataset.saved || '').trim();
+    }
+    function setStatus(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.classList.remove('text-amber-600', 'text-teal-600', 'text-navy-400');
+      statusEl.classList.add(kind === 'ok' ? 'text-teal-600' : kind === 'warn' ? 'text-amber-600' : 'text-navy-400');
+    }
+    function dirtyRows() { return rows.filter(isDirty); }
+
+    function persistDrafts() {
+      if (!storageOK) return;
+      var d = readDraft();
+      rows.forEach(function (tr) {
+        var id = tr.dataset.submissionId, p = parts(tr);
+        if (isDirty(tr)) d[id] = { m: p.m.value, r: p.r.value };
+        else delete d[id];
+      });
+      writeDraft(d);
+    }
+
+    function refreshRow(tr, serverMsg) {
+      var p = parts(tr);
+      if (serverMsg !== undefined) tr._srv = serverMsg;   // message from the server stays until the row is edited
+      var msg = validateMark(p.m.value) || tr._srv || '';
+      var dirty = isDirty(tr);
+      tr.classList.toggle('row-dirty', dirty);
+      p.m.classList.toggle('mark-invalid', !!msg);
+      p.err.textContent = msg;
+      p.err.style.display = msg ? 'block' : 'none';
+      p.btn.disabled = !!msg || !dirty || busy;
+      p.btn.title = msg ? msg : (dirty ? '' : 'Nothing changed on this row');
+    }
+    function refreshAll() {
+      var n = dirtyRows().length;
+      dirtyEl.textContent = n ? n + ' row' + (n === 1 ? '' : 's') + ' with unsaved changes' : '';
+      persistDrafts();
+    }
+    function onEdit(tr) { tr._srv = ''; refreshRow(tr); refreshAll(); }
+
+    // ---- wiring: typing ----
+    rows.forEach(function (tr) {
+      var p = parts(tr);
+      p.m.addEventListener('keydown', function (e) {
+        // number inputs happily accept these; none make sense for marks
+        if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') e.preventDefault();
+      });
+      p.m.addEventListener('input', function () { onEdit(tr); });
+      p.r.addEventListener('input', function () { onEdit(tr); });
+      p.form.addEventListener('submit', function (e) {
+        e.preventDefault(); // saved in the background below — no page reload
+        if (busy) return;
+        var msg = validateMark(p.m.value);
+        if (msg) { refreshRow(tr); p.m.focus(); return; }
+        if (!isDirty(tr)) { setStatus('Nothing changed on that row.', 'warn'); return; }
+        if (p.m.value.trim() === '' && p.r.value.trim() === '') { resetRow(tr); refreshAll(); return; }
+        send([tr]);
+      });
+    });
+
+    function resetRow(tr) {
+      var p = parts(tr);
+      p.m.value = p.m.dataset.saved || '';
+      p.r.value = p.r.dataset.saved || '';
+      refreshRow(tr);
+    }
+
+    // ---- restore unsaved work from the last visit ----
+    (function restore() {
+      var d = readDraft(), restored = 0;
+      rows.forEach(function (tr) {
+        var e = d[tr.dataset.submissionId];
+        if (!e) return;
+        var p = parts(tr);
+        p.m.value = e.m || '';
+        p.r.value = e.r || '';
+        if (isDirty(tr)) restored++;
+      });
+      rows.forEach(function (tr) { refreshRow(tr); });
+      refreshAll();
+      if (restored) {
+        document.getElementById('draft-banner-text').textContent =
+          'Restored ' + restored + ' unsaved entr' + (restored === 1 ? 'y' : 'ies') + ' from your last visit. They are highlighted and not saved yet.';
+        banner.style.display = 'flex';
+      }
+    })();
+    document.getElementById('draft-discard').addEventListener('click', function () {
+      rows.forEach(resetRow);
+      banner.style.display = 'none';
+      refreshAll();
+      setStatus('Unsaved entries discarded.', 'warn');
+    });
+
+    // ---- saving ----
+    function setBusy(b) {
+      busy = b;
+      saveAllBtn.disabled = b;
+      rows.forEach(function (tr) { refreshRow(tr); });
+    }
+    function applySaved(tr) {
+      var p = parts(tr);
+      var typed = p.m.value.trim();
+      var n = typed === '' ? 0 : parseFloat(typed); // remarks-only => 0, same rule as the server
+      p.m.value = fmt(n);
+      p.m.dataset.saved = p.m.value;
+      // The server only overwrites remarks when new text is sent; an emptied box keeps the old remark.
+      if (p.r.value.trim() === '' && (p.r.dataset.saved || '').trim() !== '') {
+        p.r.value = p.r.dataset.saved;
+        keptOldRemark = true;
+      }
+      p.r.dataset.saved = p.r.value.trim();
+      var cell = tr.querySelector('.sub-status-cell');
+      if (cell) {
+        cell.innerHTML = '';
+        var b = document.createElement('span');
+        b.className = 'badge-info';
+        b.textContent = fmt(n) + '/' + fmt(MAX);
+        cell.appendChild(b);
+      }
+      tr.dataset.status = 'evaluated';
+      tr.dataset.marks = String(n);
+      refreshRow(tr);
+    }
+    function send(trs) {
+      var payload = trs.map(function (tr) {
+        var p = parts(tr);
+        return { submissionId: tr.dataset.submissionId, marksObtained: p.m.value.trim(), remarks: p.r.value.trim() };
+      });
+      setBusy(true);
+      setStatus('Saving ' + payload.length + ' row' + (payload.length === 1 ? '' : 's') + '…', 'info');
+      return fetch(window.location.pathname + '/save-all', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ rows: payload })
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json(); // a login page (expired session) is not JSON -> lands in catch
+        })
+        .then(function (data) {
+          var failed = {};
+          (data.errors || []).forEach(function (e) { failed[String(e.submissionId)] = e.reason || 'Invalid marks'; });
+          var ok = 0, bad = 0;
+          keptOldRemark = false;
+          trs.forEach(function (tr) {
+            var id = tr.dataset.submissionId;
+            if (failed[id]) { bad++; refreshRow(tr, failed[id]); }
+            else { ok++; tr._srv = ''; applySaved(tr); }
+          });
+          if (typeof data.saved === 'number' && data.saved < ok) {
+            setStatus(data.saved + ' of ' + payload.length + ' saved — some rows could not be found. Reload to check.', 'warn');
+          } else if (bad) {
+            setStatus(ok + ' saved, ' + bad + ' not saved (see the red messages).', 'warn');
+          } else {
+            setStatus(ok + ' saved.' + (keptOldRemark ? ' (An emptied remarks box keeps the previous remark — remarks can\'t be cleared.)' : ''), keptOldRemark ? 'warn' : 'ok');
+          }
+          if (window.__subApply) window.__subApply();
+        })
+        .catch(function () {
+          // Nothing is cleared: every typed value is still on the page (and in the draft).
+          setStatus('Could not save (network or session problem). Your entries are still here — try again.', 'warn');
+        })
+        .then(function () { setBusy(false); refreshAll(); });
+    }
+
+    saveAllBtn.addEventListener('click', function () {
+      if (busy) return;
+      var dirty = dirtyRows();
+      var invalid = dirty.filter(function (tr) { return validateMark(parts(tr).m.value); });
+      if (invalid.length) {
+        invalid.forEach(function (tr) { refreshRow(tr); });
+        invalid[0].scrollIntoView({ block: 'center' });
+        parts(invalid[0]).m.focus();
+        setStatus('Fix ' + invalid.length + ' invalid mark' + (invalid.length === 1 ? '' : 's') + ' first — nothing was saved.', 'warn');
+        return;
+      }
+      // A row cleared back to empty has nothing to save (a mark can't be un-set here): put it back.
+      var toSend = dirty.filter(function (tr) {
+        var p = parts(tr);
+        if (p.m.value.trim() === '' && p.r.value.trim() === '') { resetRow(tr); return false; }
+        return true;
+      });
+      if (!toSend.length) { refreshAll(); setStatus('Nothing to save — no row has new changes.', 'warn'); return; }
+      send(toSend);
+    });
+
+    // ---- bulk "Apply to selected" (full page POST, so validate first) ----
+    var bulkForm = document.getElementById('bulk-evaluate-form');
+    var bulkMarks = document.getElementById('bulk-marks');
+    var bulkRemarks = document.getElementById('bulk-remarks');
+    var bulkErr = document.getElementById('bulk-error');
+    function showBulk(msg) {
+      bulkMarks.classList.toggle('mark-invalid', !!msg);
+      bulkErr.textContent = msg || '';
+      bulkErr.style.display = msg ? 'block' : 'none';
+    }
+    bulkMarks.addEventListener('keydown', function (e) {
+      if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') e.preventDefault();
+    });
+    bulkMarks.addEventListener('input', function () { showBulk(validateMark(bulkMarks.value)); });
+    bulkForm.addEventListener('submit', function (e) {
+      var msg = validateMark(bulkMarks.value);
+      var checked = Array.prototype.slice.call(document.querySelectorAll('.sub-check:checked'));
+      if (!msg && !checked.length) msg = 'Tick at least one row first.';
+      if (!msg && bulkMarks.value.trim() === '' && bulkRemarks.value.trim() === '') msg = 'Enter bulk marks or remarks.';
+      if (msg) { e.preventDefault(); showBulk(msg); bulkMarks.focus(); return; }
+      showBulk('');
+      // The bulk result replaces whatever was typed for those rows — drop their stale drafts.
+      var d = readDraft();
+      checked.forEach(function (c) { delete d[c.value]; });
+      writeDraft(d);
+      leaving = true;
+    });
+
+    // Messages the server sends back by redirect (?error=...) were never shown before.
+    (function () {
+      var m = /[?&]error=([^&]+)/.exec(window.location.search);
+      if (!m) return;
+      var code = decodeURIComponent(m[1]), box = document.getElementById('server-notice');
+      var text = code === 'invalid_marks' ? 'Those marks were not saved — marks must be between 0 and ' + maxLabel() + '.'
+               : code === 'invalid_bulk' ? 'Bulk update not applied — tick at least one row and enter marks (0 – ' + maxLabel() + ') or remarks.'
+               : '';
+      if (text) { box.textContent = text; box.style.display = 'block'; }
+    })();
+
+    // Only matters when the browser can't keep drafts (otherwise a reload restores them).
+    window.addEventListener('beforeunload', function (e) {
+      if (!storageOK && !leaving && dirtyRows().length) { e.preventDefault(); e.returnValue = ''; }
+    });
   })();
 </script>
